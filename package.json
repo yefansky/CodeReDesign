@@ -11,20 +11,30 @@
   ],
   "activationEvents": [
     "onCommand:codeReDesign.generateCvb",
-    "onCommand:codeReDesign.parseCvb"
+    "onCommand:codeReDesign.uploadCvb"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "codeReDesign.generateCvb",
-        "title": "Generate CVB File"
-      },
-      {
-        "command": "codeReDesign.parseCvb",
-        "title": "Parse CVB File"
+      "commands": [
+          {
+              "command": "codeReDesign.generateCvb",
+              "title": "codeReDesign:Generate CVB File"
+          },
+          {
+              "command": "codeReDesign.uploadCvb",
+              "title": "codeReDesign:Upload CVB and Call API"
+          }
+      ],
+      "configuration": {
+          "title": "CodeReDesign",
+          "properties": {
+              "codeReDesign.deepSeekApiKey": {
+                  "type": "string",
+                  "default": "",
+                  "description": "DeepSeek API Key"
+              }
+          }
       }
-    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -53,6 +63,7 @@
   },
   "dependencies": {
     "iconv-lite": "^0.6.3",
-    "jschardet": "^3.1.4"
+    "jschardet": "^3.1.4",
+    "openai": "^4.78.1"
   }
 }
