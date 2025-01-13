@@ -9,7 +9,7 @@ import * as iconv from 'iconv-lite'; // 编码转换库
  */
 export function getCvbFormatDescription(): string {
     return `
-CVB 格式介绍：
+CVB 格式介绍:
 - 文件以 "@@@BEGIN_CVB@@@" 开头，以 "@@@END_CVB@@@" 结尾。
 - 元数据部分以 "@@@META@@@" 开头，以 "@@@END_META@@@" 结尾，包含用户需求和时间戳。
 - 每个文件以 "@@@FILE:文件路径@@@" 开头，以 "@@@END_FILE@@@" 结尾。
@@ -57,8 +57,8 @@ export function generateCvb(filePaths: string[], workspacePath: string, userRequ
     const timestamp = new Date().toISOString();
     let cvbContent = `@@@BEGIN_CVB@@@\n`;
     cvbContent += `@@@META@@@\n`;
-    cvbContent += `@用户需求：${userRequest}\n`;
-    cvbContent += `@时间戳：${timestamp}\n`;
+    cvbContent += `@用户需求: ${userRequest}\n`;
+    cvbContent += `@时间戳: ${timestamp}\n`;
     cvbContent += `@@@END_META@@@\n\n`;
 
     // 生成 CVB 正文（文件内容）
@@ -112,7 +112,7 @@ export function parseCvb(apiResponse: string): {
 
     const metadata: Record<string, string> = {};
     metaMatch[1].trim().split('\n').forEach(line => {
-        const [key, value] = line.split('：'); // 注意：使用中文冒号
+        const [key, value] = line.split(':');
         if (key && value) {
             metadata[key.trim()] = value.trim();
         }

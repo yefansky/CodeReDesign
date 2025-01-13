@@ -9,7 +9,10 @@ import { callDeepSeekApi } from './deepseekApi';
 export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "CodeReDesign" is now active!');
 
-    // 注册命令：选择文件并生成 CVB
+    // 创建输出通道
+    const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
+
+    // 注册命令:选择文件并生成 CVB
     let generateCvbCommand = vscode.commands.registerCommand('codeReDesign.generateCvb', async () => {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
@@ -37,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`CVB file generated at: ${cvbFilePath}`);
     });
 
-    // 注册命令：上传 CVB 并调用 API
+    // 注册命令:上传 CVB 并调用 API
     let uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadCvb', async () => {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
@@ -77,8 +80,8 @@ export function activate(context: vscode.ExtensionContext) {
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
         const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
 
-        // 调用 DeepSeek API
-        const apiResponse = await callDeepSeekApi(cvbContent, userPrompt);
+        // 调用 DeepSeek API（流式模式）
+        const apiResponse = await callDeepSeekApi(cvbContent, userPrompt, outputChannel);
         if (apiResponse) {
             // 解析 API 返回的 CVB 内容
             const { cvbContent, metadata, files } = parseCvb(apiResponse);
@@ -91,7 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, uploadCvbCommand);
+    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, outputChannel);
 }
 
 // 插件停用时调用
