@@ -23,6 +23,10 @@
           {
               "command": "codeReDesign.uploadCvb",
               "title": "codeReDesign:Upload CVB and Call API"
+          },
+          {
+            "command": "codeReDesign.applyCvb",
+            "title": "CodeReDesign: Apply CVB to Workspace"
           }
       ],
       "configuration": {

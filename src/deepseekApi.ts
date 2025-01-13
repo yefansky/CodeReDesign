@@ -63,6 +63,7 @@ ${cvbContent}
                 { role: 'user', content: requestContent },
             ],
             stream: true, // 启用流式模式
+            max_tokens:8192
         });
 
         let fullResponse = '';

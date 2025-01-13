@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
-import { generateCvb, parseCvb } from './cvbManager';
+import { generateCvb, parseCvb, applyCvbToWorkspace } from './cvbManager';
 import { callDeepSeekApi } from './deepseekApi';
 
 // 插件激活时调用
@@ -94,7 +94,45 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, outputChannel);
+    // 注册命令：应用 CVB 到工作目录
+    let applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyCvb', async () => {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            vscode.window.showErrorMessage('No workspace folder found.');
+            return;
+        }
+
+        const workspacePath = workspaceFolders[0].uri.fsPath;
+        const tmpDir = path.join(workspacePath, 'CodeReDesignWorkSpace', 'tmp');
+        const cvbFiles = fs.readdirSync(tmpDir).filter((file: string) => file.endsWith('.cvb'));
+
+        if (cvbFiles.length === 0) {
+            vscode.window.showErrorMessage('No CVB files found in the tmp directory.');
+            return;
+        }
+
+        // 让用户选择要应用的 CVB 文件
+        const selectedCvbFile = await vscode.window.showQuickPick(cvbFiles, {
+            placeHolder: 'Select a CVB file to apply',
+        });
+
+        if (!selectedCvbFile) {
+            return;
+        }
+
+        // 读取 CVB 文件内容
+        const cvbFilePath = path.join(tmpDir, selectedCvbFile);
+        const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
+
+        try {
+            // 应用 CVB 到工作目录
+            applyCvbToWorkspace(cvbContent, workspacePath);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to apply CVB: ${(error as Error).message}`);
+        }
+    });
+
+    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, outputChannel);
 }
 
 // 插件停用时调用

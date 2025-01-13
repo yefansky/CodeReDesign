@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as jschardet from 'jschardet'; // 编码检测库
 import * as iconv from 'iconv-lite'; // 编码转换库
+import * as vscode from 'vscode';
 
 /**
  * 返回 CVB 格式介绍的静态字符串
@@ -81,6 +82,39 @@ export function generateCvb(filePaths: string[], workspacePath: string, userRequ
     fs.writeFileSync(cvbFilePath, cvbContent, 'utf-8');
 
     return cvbFilePath;
+}
+
+/**
+ * 将 CVB 文件内容应用到当前工作目录
+ * @param cvbContent CVB 文件内容
+ * @param workspacePath 当前工作目录路径
+ */
+export function applyCvbToWorkspace(cvbContent: string, workspacePath: string): void {
+    // 解析 CVB 文件内容
+    const { files } = parseCvb(cvbContent);
+
+    // 遍历文件内容
+    for (const [filePath, fileContent] of Object.entries(files)) {
+        // 解析文件路径
+        const normalizedFilePath = path.normalize(filePath);
+
+        // 安全检查：确保文件路径不会超出当前工作目录
+        const absoluteFilePath = path.resolve(workspacePath, normalizedFilePath);
+        if (!absoluteFilePath.startsWith(workspacePath)) {
+            throw new Error(`Invalid file path: ${filePath}. File path is outside the workspace.`);
+        }
+
+        // 创建目录（如果不存在）
+        const dirPath = path.dirname(absoluteFilePath);
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
+        }
+
+        // 写入文件
+        fs.writeFileSync(absoluteFilePath, fileContent, 'utf-8');
+    }
+
+    vscode.window.showInformationMessage('CVB applied successfully!');
 }
 
 /**
