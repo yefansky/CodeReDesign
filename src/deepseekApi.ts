@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { getCvbFormatDescription } from './cvbManager';
 
 /**
- * »ñÈ¡ DeepSeek API Key
+ * è·å– DeepSeek API Key
  * @returns DeepSeek API Key
  */
 function getDeepSeekApiKey(): string | null {
@@ -16,10 +16,10 @@ function getDeepSeekApiKey(): string | null {
 }
 
 /**
- * µ÷ÓÃ DeepSeek API ·¢ËÍÇëÇó
- * @param cvbContent CVB ÎÄ¼şÄÚÈİ
- * @param userRequest ÓÃ»§ÊäÈëµÄÖØ¹¹ĞèÇó
- * @returns API ·µ»ØµÄ CVB ÄÚÈİ
+ * è°ƒç”¨ DeepSeek API å‘é€è¯·æ±‚
+ * @param cvbContent CVB æ–‡ä»¶å†…å®¹
+ * @param userRequest ç”¨æˆ·è¾“å…¥çš„é‡æ„éœ€æ±‚
+ * @returns API è¿”å›çš„ CVB å†…å®¹
  */
 export async function callDeepSeekApi(cvbContent: string, userRequest: string): Promise<string | null> {
     const apiKey = getDeepSeekApiKey();
@@ -28,34 +28,35 @@ export async function callDeepSeekApi(cvbContent: string, userRequest: string): 
     }
 
     try {
-        // ³õÊ¼»¯ OpenAI ¿Í»§¶Ë
+        // åˆå§‹åŒ– OpenAI å®¢æˆ·ç«¯
         const openai = new OpenAI({
             apiKey: apiKey,
-            baseURL: 'https://api.deepseek.com',
+            baseURL: 'https://api.deepseek.com', // ä½¿ç”¨ DeepSeek çš„ API åœ°å€
         });
 
-        // Æ´½ÓÇëÇóÄÚÈİ
+        // æ‹¼æ¥è¯·æ±‚å†…å®¹
         const requestContent = `
-ÓÃ»§ÊäÈëÇëÇó£º
+è¿™æ˜¯æˆ‘çš„éœ€æ±‚:
 ${userRequest}
 
+è¿™æ˜¯ CVB æ ¼å¼çš„è¯´æ˜:
 ${getCvbFormatDescription()}
 
-Çë¶ÁÈ¡ÒÔÏÂ CVB ¸ñÊ½ÄÚÈİ£¬°´ÕÕÇëÇóÖØĞÂÊä³öÒ»¸ö CVB£º
+è¯·è¯»å–ä»¥ä¸‹ CVB æ ¼å¼çš„ä»£ç ï¼ŒæŒ‰ç…§éœ€æ±‚ç»™å‡ºå®Œæ•´ä»£ç ï¼Œå¹¶æŠŠä»–æŒ‰ç…§ CVB æ ¼å¼è½¬æ¢è¾“å‡ºï¼š
 ${cvbContent}
 `;
 
-        // µ÷ÓÃ DeepSeek API
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat',
+        // è°ƒç”¨ DeepSeek API
+        const completion = await openai.chat.completions.create({
+            model: 'deepseek-chat', // ä½¿ç”¨ DeepSeek çš„æ¨¡å‹
             messages: [
                 { role: 'system', content: 'You are a helpful assistant.' },
                 { role: 'user', content: requestContent },
             ],
         });
 
-        // ·µ»Ø API ÏìÓ¦µÄ CVB ÄÚÈİ
-        return response.choices[0].message.content;
+        // è¿”å› API å“åº”çš„ CVB å†…å®¹
+        return completion.choices[0].message.content;
     } catch (error) {
         vscode.window.showErrorMessage('Failed to call DeepSeek API: ' + (error as Error).message);
         return null;
