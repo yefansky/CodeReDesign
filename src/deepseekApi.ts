@@ -65,7 +65,7 @@ ${cvbContent}
         const stream = await openai.chat.completions.create({
             model: 'deepseek-chat', // 使用 DeepSeek 的模型
             messages: [
-                { role: 'system', content: 'You are a helpful assistant.' },
+                { role: 'system', content: '你是一个代码重构工具，你只会按照要求输出cvb格式的结果，不会有思考过程和附加内容。' },
                 { role: 'user', content: requestContent },
             ],
             stream: true, // 启用流式模式
