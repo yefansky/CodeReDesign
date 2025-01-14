@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
-import { generateCvb, parseCvb, applyCvbToWorkspace } from './cvbManager';
-import { callDeepSeekApi } from './deepseekApi';
+import { generateCvb, parseCvb, applyCvbToWorkspace, generateTimestamp } from './cvbManager';
+import { callDeepSeekApi, generateFilenameFromRequest} from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 
 // 插件激活时调用
@@ -48,49 +48,51 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage('No workspace folder found.');
             return;
         }
-
+    
         const workspacePath = workspaceFolders[0].uri.fsPath;
         const tmpDir = path.join(workspacePath, 'CodeReDesignWorkSpace', 'tmp');
         const cvbFiles = fs.readdirSync(tmpDir).filter((file: string) => file.endsWith('.cvb'));
-
+    
         if (cvbFiles.length === 0) {
             vscode.window.showErrorMessage('No CVB files found in the tmp directory.');
             return;
         }
-
-        // 让用户选择要上传的 CVB 文件
+    
         const selectedCvbFile = await vscode.window.showQuickPick(cvbFiles, {
             placeHolder: 'Select a CVB file to upload',
         });
-
+    
         if (!selectedCvbFile) {
             return;
         }
-
-        // 让用户输入提示词
+    
         const userPrompt = await vscode.window.showInputBox({
             prompt: 'Enter your prompt for the refactoring',
             placeHolder: 'e.g., Refactor the code to improve readability',
         });
-
+    
         if (!userPrompt) {
             return;
         }
-
-        // 读取 CVB 文件内容
+    
+        const filenameSummary = await generateFilenameFromRequest(userPrompt);
+        const timestamp = generateTimestamp();
+        let baseFileName = `${timestamp}_${filenameSummary}.cvb`;
+        let fileName = baseFileName;
+        let i = 1;
+        while (fs.existsSync(path.join(tmpDir, fileName))) {
+            fileName = `${timestamp}_${filenameSummary}_${i}.cvb`;
+            i++;
+        }
+    
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
         const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
-
-        // 调用 DeepSeek API（流式模式）
+    
         const apiResponse = await callDeepSeekApi(cvbContent, userPrompt, outputChannel);
         if (apiResponse) {
-            // 解析 API 返回的 CVB 内容
-            const { cvbContent, metadata, files } = parseCvb(apiResponse);
-
-            // 将 API 返回的 CVB 内容保存为新文件
-            const newCvbFilePath = path.join(tmpDir, `${new Date().getTime()}.cvb`);
-            fs.writeFileSync(newCvbFilePath, cvbContent, 'utf-8');
-
+            const { cvbContent: newCvbContent, metadata, files } = parseCvb(apiResponse);
+            const newCvbFilePath = path.join(tmpDir, fileName);
+            fs.writeFileSync(newCvbFilePath, newCvbContent, 'utf-8');
             vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
         }
     });
