@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as jschardet from 'jschardet'; // 编码检测库
 import * as iconv from 'iconv-lite'; // 编码转换库
 import * as vscode from 'vscode';
+import { generateFilenameFromRequest } from './deepseekApi';
 
 // 语言映射表
 const languageMapping: { [key: string]: string } = {
@@ -78,6 +79,17 @@ function isLikelyGBK(buffer: Buffer): boolean {
   return false;
 }
 
+function generateTimestamp(): string {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const hour = now.getHours().toString().padStart(2, '0');
+    const minute = now.getMinutes().toString().padStart(2, '0');
+    const second = now.getSeconds().toString().padStart(2, '0');
+    return `${year}${month}${day}${hour}${minute}${second}`;
+}
+
 /**
  * 生成 CVB 格式的文件
  * @param filePaths 文件路径数组
@@ -85,48 +97,61 @@ function isLikelyGBK(buffer: Buffer): boolean {
  * @param userRequest 用户输入的重构需求
  * @returns 生成的 CVB 文件路径
  */
-export function generateCvb(filePaths: string[], workspacePath: string, userRequest: string): string {
-  // 创建临时目录（如果不存在）
-  const tmpDir = path.join(workspacePath, 'CodeReDesignWorkSpace', 'tmp');
-  if (!fs.existsSync(tmpDir)) {
-    fs.mkdirSync(tmpDir, { recursive: true });
-  }
-
-  // 生成 CVB 头部
-  const timestamp = new Date().toISOString();
-  let cvbContent = `## BEGIN_CVB\n`;
-  cvbContent += `## META\n`;
-  cvbContent += `@用户需求: ${userRequest}\n`;
-  cvbContent += `@时间戳: ${timestamp}\n`;
-  cvbContent += `## END_META\n\n`;
-
-  // 生成 CVB 正文（文件内容）
-  filePaths.forEach(filePath => {
-    try {
-      const fileContent = readFileWithEncoding(filePath);
-      const ext = path.extname(filePath).slice(1).toLowerCase();
-      const lang = languageMapping[ext] || 'text';
-      cvbContent += `## FILE:${filePath}\n`;
-      cvbContent += '```' + lang + '\n';
-      cvbContent += fileContent + '\n';
-      cvbContent += '```\n\n';
-    } catch (error) {
-      console.error(`Failed to read file ${filePath}:`, error);
+export async function generateCvb(filePaths: string[], workspacePath: string, userRequest: string): Promise<string> {
+    // Create temporary directory (if not exists)
+    const tmpDir = path.join(workspacePath, 'CodeReDesignWorkSpace', 'tmp');
+    if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
     }
-  });
 
-  // 添加 CVB 结束标记
-  cvbContent += `## END_CVB\n`;
+    // Generate CVB header
+    const timestamp = generateTimestamp();
+    let cvbContent = `## BEGIN_CVB\n`;
+    cvbContent += `## META\n`;
+    cvbContent += `@用户需求: ${userRequest}\n`;
+    cvbContent += `@时间戳: ${timestamp}\n`;
+    cvbContent += `## END_META\n\n`;
 
-  // 生成 CVB 文件名（使用时间戳）
-  const cvbFilePath = path.join(tmpDir, `${new Date().getTime()}.cvb`);
+    // Generate CVB body (file contents)
+    for (const filePath of filePaths) {
+        try {
+            const fileContent = readFileWithEncoding(filePath);
+            const ext = path.extname(filePath).slice(1).toLowerCase();
+            const lang = languageMapping[ext] || 'text';
+            cvbContent += `## FILE:${filePath}\n`;
+            cvbContent += '```' + lang + '\n';
+            cvbContent += fileContent + '\n';
+            cvbContent += '```\n\n';
+        } catch (error) {
+            console.error(`Failed to read file ${filePath}:`, error);
+        }
+    }
 
-  // 将 CVB 内容写入文件
-  fs.writeFileSync(cvbFilePath, cvbContent, 'utf-8');
+    // Get summary of user request for filename
+    let summary = await generateFilenameFromRequest (userRequest);
+    if (!summary || summary.length === 0) {
+        summary = 'default';
+    }
 
-  return cvbFilePath;
+    // Create the base filename
+    let baseFileName = `${timestamp}_${summary}.cvb`;
+
+    // Ensure the filename is unique
+    let fileName = baseFileName;
+    let i = 1;
+    while (fs.existsSync(path.join(tmpDir, fileName))) {
+        fileName = `${timestamp}_${summary}_${i}.cvb`;
+        i++;
+    }
+
+    // Full path for the CVB file
+    const cvbFilePath = path.join(tmpDir, fileName);
+
+    // Write CVB content to file
+    fs.writeFileSync(cvbFilePath, cvbContent, 'utf-8');
+
+    return cvbFilePath;
 }
-
 /**
  * 解析 CVB 格式内容
  * @param cvbContent CVB 内容

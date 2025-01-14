@@ -87,3 +87,50 @@ ${cvbContent}
         return null;
     }
 }
+
+function cleanFilename(str: string) {
+    // Replace invalid filename characters for Windows with underscores
+    return str.replace(/[\\/:*?"<>|]/g, '_');
+}
+
+export async function generateFilenameFromRequest(userRequest: string): Promise<string> {
+    const apiKey = getDeepSeekApiKey();
+    if (!apiKey) {
+        return 'default';
+    }
+
+    try {
+        const openai = new OpenAI({
+            apiKey: apiKey,
+            baseURL: 'https://api.deepseek.com',
+        });
+
+        const summaryResponse = await openai.chat.completions.create({
+            model: 'deepseek-chat',
+            messages: [
+                { role: 'system', content: '你是一个工具函数，接收请求，只返回纯结果，不要有附加说明.' },
+                { role: 'user', content: `请简单概括一下需求，输出字符串作为文件名。如果描述里有版本名称，这个名称一定要保留并放在开头。 需求："${userRequest}"` },
+            ],
+            max_tokens: 100,
+            temperature: 0,
+        });
+
+        let summary = summaryResponse.choices[0]?.message?.content || '';
+        console.log('Raw Summary:', summary);
+
+        // Clean the summary
+        summary = cleanFilename(summary);
+        summary = summary.replace(/^\.+|\.+$/g, ''); // Remove leading/trailing dots
+        summary = summary.replace(/^ +| +$/g, '');   // Remove leading/trailing spaces
+        summary = summary.substring(0, 15);           // Truncate to 5 characters
+
+        if (summary.length === 0) {
+            summary = 'summary';
+        }
+
+        return summary;
+    } catch (error) {
+        vscode.window.showErrorMessage('Failed to summarize request: ' + (error as Error).message);
+        return 'error';
+    }
+}
