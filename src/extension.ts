@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
 import { generateCvb, parseCvb, applyCvbToWorkspace } from './cvbManager';
 import { callDeepSeekApi } from './deepseekApi';
+import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 
 // 插件激活时调用
 export function activate(context: vscode.ExtensionContext) {
@@ -133,6 +134,8 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, outputChannel);
+
+    setupCvbAsMarkdown(context);
 }
 
 // 插件停用时调用

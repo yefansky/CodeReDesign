@@ -36,6 +36,11 @@
                   "type": "string",
                   "default": "",
                   "description": "DeepSeek API Key"
+              },
+              "codeReDesign.treatCvbAsMarkdown": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Treat .cvb files as Markdown"
               }
           }
       }
