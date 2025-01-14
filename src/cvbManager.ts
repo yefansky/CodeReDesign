@@ -27,8 +27,19 @@ CVB 格式介绍:
 function readFileWithEncoding(filePath: string): string {
     const buffer = fs.readFileSync(filePath);
     const detected = jschardet.detect(buffer);
-    const encoding = detected.encoding.toLowerCase();
+    let encoding = detected.encoding.toLowerCase();
 
+    // 如果检测结果为 ascii，进一步判断是否为 GBK
+    if (encoding === 'ascii') {
+        // 检查是否包含 GBK 特有的双字节字符
+        if (isLikelyGBK(buffer)) {
+            encoding = 'gbk';
+        } else {
+            encoding = 'utf-8'; // 默认使用 UTF-8
+        }
+    }
+
+    // 根据编码进行转换
     if (encoding === 'utf-8') {
         return buffer.toString('utf-8');
     }
@@ -38,6 +49,24 @@ function readFileWithEncoding(filePath: string): string {
     }
 
     throw new Error(`Unsupported encoding: ${encoding}`);
+}
+
+/**
+ * 判断 buffer 是否可能是 GBK 编码
+ * @param buffer 文件内容的 buffer
+ * @returns 是否为 GBK 编码
+ */
+function isLikelyGBK(buffer: Buffer): boolean {
+    for (let i = 0; i < buffer.length; i++) {
+        // GBK 双字节字符的第一个字节范围是 0x81-0xFE
+        if (buffer[i] >= 0x81 && buffer[i] <= 0xFE) {
+            // 检查下一个字节是否在 GBK 范围内
+            if (i + 1 < buffer.length && (buffer[i + 1] >= 0x40 && buffer[i + 1] <= 0xFE)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /**
@@ -85,6 +114,61 @@ export function generateCvb(filePaths: string[], workspacePath: string, userRequ
 }
 
 /**
+ * 解析 API 返回的字符串，提取 CVB 格式内容
+ * @param apiResponse API 返回的字符串
+ * @returns 包含 CVB 字符串、元数据和文件内容的对象
+ */
+export function parseCvb(apiResponse: string): {
+    cvbContent: string;
+    metadata: Record<string, string>;
+    files: Record<string, string>;
+} {
+    const cvbStartIndex = apiResponse.indexOf('@@@BEGIN_CVB@@@');
+    const cvbEndIndex = apiResponse.indexOf('@@@END_CVB@@@');
+
+    if (cvbStartIndex === -1 || cvbEndIndex === -1) {
+        throw new Error('Invalid API response: missing CVB format markers.');
+    }
+
+    const cvbContent = apiResponse.slice(cvbStartIndex, cvbEndIndex + '@@@END_CVB@@@'.length);
+
+    // 提取元数据部分
+    const metaMatch = cvbContent.match(/@@@META@@@([\s\S]*?)@@@END_META@@@/);
+    if (!metaMatch) {
+        throw new Error('Invalid CVB format: missing META section.');
+    }
+
+    const metadata: Record<string, string> = {};
+    metaMatch[1].trim().split('\n').forEach(line => {
+        const parts = line.split(':');
+        if (parts.length >= 2) {
+            const key = parts.shift()?.trim();
+            const value = parts.join(':').trim();
+            if (key) {
+                metadata[key] = value;
+            }
+        }
+    });
+
+    // 提取文件内容部分
+    const files: Record<string, string> = {};
+    const fileRegex = /@@@FILE:(.*?)@@@([\s\S]*?)@@@END_FILE@@@/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = fileRegex.exec(cvbContent)) !== null) {
+        const filePath = match[1];
+        const fileContent = match[2].trim();
+        files[filePath] = fileContent;
+    }
+
+    return {
+        cvbContent,
+        metadata,
+        files,
+    };
+}
+
+/**
  * 将 CVB 文件内容应用到当前工作目录
  * @param cvbContent CVB 文件内容
  * @param workspacePath 当前工作目录路径
@@ -115,55 +199,4 @@ export function applyCvbToWorkspace(cvbContent: string, workspacePath: string): 
     }
 
     vscode.window.showInformationMessage('CVB applied successfully!');
-}
-
-/**
- * 解析 API 返回的字符串，提取 CVB 格式内容
- * @param apiResponse API 返回的字符串
- * @returns 包含 CVB 字符串、元数据和文件内容的对象
- */
-export function parseCvb(apiResponse: string): {
-    cvbContent: string; // 纯字符串形式的 CVB 内容
-    metadata: Record<string, string>; // 元数据
-    files: Record<string, string>; // 文件内容
-} {
-    // 检查是否包含 CVB 格式的起始和结束标记
-    const cvbStartIndex = apiResponse.indexOf('@@@BEGIN_CVB@@@');
-    const cvbEndIndex = apiResponse.indexOf('@@@END_CVB@@@');
-
-    if (cvbStartIndex === -1 || cvbEndIndex === -1) {
-        throw new Error('Invalid API response: missing CVB format markers.');
-    }
-
-    // 提取 CVB 内容部分
-    const cvbContent = apiResponse.slice(cvbStartIndex, cvbEndIndex + '@@@END_CVB@@@'.length);
-
-    // 提取元数据部分
-    const metaMatch = cvbContent.match(/@@@META@@@([\s\S]*?)@@@END_META@@@/);
-    if (!metaMatch) {
-        throw new Error('Invalid CVB format: missing META section.');
-    }
-
-    const metadata: Record<string, string> = {};
-    metaMatch[1].trim().split('\n').forEach(line => {
-        const [key, value] = line.split(':');
-        if (key && value) {
-            metadata[key.trim()] = value.trim();
-        }
-    });
-
-    // 提取文件内容部分
-    const files: Record<string, string> = {};
-    const fileSections = cvbContent.split('@@@FILE:');
-    fileSections.slice(1).forEach(section => {
-        const [filePath, fileContent] = section.split('@@@END_FILE@@@');
-        const normalizedFilePath = filePath.trim();
-        files[normalizedFilePath] = fileContent.trim();
-    });
-
-    return {
-        cvbContent, // 返回纯字符串形式的 CVB 内容
-        metadata,   // 返回元数据
-        files,      // 返回文件内容
-    };
 }

@@ -15,7 +15,7 @@ export async function selectFiles(): Promise<string[]> {
     const workspacePath = workspaceFolders[0].uri.fsPath;
 
     // 获取当前目录下的所有源文件
-    const files = await vscode.workspace.findFiles('**/*.{cpp,hpp,py,lua,ts,js}'); // 支持的文件类型
+    const files = await vscode.workspace.findFiles('**/*.{cpp,h,c,cxx,hpp,py,lua,ls,lh,ts,js}'); // 支持的文件类型
     const filePaths = files.map(file => file.fsPath);
 
     // 显示文件选择面板

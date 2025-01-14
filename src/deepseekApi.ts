@@ -47,7 +47,13 @@ ${userRequest}
 这是 CVB 格式的说明:
 ${getCvbFormatDescription()}
 
-请读取以下 CVB 格式的代码，按照需求给出完整代码，并把他按照 CVB 格式转换输出:
+请读取以下 CVB 格式的代码，按照需求写代码，
+注意：
+如果我要你移动代码，其实是让你去修改原始代码，重新封装到新位置，所以不是让你简单的把代码拷贝到新为止
+记住你是个代码重构助手
+任何时候都要保证修改完的代码是完整的可执行的，不能有省略
+
+最后的输出需要时 CVB 格式， （注意要完整输出所有文件，不管是否有修改，CVB是一个当前所有文件的快照，所以你不能偷懒）:
 ${cvbContent}
 `;
 
@@ -63,7 +69,8 @@ ${cvbContent}
                 { role: 'user', content: requestContent },
             ],
             stream: true, // 启用流式模式
-            max_tokens:8192
+            max_tokens: 8192,
+            temperature: 0
         });
 
         let fullResponse = '';
