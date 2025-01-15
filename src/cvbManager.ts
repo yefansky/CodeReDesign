@@ -152,6 +152,7 @@ export async function generateCvb(filePaths: string[], workspacePath: string, us
 
     return cvbFilePath;
 }
+
 /**
  * 解析 CVB 格式内容
  * @param cvbContent CVB 内容
@@ -162,23 +163,34 @@ export function parseCvb(cvbContent: string): {
   metadata: Record<string, string>;
   files: Record<string, string>;
 } {
-  const cvbStartIndex = cvbContent.indexOf('## BEGIN_CVB');
-  const cvbEndIndex = cvbContent.indexOf('## END_CVB');
-
-  if (cvbStartIndex === -1 || cvbEndIndex === -1) {
-    throw new Error('Invalid CVB format: missing BEGIN or END markers.');
+  // 匹配## BEGIN_CVB在行首的位置
+  const cvbStartRegex = /^## BEGIN_CVB/m;
+  const cvbStartMatch = cvbStartRegex.exec(cvbContent);
+  if (!cvbStartMatch) {
+    throw new Error('Invalid CVB format: missing BEGIN_CVB marker.');
   }
+  const cvbStartIndex = cvbStartMatch.index;
 
-  const content = cvbContent.slice(cvbStartIndex, cvbEndIndex + '## END_CVB'.length);
+  // 匹配## END_CVB在行首的位置
+  const cvbEndRegex = /^## END_CVB/m;
+  const cvbEndMatch = cvbEndRegex.exec(cvbContent);
+  if (!cvbEndMatch) {
+    throw new Error('Invalid CVB format: missing END_CVB marker.');
+  }
+  const cvbEndIndex = cvbEndMatch.index;
+
+  // 提取CVB内容，包括## BEGIN_CVB和## END_CVB
+  const cvbContentStr = cvbContent.slice(cvbStartIndex, cvbEndIndex + cvbEndMatch[0].length);
 
   // 提取元数据部分
-  const metaMatch = content.match(/## META([\s\S]*?)## END_META/);
+  const metaRegex = /^## META\n([\s\S]*?)^## END_META/m;
+  const metaMatch = metaRegex.exec(cvbContentStr);
   if (!metaMatch) {
     throw new Error('Invalid CVB format: missing META section.');
   }
-
   const metadata: Record<string, string> = {};
-  metaMatch[1].trim().split('\n').forEach(line => {
+  const metaContent = metaMatch[1].trim().split('\n');
+  metaContent.forEach(line => {
     const parts = line.split(':');
     if (parts.length >= 2) {
       const key = parts.shift()?.trim();
@@ -191,24 +203,23 @@ export function parseCvb(cvbContent: string): {
 
   // 提取文件内容部分
   const files: Record<string, string> = {};
-  const fileRegex = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|## END_CVB)/gm;
+  const fileRegex = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
   let match: RegExpExecArray | null;
 
-  while ((match = fileRegex.exec(content)) !== null) {
+  while ((match = fileRegex.exec(cvbContentStr)) !== null) {
     const filePath = match[1];
-    const fileContent = match[2].trim();
+    let fileContent = match[2].trim();
     // 去除代码块标记
-    const codeBlockRegex = /^```.*\n([\s\S]*?)\n```$/;
-    const codeBlockMatch = fileContent.match(codeBlockRegex);
+    const codeBlockRegex = /^```.*\n([\s\S]*?)\n```$/m;
+    const codeBlockMatch = codeBlockRegex.exec(fileContent);
     if (codeBlockMatch) {
-      files[filePath] = codeBlockMatch[1];
-    } else {
-      files[filePath] = fileContent;
+      fileContent = codeBlockMatch[1];
     }
+    files[filePath] = fileContent;
   }
 
   return {
-    cvbContent: content,
+    cvbContent: cvbContentStr,
     metadata,
     files,
   };
