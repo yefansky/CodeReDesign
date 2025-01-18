@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
 import { generateCvb, parseCvb, applyCvbToWorkspace, generateTimestamp } from './cvbManager';
-import { callDeepSeekApi, generateFilenameFromRequest} from './deepseekApi';
+import { queryCodeReDesign, generateFilenameFromRequest} from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 
 // 插件激活时调用
@@ -88,7 +88,7 @@ export function activate(context: vscode.ExtensionContext) {
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
         const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
     
-        const apiResponse = await callDeepSeekApi(cvbContent, userPrompt, outputChannel);
+        const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel);
         if (apiResponse) {
             const { cvbContent: newCvbContent, metadata, files } = parseCvb(apiResponse);
             const newCvbFilePath = path.join(tmpDir, fileName);
