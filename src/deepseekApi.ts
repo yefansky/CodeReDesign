@@ -15,11 +15,21 @@ function getDeepSeekApiKey(): string | null {
     return apiKey;
 }
 
+/**
+ * 调用 DeepSeek API
+ * @param userContent 用户输入内容
+ * @param systemContent 系统提示内容
+ * @param outputChannel 输出通道，用于实时显示流式内容
+ * @param streamMode 是否启用流式模式
+ * @param endstring 结束字符串，用于检查输出是否包含特定字符串
+ * @returns API 返回的完整内容
+ */
 async function callDeepSeekApi(
     userContent: string,
     systemContent: string = 'You are a helpful assistant.',
     outputChannel?: vscode.OutputChannel,
-    streamMode: boolean = true
+    streamMode: boolean = true,
+    endstring?: string
 ): Promise<string | null> {
     const apiKey = getDeepSeekApiKey();
     if (!apiKey) {
@@ -42,9 +52,11 @@ async function callDeepSeekApi(
             { role: 'user', content: userContent },
         ];
         let fullResponse = '';
-        let continueResponse = true;
+        let maxAttempts = 5;
+        let attempts = 0;
 
-        while (continueResponse) {
+        while (attempts < maxAttempts) {
+            attempts++;
             const response = await openai.chat.completions.create({
                 model: 'deepseek-chat',
                 messages: messages_body,
@@ -53,41 +65,53 @@ async function callDeepSeekApi(
                 temperature: 0
             });
 
+            let chunkResponse = '';
+            let finishReason: string | null = null;
+
             if (streamMode) {
-                let lastChunk: any = null;
                 for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
                     const content = chunk.choices[0]?.delta?.content || '';
-                    fullResponse += content;
+                    chunkResponse += content;
                     if (outputChannel) {
                         outputChannel.append(content);
                     }
-                    lastChunk = chunk;
-                }
-                // 检查最后的 finish_reason
-                if (lastChunk && lastChunk.choices[0].finish_reason === 'length') {
-                    // 需要继续
-                    messages_body.push({ role: 'user', content: 'Please continue.' });
-                } else {
-                    continueResponse = false;
+                    finishReason = chunk.choices[0]?.finish_reason || null;
                 }
             } else {
-                fullResponse = (response as OpenAI.Chat.Completions.ChatCompletion).choices[0].message.content || "";
+                const completion = response as OpenAI.Chat.Completions.ChatCompletion;
+                chunkResponse = completion.choices[0].message.content || "";
+                finishReason = completion.choices[0].finish_reason || null;
                 if (outputChannel) {
-                    outputChannel.append(fullResponse);
-                }
-                if ((response as OpenAI.Chat.Completions.ChatCompletion).choices[0].finish_reason === 'length') {
-                    // 需要继续
-                    messages_body.push({ role: 'user', content: 'Please continue.' });
-                } else {
-                    continueResponse = false;
+                    outputChannel.append(chunkResponse);
                 }
             }
+
+            // 累积完整响应
+            fullResponse += chunkResponse;
+
+            // 检查终止条件
+            const shouldContinue = 
+                finishReason === 'length' || 
+                (endstring && !fullResponse.includes(endstring));
+
+            if (!shouldContinue) {break};
+
+            // 准备下一次请求
+            messages_body.push(
+                { role: 'assistant', content: fullResponse },
+                { role: 'user', content: '你的输出被截断了，请继续输出剩余部分:' }
+            );
+        }
+
+        // 最终检查
+        if (endstring && !fullResponse.includes(endstring)) {
+            vscode.window.showWarningMessage('响应未包含结束标记');
         }
 
         return fullResponse;
 
     } catch (error) {
-        vscode.window.showErrorMessage('Failed to call DeepSeek API: ' + (error as Error).message);
+        vscode.window.showErrorMessage('API调用失败: ' + (error as Error).message);
         return null;
     }
 }
@@ -121,14 +145,24 @@ ${getCvbFormatDescription()}
 ${cvbContent}
 `;
 
-    return callDeepSeekApi(requestContent, undefined, outputChannel, true);
+    return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_CVB'); // 添加结束字符串
 }
 
+/**
+ * 清理文件名
+ * @param str 原始字符串
+ * @returns 清理后的文件名
+ */
 function cleanFilename(str: string) {
-    // Replace invalid filename characters for Windows with underscores
+    // 替换 Windows 文件名中的非法字符
     return str.replace(/[\\/:*?"<>|]/g, '_');
 }
 
+/**
+ * 根据用户需求生成文件名
+ * @param userRequest 用户需求
+ * @returns 生成的文件名
+ */
 export async function generateFilenameFromRequest(userRequest: string): Promise<string> {
     const summaryResponse = await callDeepSeekApi(
         `请简单概括一下需求，输出字符串作为文件名。如果描述里有版本名称，这个名称一定要保留并放在开头。 需求："${userRequest}"`,
@@ -140,11 +174,11 @@ export async function generateFilenameFromRequest(userRequest: string): Promise<
     let summary = summaryResponse || '';
     console.log('Raw Summary:', summary);
 
-    // Clean the summary
+    // 清理文件名
     summary = cleanFilename(summary);
-    summary = summary.replace(/^\.+|\.+$/g, ''); // Remove leading/trailing dots
-    summary = summary.replace(/^ +| +$/g, '');   // Remove leading/trailing spaces
-    summary = summary.substring(0, 15);           // Truncate to 15 characters
+    summary = summary.replace(/^\.+|\.+$/g, ''); // 移除开头和结尾的点
+    summary = summary.replace(/^ +| +$/g, '');   // 移除开头和结尾的空格
+    summary = summary.substring(0, 15);           // 截取前15个字符
 
     if (summary.length === 0) {
         summary = 'summary';
@@ -152,4 +186,3 @@ export async function generateFilenameFromRequest(userRequest: string): Promise<
 
     return summary;
 }
-
