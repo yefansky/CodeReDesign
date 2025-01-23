@@ -15,14 +15,6 @@ function getDeepSeekApiKey(): string | null {
     return apiKey;
 }
 
-/**
- * 调用 DeepSeek API 的统一函数
- * @param userContent 用户输入的内容
- * @param systemContent 系统提示词，可选（默认是 "You are a helpful assistant."）
- * @param outputChannel 输出通道，用于实时显示流式内容
- * @param streamMode 是否启用流式模式，默认为 true
- * @returns API 返回的完整内容
- */
 async function callDeepSeekApi(
     userContent: string,
     systemContent: string = 'You are a helpful assistant.',
@@ -35,45 +27,60 @@ async function callDeepSeekApi(
     }
 
     try {
-        // 初始化 OpenAI 客户端
         const openai = new OpenAI({
             apiKey: apiKey,
-            baseURL: 'https://api.deepseek.com', // 使用 DeepSeek 的 API 地址
+            baseURL: 'https://api.deepseek.com',
         });
 
-        // 清空输出通道并显示
         if (outputChannel) {
             outputChannel.clear();
             outputChannel.show();
         }
 
-        // 调用 OpenAI API
-        const response = await openai.chat.completions.create({
-            model: 'deepseek-chat', // 使用 DeepSeek 的模型
-            messages: [
-                { role: 'system', content: systemContent },
-                { role: 'user', content: userContent },
-            ],
-            stream: streamMode, // 是否启用流式模式
-            max_tokens: 8192,
-            temperature: 0
-        });
-
+        const messages_body: OpenAI.ChatCompletionMessageParam[] = [
+            { role: 'system', content: systemContent },
+            { role: 'user', content: userContent },
+        ];
         let fullResponse = '';
-        if (streamMode) {
-            // 处理流式响应
-            for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
-                const content = chunk.choices[0]?.delta?.content || '';
-                fullResponse += content;
-                if (outputChannel) {
-                    outputChannel.append(content); // 实时输出到通道
+        let continueResponse = true;
+
+        while (continueResponse) {
+            const response = await openai.chat.completions.create({
+                model: 'deepseek-chat',
+                messages: messages_body,
+                stream: streamMode,
+                max_tokens: 8192,
+                temperature: 0
+            });
+
+            if (streamMode) {
+                let lastChunk: any = null;
+                for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+                    const content = chunk.choices[0]?.delta?.content || '';
+                    fullResponse += content;
+                    if (outputChannel) {
+                        outputChannel.append(content);
+                    }
+                    lastChunk = chunk;
                 }
-            }
-        } else {
-            // 处理非流式响应
-            fullResponse = (response as OpenAI.Chat.Completions.ChatCompletion).choices[0].message.content || "";
-            if (outputChannel) {
-                outputChannel.append(fullResponse);
+                // 检查最后的 finish_reason
+                if (lastChunk && lastChunk.choices[0].finish_reason === 'length') {
+                    // 需要继续
+                    messages_body.push({ role: 'user', content: 'Please continue.' });
+                } else {
+                    continueResponse = false;
+                }
+            } else {
+                fullResponse = (response as OpenAI.Chat.Completions.ChatCompletion).choices[0].message.content || "";
+                if (outputChannel) {
+                    outputChannel.append(fullResponse);
+                }
+                if ((response as OpenAI.Chat.Completions.ChatCompletion).choices[0].finish_reason === 'length') {
+                    // 需要继续
+                    messages_body.push({ role: 'user', content: 'Please continue.' });
+                } else {
+                    continueResponse = false;
+                }
             }
         }
 
