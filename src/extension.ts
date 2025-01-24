@@ -22,7 +22,6 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const workspacePath = workspaceFolders[0].uri.fsPath;
         const selectedFiles = await selectFiles();
         if (selectedFiles.length === 0) {
             vscode.window.showErrorMessage('No files selected.');
@@ -38,7 +37,7 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const cvbFilePath = generateCvb(selectedFiles, workspacePath, userRequest);
+        const cvbFilePath = generateCvb(selectedFiles, userRequest);
         vscode.window.showInformationMessage(`CVB file generated at: ${cvbFilePath}`);
     });
 
@@ -130,7 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         try {
             // 应用 CVB 到工作目录
-            applyCvbToWorkspace(cvbContent, workspacePath);
+            applyCvbToWorkspace(cvbContent);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to apply CVB: ${(error as Error).message}`);
         }

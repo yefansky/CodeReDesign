@@ -1,27 +1,27 @@
 import * as vscode from 'vscode';
 
 export function setupCvbAsMarkdown(context: vscode.ExtensionContext) {
-    // »ñÈ¡ÅäÖÃ
+    // èŽ·å–é…ç½®
     const config = vscode.workspace.getConfiguration('codeReDesign');
     const treatCvbAsMarkdown = config.get('treatCvbAsMarkdown', true);
 
-    // ÓÃÓÚ´æ´¢Ô­Ê¼ÓïÑÔÄ£Ê½
+    // ç”¨äºŽå­˜å‚¨åŽŸå§‹è¯­è¨€æ¨¡å¼
     const originalLanguages: { [key: string]: string } = {};
 
     /**
-     * ÉèÖÃ .cvb ÎÄ¼þµÄÓïÑÔÄ£Ê½
-     * @param enabled ÊÇ·ñ½« .cvb ÎÄ¼þÊÓÎª Markdown
+     * è®¾ç½® .cvb æ–‡ä»¶çš„è¯­è¨€æ¨¡å¼
+     * @param enabled æ˜¯å¦å°† .cvb æ–‡ä»¶è§†ä¸º Markdown
      */
     function setLanguageForCvbDocuments(enabled: boolean) {
         vscode.workspace.textDocuments.forEach(doc => {
             if (doc.fileName.endsWith('.cvb')) {
                 if (enabled) {
-                    // ±£´æÔ­Ê¼ÓïÑÔÄ£Ê½
+                    // ä¿å­˜åŽŸå§‹è¯­è¨€æ¨¡å¼
                     originalLanguages[doc.uri.toString()] = doc.languageId;
-                    // ÉèÖÃÎª Markdown
+                    // è®¾ç½®ä¸º Markdown
                     vscode.languages.setTextDocumentLanguage(doc, 'markdown');
                 } else {
-                    // »Ö¸´Ô­Ê¼ÓïÑÔÄ£Ê½
+                    // æ¢å¤åŽŸå§‹è¯­è¨€æ¨¡å¼
                     const originalLanguage = originalLanguages[doc.uri.toString()];
                     if (originalLanguage) {
                         vscode.languages.setTextDocumentLanguage(doc, originalLanguage);
@@ -32,12 +32,12 @@ export function setupCvbAsMarkdown(context: vscode.ExtensionContext) {
         });
     }
 
-    // ³õÊ¼»¯Ê±ÉèÖÃÓïÑÔÄ£Ê½
+    // åˆå§‹åŒ–æ—¶è®¾ç½®è¯­è¨€æ¨¡å¼
     if (treatCvbAsMarkdown) {
         setLanguageForCvbDocuments(true);
     }
 
-    // ¼àÌýÎÄ¼þ´ò¿ªÊÂ¼þ
+    // ç›‘å¬æ–‡ä»¶æ‰“å¼€äº‹ä»¶
     const openDocumentListener = vscode.workspace.onDidOpenTextDocument(document => {
         if (document.fileName.endsWith('.cvb') && treatCvbAsMarkdown) {
             originalLanguages[document.uri.toString()] = document.languageId;
@@ -46,7 +46,7 @@ export function setupCvbAsMarkdown(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(openDocumentListener);
 
-    // ¼àÌýÅäÖÃ±ä»¯
+    // ç›‘å¬é…ç½®å˜åŒ–
     const configChangeListener = vscode.workspace.onDidChangeConfiguration((e: vscode.ConfigurationChangeEvent) => {
         if (e.affectsConfiguration('codeReDesign.treatCvbAsMarkdown')) {
             const newValue = config.get('treatCvbAsMarkdown', true);

@@ -93,11 +93,17 @@ export function generateTimestamp(): string {
 /**
  * 生成 CVB 格式的文件
  * @param filePaths 文件路径数组
- * @param workspacePath 工作目录路径
  * @param userRequest 用户输入的重构需求
  * @returns 生成的 CVB 文件路径
  */
-export async function generateCvb(filePaths: string[], workspacePath: string, userRequest: string): Promise<string> {
+export async function generateCvb(filePaths: string[], userRequest: string): Promise<string> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        throw new Error('No workspace folder found.');
+    }
+
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+
     // Create temporary directory (if not exists)
     const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
     if (!fs.existsSync(tmpDir)) {
@@ -228,9 +234,15 @@ export function parseCvb(cvbContent: string): {
 /**
  * 将 CVB 文件内容应用到当前工作目录
  * @param cvbContent CVB 文件内容
- * @param workspacePath 当前工作目录路径
  */
-export function applyCvbToWorkspace(cvbContent: string, workspacePath: string): void {
+export function applyCvbToWorkspace(cvbContent: string): void {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders) {
+    throw new Error('No workspace folder found.');
+  }
+
+  const workspacePath = workspaceFolders[0].uri.fsPath;
+
   // 解析 CVB 文件内容
   const { files } = parseCvb(cvbContent);
 

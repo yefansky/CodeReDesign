@@ -131,7 +131,7 @@ function applyCvb(filePath: string) {
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (workspaceFolders) {
-    applyCvbToWorkspace(cvbContent, workspaceFolders[0].uri.path);
+    applyCvbToWorkspace(cvbContent);
   }
 }
 
