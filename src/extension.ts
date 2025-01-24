@@ -3,8 +3,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
 import { generateCvb, parseCvb, applyCvbToWorkspace, generateTimestamp } from './cvbManager';
-import { queryCodeReDesign, generateFilenameFromRequest} from './deepseekApi';
+import { queryCodeReDesign, generateFilenameFromRequest } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
+import { registerCvbContextMenu } from './siderBar';
 
 // 插件激活时调用
 export function activate(context: vscode.ExtensionContext) {
@@ -50,7 +51,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     
         const workspacePath = workspaceFolders[0].uri.fsPath;
-        const tmpDir = path.join(workspacePath, 'CodeReDesignWorkSpace', 'tmp');
+        const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
         const cvbFiles = fs.readdirSync(tmpDir).filter((file: string) => file.endsWith('.cvb'));
     
         if (cvbFiles.length === 0) {
@@ -106,7 +107,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const workspacePath = workspaceFolders[0].uri.fsPath;
-        const tmpDir = path.join(workspacePath, 'CodeReDesignWorkSpace', 'tmp');
+        const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
         const cvbFiles = fs.readdirSync(tmpDir).filter((file: string) => file.endsWith('.cvb'));
 
         if (cvbFiles.length === 0) {
@@ -138,6 +139,9 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, outputChannel);
 
     setupCvbAsMarkdown(context);
+
+    // 注册右键菜单
+    registerCvbContextMenu(context);
 }
 
 // 插件停用时调用

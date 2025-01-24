@@ -9,41 +9,58 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:codeReDesign.generateCvb",
-    "onCommand:codeReDesign.uploadCvb"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
-      "commands": [
-          {
-              "command": "codeReDesign.generateCvb",
-              "title": "codeReDesign:Generate CVB File"
-          },
-          {
-              "command": "codeReDesign.uploadCvb",
-              "title": "codeReDesign:Upload CVB and Call API"
-          },
-          {
-            "command": "codeReDesign.applyCvb",
-            "title": "CodeReDesign: Apply CVB to Workspace"
-          }
-      ],
-      "configuration": {
-          "title": "CodeReDesign",
-          "properties": {
-              "codeReDesign.deepSeekApiKey": {
-                  "type": "string",
-                  "default": "",
-                  "description": "DeepSeek API Key"
-              },
-              "codeReDesign.treatCvbAsMarkdown": {
-                  "type": "boolean",
-                  "default": true,
-                  "description": "Treat .cvb files as Markdown"
-              }
-          }
+    "commands": [
+      {
+        "command": "codeReDesign.generateCvb",
+        "title": "codeReDesign:Generate CVB File"
+      },
+      {
+        "command": "codeReDesign.uploadCvb",
+        "title": "codeReDesign:Upload CVB and Call API"
+      },
+      {
+        "command": "codeReDesign.applyCvb",
+        "title": "CodeReDesign: Apply CVB to Workspace"
+      },
+      {
+        "command": "codeReDesign.applyThisCvb",
+        "title": "CodeReDesign: Apply this CVB to Workspace"
       }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "codeReDesign.cvbView",
+          "name": "CVB Actions"
+        }
+      ]
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "codeReDesign.applyThisCvb",
+          "when": "resourceExtname  == .cvb",
+          "group": "cvb@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeReDesign",
+      "properties": {
+        "codeReDesign.deepSeekApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "DeepSeek API Key"
+        },
+        "codeReDesign.treatCvbAsMarkdown": {
+          "type": "boolean",
+          "default": true,
+          "description": "Treat .cvb files as Markdown"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

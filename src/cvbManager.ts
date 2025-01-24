@@ -99,7 +99,7 @@ export function generateTimestamp(): string {
  */
 export async function generateCvb(filePaths: string[], workspacePath: string, userRequest: string): Promise<string> {
     // Create temporary directory (if not exists)
-    const tmpDir = path.join(workspacePath, 'CodeReDesignWorkSpace', 'tmp');
+    const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
     if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true });
     }
