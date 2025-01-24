@@ -15,6 +15,16 @@ function getDeepSeekApiKey(): string | null {
     return apiKey;
 }
 
+
+const model_name =  "deepseek-chat";
+const apiBaseURL = "https://api.deepseek.com";
+
+// const model_name =  "deepseek-reasoner";
+// const apiBaseURL = "https://api.deepseek.com";
+
+// const model_name =  "deepseek-coder-v2";
+// const apiBaseURL = "http://10.11.39.58:31084";
+
 /**
  * 调用 DeepSeek API
  * @param userContent 用户输入内容
@@ -39,7 +49,7 @@ async function callDeepSeekApi(
     try {
         const openai = new OpenAI({
             apiKey: apiKey,
-            baseURL: 'https://api.deepseek.com',
+            baseURL: apiBaseURL,
         });
 
         if (outputChannel) {
@@ -58,7 +68,7 @@ async function callDeepSeekApi(
         while (attempts < maxAttempts) {
             attempts++;
             const response = await openai.chat.completions.create({
-                model: 'deepseek-chat',
+                model: model_name,
                 messages: messages_body,
                 stream: streamMode,
                 max_tokens: 8192,
