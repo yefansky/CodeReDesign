@@ -39,9 +39,10 @@ export function setupCvbAsMarkdown(context: vscode.ExtensionContext) {
 
     // 监听文件打开事件
     const openDocumentListener = vscode.workspace.onDidOpenTextDocument(document => {
-        if (document.fileName.endsWith('.cvb') && treatCvbAsMarkdown) {
-            originalLanguages[document.uri.toString()] = document.languageId;
-            vscode.languages.setTextDocumentLanguage(document, 'markdown');
+        if (document.fileName.endsWith('.cvb') &&  treatCvbAsMarkdown) {
+            if (document.languageId !== 'markdown') {
+                vscode.languages.setTextDocumentLanguage(document, 'markdown');
+            }
         }
     });
     context.subscriptions.push(openDocumentListener);
