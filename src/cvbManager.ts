@@ -133,6 +133,9 @@ export async function generateCvb(filePaths: string[], userRequest: string): Pro
         }
     }
 
+    // 添加 CVB 结束标记
+    cvbContent += `## END_CVB\n`;
+    
     // Get summary of user request for filename
     let summary = await generateFilenameFromRequest (userRequest);
     if (!summary || summary.length === 0) {
