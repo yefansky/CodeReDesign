@@ -30,5 +30,5 @@ jobs:
       - name: Publish to Marketplace
         uses: HaaLeo/publish-vscode-extension@v1  # 第三方 Action 简化发布
         with:
-          pat: ${{ secrets.VSCODE_TOKEN }}  # 引用 GitHub Secret
+          pat: ${{ secrets.SHELLING }}  # 引用 GitHub Secret
           skipDuplicate: true  # 忽略重复版本错误
