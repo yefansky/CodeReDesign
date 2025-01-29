@@ -11,6 +11,16 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:codeReDesign.generateCvb",
+    "onCommand:codeReDesign.uploadCvb",
+    "onCommand:codeReDesign.applyCvb",
+    "onCommand:codeReDesign.applyThisCvb"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yefansky/CodeReDesign"
+  },
   "contributes": {
     "commands": [
       {

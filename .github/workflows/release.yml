@@ -1,0 +1,34 @@
+name: Publish VS Code Extension
+
+on:
+  push:
+    branches: [ "main" ]  # 主分支推送时触发
+  workflow_dispatch:      # 允许手动触发
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package Extension
+        run: vsce package  # 生成 .vsix 文件
+
+      - name: Publish to Marketplace
+        uses: HaaLeo/publish-vscode-extension@v1  # 第三方 Action 简化发布
+        with:
+          pat: ${{ secrets.VSCODE_TOKEN }}  # 引用 GitHub Secret
+          skipDuplicate: true  # 忽略重复版本错误
