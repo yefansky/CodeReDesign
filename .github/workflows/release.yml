@@ -39,7 +39,7 @@ jobs:
         run: vsce package  # 生成 .vsix 文件
 
       - name: Publish to Marketplace
-        uses: HaaLeo/publish-vscode-extension@v1  # 第三方 Action 简化发布
+        uses: HaaLeo/publish-vscode-extension@v1.6.2  # 第三方 Action 简化发布
         with:
           pat: ${{ secrets.SHELLING }}  # 引用 GitHub Secret
           registryUrl: https://marketplace.visualstudio.com
