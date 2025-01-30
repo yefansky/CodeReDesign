@@ -39,6 +39,7 @@ ctrl + shift + p 打开指令菜单（Command Palette），有以下几个指令
    如果查看后觉得没问题，可以用这个指令
    将这个 CVB 格式文件展开覆盖本地文件
 
+
 ---
 
 # CodeReDesign
