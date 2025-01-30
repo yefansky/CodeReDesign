@@ -1,8 +1,9 @@
 {
   "name": "CodeReDesign",
   "displayName": "CodeReDesign",
-  "description": "A VSCode extension for code refactoring and redesign.",
+  "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
+  "icon": "images/icon.png",
   "version": "0.0.2",
   "engines": {
     "vscode": "^1.96.0"
