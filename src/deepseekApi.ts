@@ -43,6 +43,7 @@ async function callDeepSeekApi(
 ): Promise<string | null> {
     const apiKey = getDeepSeekApiKey();
     if (!apiKey) {
+        vscode.window.showWarningMessage('请先设置DeepSeek API Key');
         return null;
     }
 
@@ -65,6 +66,8 @@ async function callDeepSeekApi(
         let maxAttempts = 5;
         let attempts = 0;
 
+        vscode.window.showInformationMessage('开始上传DeepSeek API');
+
         while (attempts < maxAttempts) {
             attempts++;
             const response = await openai.chat.completions.create({
@@ -74,6 +77,8 @@ async function callDeepSeekApi(
                 max_tokens: 8192,
                 temperature: 0
             });
+
+            vscode.window.showInformationMessage('DeepSeek API 正在处理...');
 
             let chunkResponse = '';
             let finishReason: string | null = null;
@@ -105,6 +110,8 @@ async function callDeepSeekApi(
                 (endstring && !fullResponse.includes(endstring));
 
             if (!shouldContinue) {break};
+
+            vscode.window.showWarningMessage('超过最大Token数，正在重试...');
 
             // 准备下一次请求
             messages_body.push(

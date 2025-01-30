@@ -173,7 +173,7 @@ export function parseCvb(cvbContent: string): {
   files: Record<string, string>;
 } {
   // 匹配## BEGIN_CVB在行首的位置
-  const cvbStartRegex = /^## BEGIN_CVB/m;
+  const cvbStartRegex = /^## BEGIN_CVB(\s|$)/m;
   const cvbStartMatch = cvbStartRegex.exec(cvbContent);
   if (!cvbStartMatch) {
     throw new Error('Invalid CVB format: missing BEGIN_CVB marker.');
@@ -181,7 +181,7 @@ export function parseCvb(cvbContent: string): {
   const cvbStartIndex = cvbStartMatch.index;
 
   // 匹配## END_CVB在行首的位置
-  const cvbEndRegex = /^## END_CVB/m;
+  const cvbEndRegex = /^## END_CVB(\s|$)/m;
   const cvbEndMatch = cvbEndRegex.exec(cvbContent);
   if (!cvbEndMatch) {
     throw new Error('Invalid CVB format: missing END_CVB marker.');
@@ -192,7 +192,7 @@ export function parseCvb(cvbContent: string): {
   const cvbContentStr = cvbContent.slice(cvbStartIndex, cvbEndIndex + cvbEndMatch[0].length);
 
   // 提取元数据部分
-  const metaRegex = /^## META\n([\s\S]*?)^## END_META/m;
+  const metaRegex = /^## META\n([\s\S]*?)^## END_META(\s|$)/m;
   const metaMatch = metaRegex.exec(cvbContentStr);
   if (!metaMatch) {
     throw new Error('Invalid CVB format: missing META section.');
