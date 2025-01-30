@@ -21,6 +21,12 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Install standard-version
+        run: npm install --save-dev standard-version
+
+      - name: Run standard-version
+        run: npx standard-version  # 自动更新版本号
+
       - name: Install vsce
         run: npm install -g @vscode/vsce
 
