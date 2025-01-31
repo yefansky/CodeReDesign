@@ -24,6 +24,9 @@ jobs:
       - name: Install standard-version
         run: npm install --save-dev standard-version
 
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
       - name: Set Git user name and email
         run: |
           git config --global user.name "GitHub Actions"
@@ -32,8 +35,9 @@ jobs:
       - name: Run standard-version
         run: npx standard-version  # 自动更新版本号
 
-      - name: Install vsce
-        run: npm install -g @vscode/vsce
+      - name: Push changes and tags
+        run: |
+          git push --follow-tags  # 推送修改的 version 和 Git 标签到远程仓库
 
       - name: Package Extension
         run: vsce package  # 生成 .vsix 文件
