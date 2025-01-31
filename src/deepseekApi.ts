@@ -146,8 +146,6 @@ export async function queryCodeReDesign(
     outputChannel: vscode.OutputChannel
 ): Promise<string | null> {
     const requestContent = `
-这是我的需求:
-${userRequest}
 
 这是 CVB 格式的说明:
 ${getCvbFormatDescription()}
@@ -161,8 +159,15 @@ ${getCvbFormatDescription()}
 最后的输出需要是 CVB 格式， 
 尤其注意，输出除了CVB的正文内容以外，别的地方出现CVB的开始符和结束符(比如一些关于CVB的附加说明，或者正好字符串前缀和CVB符号一样)要做转义，
 以免接收的时候被错误的当成CVB块（比如前面加入一些空格）
-（注意要完整输出所有文件，不管是否有修改，CVB是一个当前所有文件的快照，所以你不能偷懒）:
+（注意要完整输出所有文件，不管是否有修改，CVB是一个当前所有文件的快照，所以你不能偷懒）
+
+输入代码:
 ${cvbContent}
+
+这是我的需求:
+${userRequest}
+
+请输出CVB格式的代码:
 `;
 
     return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_CVB'); // 添加结束字符串
