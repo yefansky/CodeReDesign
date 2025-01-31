@@ -37,7 +37,6 @@ jobs:
 
       - name: Push changes and tags
         run: |
-          git remote set-url origin https://${{ secrets.GIT_TOKEN }}@github.com/${{ github.repository }}.git
           git push --follow-tags  # 推送修改的 version 和 Git 标签到远程仓库
 
       - name: Package Extension
