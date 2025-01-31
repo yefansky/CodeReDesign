@@ -32,6 +32,7 @@ const apiBaseURL = "https://api.deepseek.com";
  * @param outputChannel 输出通道，用于实时显示流式内容
  * @param streamMode 是否启用流式模式
  * @param endstring 结束字符串，用于检查输出是否包含特定字符串
+ * @param abortSignal 用于中断请求的信号
  * @returns API 返回的完整内容
  */
 async function callDeepSeekApi(
@@ -39,7 +40,8 @@ async function callDeepSeekApi(
     systemContent: string = 'You are a helpful assistant.',
     outputChannel?: vscode.OutputChannel,
     streamMode: boolean = true,
-    endstring?: string
+    endstring?: string,
+    abortSignal?: AbortSignal
 ): Promise<string | null> {
     const apiKey = getDeepSeekApiKey();
     if (!apiKey) {
@@ -85,6 +87,9 @@ async function callDeepSeekApi(
 
             if (streamMode) {
                 for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+                    if (abortSignal?.aborted) {
+                        throw new Error('operation stop by user');
+                    }
                     const content = chunk.choices[0]?.delta?.content || '';
                     chunkResponse += content;
                     if (outputChannel) {
@@ -128,6 +133,10 @@ async function callDeepSeekApi(
         return fullResponse;
 
     } catch (error) {
+        if (error instanceof Error && error.message === 'operation stop by user') {
+            vscode.window.showInformationMessage('operation stop by user');
+            return null;
+        }
         vscode.window.showErrorMessage('API调用失败: ' + (error as Error).message);
         return null;
     }
@@ -138,12 +147,14 @@ async function callDeepSeekApi(
  * @param cvbContent CVB 文件内容
  * @param userRequest 用户输入的重构需求
  * @param outputChannel 输出通道，用于实时显示流式内容
+ * @param abortSignal 用于中断请求的信号
  * @returns API 返回的完整 CVB 内容
  */
 export async function queryCodeReDesign(
     cvbContent: string,
     userRequest: string,
-    outputChannel: vscode.OutputChannel
+    outputChannel: vscode.OutputChannel,
+    abortSignal?: AbortSignal
 ): Promise<string | null> {
     const requestContent = `
 
@@ -170,7 +181,7 @@ ${userRequest}
 请输出CVB格式的代码:
 `;
 
-    return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_CVB'); // 添加结束字符串
+    return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_CVB', abortSignal); // 添加结束字符串
 }
 
 /**

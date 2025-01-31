@@ -39,7 +39,8 @@ ctrl + shift + p 打开指令菜单（Command Palette），有以下几个指令
    如果查看后觉得没问题，可以用这个指令
    将这个 CVB 格式文件展开覆盖本地文件
 
-
+4. **codeReDesign.stopOperation** (中断处理)
+   中断正在执行的uploadCvb操作
 ---
 
 # CodeReDesign
@@ -82,3 +83,6 @@ Press `ctrl + shift + p` to open the Command Palette, where the following comman
 3. **codeReDesign.applyCvb** (Apply CVB file)
    If you review the changes and find them satisfactory, you can use this command.
    It will unpack and overwrite the local files with the changes from the CVB file.
+
+4. **codeReDesign.stopOperation** (stop Upload CVB)
+   stop processing Operation

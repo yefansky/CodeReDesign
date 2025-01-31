@@ -41,6 +41,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`CVB file generated at: ${cvbFilePath}`);
     });
 
+    // 用于存储当前的上传操作
+    let currentOperationController: AbortController | null = null;
+
     // 注册命令:上传 CVB 并调用 API
     let uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadCvb', async () => {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -88,12 +91,26 @@ export function activate(context: vscode.ExtensionContext) {
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
         const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
     
-        const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel);
+        // 创建新的 AbortController
+        currentOperationController = new AbortController();
+        const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, currentOperationController.signal);
         if (apiResponse) {
             const { cvbContent: newCvbContent, metadata, files } = parseCvb(apiResponse);
             const newCvbFilePath = path.join(tmpDir, fileName);
             fs.writeFileSync(newCvbFilePath, newCvbContent, 'utf-8');
             vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+        }
+        currentOperationController = null;
+    });
+
+    // 注册命令：中断当前的上传操作
+    let stopOperation = vscode.commands.registerCommand('codeReDesign.stopOperation', () => {
+        if (currentOperationController) {
+            currentOperationController.abort();
+            currentOperationController = null;
+            vscode.window.showInformationMessage('Stop operation.');
+        } else {
+            vscode.window.showInformationMessage('No operation in progress.');
         }
     });
 
@@ -135,7 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, outputChannel);
+    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, stopOperation, outputChannel);
 
     setupCvbAsMarkdown(context);
 
