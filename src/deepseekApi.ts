@@ -15,15 +15,37 @@ function getDeepSeekApiKey(): string | null {
     return apiKey;
 }
 
+/**
+ * 获取 DeepSeek 模型配置
+ * @returns { modelName: string, apiBaseURL: string }
+ */
+function getDeepSeekModelConfig(): { modelName: string, apiBaseURL: string } {
+    const config = vscode.workspace.getConfiguration('codeReDesign');
+    const modelConfig = config.get<string>('modelConfig') || 'deepseek-chat';
 
-const model_name =  "deepseek-chat";
-const apiBaseURL = "https://api.deepseek.com";
+    if (modelConfig === 'custom') {
+        const customModelName = config.get<string>('customModelName') || '';
+        const customApiBaseURL = config.get<string>('customApiBaseURL') || '';
+        return {
+            modelName: customModelName,
+            apiBaseURL: customApiBaseURL
+        };
+    }
 
-// const model_name =  "deepseek-reasoner";
-// const apiBaseURL = "https://api.deepseek.com";
+    // 默认配置
+    const defaultConfigs : { [key: string]: { modelName: string, apiBaseURL: string } }  = {
+        'deepseek-chat': {
+            modelName: 'deepseek-chat',
+            apiBaseURL: 'https://api.deepseek.com'
+        },
+        'deepseek-reasoner': {
+            modelName: 'deepseek-reasoner',
+            apiBaseURL: 'https://api.deepseek.com'
+        }
+    };
 
-// const model_name =  "deepseek-coder-v2";
-// const apiBaseURL = "http://10.11.39.58:31084";
+    return defaultConfigs[modelConfig] || defaultConfigs['deepseek-chat'];
+}
 
 /**
  * 调用 DeepSeek API
@@ -46,6 +68,13 @@ async function callDeepSeekApi(
     const apiKey = getDeepSeekApiKey();
     if (!apiKey) {
         vscode.window.showWarningMessage('请先设置DeepSeek API Key');
+        return null;
+    }
+
+    const { modelName, apiBaseURL } = getDeepSeekModelConfig();
+
+    if (!modelName || !apiBaseURL) {
+        vscode.window.showErrorMessage('DeepSeek Model Name or API Base URL is not configured.');
         return null;
     }
 
@@ -73,7 +102,7 @@ async function callDeepSeekApi(
         while (attempts < maxAttempts) {
             attempts++;
             const response = await openai.chat.completions.create({
-                model: model_name,
+                model: modelName,
                 messages: messages_body,
                 stream: streamMode,
                 max_tokens: 8192,

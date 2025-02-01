@@ -74,6 +74,22 @@
           "type": "boolean",
           "default": true,
           "description": "Treat .cvb files as Markdown"
+        },
+        "codeReDesign.modelConfig": {
+          "type": "string",
+          "default": "deepseek-chat",
+          "description": "DeepSeek Model Configuration",
+          "enum": ["deepseek-chat", "deepseek-reasoner", "custom"]
+        },
+        "codeReDesign.customModelName": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Name"
+        },
+        "codeReDesign.customApiBaseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek API Base URL"
         }
       }
     }
