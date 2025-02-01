@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.8 (2025-02-01)
+
+
+### Bug Fixes
+
+* 修正nodejs工程，package.json 无法被选中修改 ([5ddb9b0](https://github.com/yefansky/CodeReDesign/commit/5ddb9b0750f0785a027df8b82aff5036f3011a68))
+
 ### 0.0.7 (2025-01-31)
 
 ### 0.0.6 (2025-01-31)
