@@ -7,14 +7,36 @@ import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode } from './d
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
 
+let currentOperationController: AbortController | null = null;
+
+export function getCurrentOperationController() {
+    if (!currentOperationController) {
+        currentOperationController = new AbortController;
+    }
+    return currentOperationController;
+}
+
+export function resetCurrentOperationController() {
+    if (currentOperationController) {
+        currentOperationController.abort();
+        currentOperationController = null;
+    }
+    currentOperationController = new AbortController;
+}
+
+export function clearCurrentOperationController() {
+    if (currentOperationController) {
+        currentOperationController.abort(); // 中止操作
+        currentOperationController = null; // 清除引用
+    }
+}
+
 // 插件激活时调用
 export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "CodeReDesign" is now active!');
 
     // 创建输出通道
     const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
-    // 用于存储当前的上传操作
-    let currentOperationController: AbortController | null = null;
 
     // 注册命令:选择文件并生成 CVB
     let generateCvbCommand = vscode.commands.registerCommand('codeReDesign.generateCvb', async () => {
@@ -90,21 +112,16 @@ export function activate(context: vscode.ExtensionContext) {
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
         const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
 
-        if (currentOperationController){
-            currentOperationController.abort();
-            currentOperationController = null;
-        }
-    
-        // 创建新的 AbortController
-        currentOperationController = new AbortController();
-        const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, currentOperationController.signal);
+        resetCurrentOperationController();
+
+        const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
         if (apiResponse) {
             const { cvbContent: newCvbContent, metadata, files } = parseCvb(apiResponse);
             const newCvbFilePath = path.join(tmpDir, fileName);
             fs.writeFileSync(newCvbFilePath, newCvbContent, 'utf-8');
             vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
         }
-        currentOperationController = null;
+        clearCurrentOperationController();
     });
 
     // 注册命令：中断当前的上传操作
@@ -196,14 +213,9 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        if (currentOperationController){
-            currentOperationController.abort();
-            currentOperationController = null;
-        }
-        // 创建新的 AbortController
-        currentOperationController = new AbortController();
+        resetCurrentOperationController();
         // 调用分析代码功能
-        const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, currentOperationController.signal);
+        const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, getCurrentOperationController().signal);
         if (analysisResult) {
             vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
         }

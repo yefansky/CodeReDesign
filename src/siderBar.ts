@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { applyCvbToWorkspace } from './cvbManager';
 import { queryCodeReDesign, analyzeCode } from './deepseekApi';
+import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController} from './extension';
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
@@ -165,10 +166,13 @@ async function uploadThisCvb(filePath: string) {
   const cvbContent = fs.readFileSync(filePath, 'utf-8');
   const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
 
-  const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel);
+  resetCurrentOperationController();
+
+  const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
   if (apiResponse) {
     vscode.window.showInformationMessage('API response received. Check the output channel for details.');
   }
+  clearCurrentOperationController();
 }
 
 /**
@@ -188,10 +192,13 @@ async function analyzeThisCvb(filePath: string) {
   const cvbContent = fs.readFileSync(filePath, 'utf-8');
   const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
 
-  const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel);
+  resetCurrentOperationController();
+
+  const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, getCurrentOperationController().signal);
   if (analysisResult) {
     vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
   }
+  clearCurrentOperationController();
 }
 
 export function deactivate() {}
