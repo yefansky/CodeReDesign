@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import {applyCvbToWorkspace} from './cvbManager';
+import { applyCvbToWorkspace } from './cvbManager';
+import { queryCodeReDesign, analyzeCode } from './deepseekApi';
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
@@ -11,11 +12,23 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
     const filePath = uri.fsPath;
 
     // 调用处理函数
-    applyCvb(filePath);
+    applyThisCvb(filePath);
+  });
+
+  // 注册上传 CVB 命令
+  const uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadThisCvb', async (uri: vscode.Uri) => {
+    const filePath = uri.fsPath;
+    await uploadThisCvb(filePath);
+  });
+
+  // 注册分析 CVB 命令
+  const analyzeCvbCommand = vscode.commands.registerCommand('codeReDesign.analyzeThisCvb', async (uri: vscode.Uri) => {
+    const filePath = uri.fsPath;
+    await analyzeThisCvb(filePath);
   });
 
   // 将命令添加到订阅中
-  context.subscriptions.push(applyCvbCommand);
+  context.subscriptions.push(applyCvbCommand, uploadCvbCommand, analyzeCvbCommand);
 
   // 注册 TreeDataProvider
   const cvbViewProvider = new CvbViewProvider();
@@ -122,7 +135,7 @@ class CvbFile extends vscode.TreeItem {
  * 处理 .cvb 文件的函数
  * @param filePath .cvb 文件的路径
  */
-function applyCvb(filePath: string) {
+function applyThisCvb(filePath: string) {
   // 在这里实现你的逻辑
   vscode.window.showInformationMessage(`Applying CVB from: ${filePath}`);
   // 例如：读取文件内容并处理
@@ -132,6 +145,52 @@ function applyCvb(filePath: string) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (workspaceFolders) {
     applyCvbToWorkspace(cvbContent);
+  }
+}
+
+/**
+ * 上传 CVB 文件并调用 API
+ * @param filePath .cvb 文件的路径
+ */
+async function uploadThisCvb(filePath: string) {
+  const userPrompt = await vscode.window.showInputBox({
+    prompt: 'Enter your prompt for the refactoring',
+    placeHolder: 'e.g., Refactor the code to improve readability',
+  });
+
+  if (!userPrompt) {
+    return;
+  }
+
+  const cvbContent = fs.readFileSync(filePath, 'utf-8');
+  const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
+
+  const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel);
+  if (apiResponse) {
+    vscode.window.showInformationMessage('API response received. Check the output channel for details.');
+  }
+}
+
+/**
+ * 分析 CVB 文件
+ * @param filePath .cvb 文件的路径
+ */
+async function analyzeThisCvb(filePath: string) {
+  const userRequest = await vscode.window.showInputBox({
+    prompt: 'Enter your analysis request',
+    placeHolder: 'e.g., Analyze the code for potential bugs',
+  });
+
+  if (!userRequest) {
+    return;
+  }
+
+  const cvbContent = fs.readFileSync(filePath, 'utf-8');
+  const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
+
+  const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel);
+  if (analysisResult) {
+    vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
   }
 }
 

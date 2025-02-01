@@ -17,7 +17,9 @@
     "onCommand:codeReDesign.uploadCvb",
     "onCommand:codeReDesign.applyCvb",
     "onCommand:codeReDesign.applyThisCvb",
-    "onCommand:codeReDesign.analyzeCode"
+    "onCommand:codeReDesign.analyzeCode",
+    "onCommand:codeReDesign.uploadThisCvb",
+    "onCommand:codeReDesign.analyzeThisCvb"
   ],
   "repository": {
     "type": "git",
@@ -48,6 +50,14 @@
       {
         "command": "codeReDesign.analyzeCode",
         "title": "CodeReDesign: Analyze Code"
+      },
+      {
+        "command": "codeReDesign.uploadThisCvb",
+        "title": "CodeReDesign: Upload this CVB and Call API"
+      },
+      {
+        "command": "codeReDesign.analyzeThisCvb",
+        "title": "CodeReDesign: Analyze this CVB"
       }
     ],
     "views": {
@@ -62,6 +72,16 @@
       "explorer/context": [
         {
           "command": "codeReDesign.applyThisCvb",
+          "when": "resourceExtname  == .cvb",
+          "group": "cvb@1"
+        },
+        {
+          "command": "codeReDesign.uploadThisCvb",
+          "when": "resourceExtname  == .cvb",
+          "group": "cvb@1"
+        },
+        {
+          "command": "codeReDesign.analyzeThisCvb",
           "when": "resourceExtname  == .cvb",
           "group": "cvb@1"
         }
