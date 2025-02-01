@@ -72,6 +72,7 @@ async function callDeepSeekApi(
     }
 
     const { modelName, apiBaseURL } = getDeepSeekModelConfig();
+    const userStopException = 'operation stop by user';
 
     if (!modelName || !apiBaseURL) {
         vscode.window.showErrorMessage('DeepSeek Model Name or API Base URL is not configured.');
@@ -117,7 +118,7 @@ async function callDeepSeekApi(
             if (streamMode) {
                 for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
                     if (abortSignal?.aborted) {
-                        throw new Error('operation stop by user');
+                        throw new Error(userStopException);
                     }
                     const content = chunk.choices[0]?.delta?.content || '';
                     chunkResponse += content;
@@ -146,7 +147,7 @@ async function callDeepSeekApi(
             if (!shouldContinue) {break};
 
             if (abortSignal?.aborted) {
-                throw new Error('operation stop by user');
+                throw new Error(userStopException);
             }
 
             vscode.window.showWarningMessage('超过最大Token数，正在重试...');
@@ -166,7 +167,7 @@ async function callDeepSeekApi(
         return fullResponse;
 
     } catch (error) {
-        if (error instanceof Error && error.message === 'operation stop by user') {
+        if (error instanceof Error && error.message === userStopException) {
             vscode.window.showInformationMessage('operation stop by user');
             return null;
         }
@@ -265,6 +266,13 @@ function cleanFilename(str: string) {
  * @returns 生成的文件名
  */
 export async function generateFilenameFromRequest(userRequest: string): Promise<string> {
+    if (userRequest.length < 16) {
+        return cleanFilename(userRequest)
+            .replace(/\s+/g, '')           // 去除所有空格
+            .replace(/^\.+|\.+$/g, '');    // 移除开头和结尾的点
+    }
+
+    // 否则，调用 API 获取概括的文件名
     const summaryResponse = await callDeepSeekApi(
         `请简单概括一下需求，输出字符串作为文件名。如果描述里有版本名称，这个名称一定要保留并放在开头。 需求："${userRequest}"`,
         '你是一个工具函数，接收请求，只返回纯结果，不要有附加说明.',
@@ -277,6 +285,7 @@ export async function generateFilenameFromRequest(userRequest: string): Promise<
 
     // 清理文件名
     summary = cleanFilename(summary);
+    summary = summary.replace(/\s+/g, '')     // 去除所有空格
     summary = summary.replace(/^\.+|\.+$/g, ''); // 移除开头和结尾的点
     summary = summary.replace(/^ +| +$/g, '');   // 移除开头和结尾的空格
     summary = summary.substring(0, 15);           // 截取前15个字符
