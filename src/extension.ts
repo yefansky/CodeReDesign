@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "CodeReDesign" is now active!');
 
     // 创建输出通道
-    const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
+    const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream', 'markdown');
 
     // 注册命令:选择文件并生成 CVB
     let generateCvbCommand = vscode.commands.registerCommand('codeReDesign.generateCvb', async () => {
