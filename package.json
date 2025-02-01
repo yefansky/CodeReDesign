@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -79,7 +79,11 @@
           "type": "string",
           "default": "deepseek-chat",
           "description": "DeepSeek Model Configuration",
-          "enum": ["deepseek-chat", "deepseek-reasoner", "custom"]
+          "enum": [
+            "deepseek-chat",
+            "deepseek-reasoner",
+            "custom"
+          ]
         },
         "codeReDesign.customModelName": {
           "type": "string",
