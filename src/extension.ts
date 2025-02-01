@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
 import { generateCvb, parseCvb, applyCvbToWorkspace, generateTimestamp } from './cvbManager';
-import { queryCodeReDesign, generateFilenameFromRequest } from './deepseekApi';
+import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
 
@@ -13,6 +13,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 创建输出通道
     const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
+    // 用于存储当前的上传操作
+    let currentOperationController: AbortController | null = null;
 
     // 注册命令:选择文件并生成 CVB
     let generateCvbCommand = vscode.commands.registerCommand('codeReDesign.generateCvb', async () => {
@@ -40,9 +42,6 @@ export function activate(context: vscode.ExtensionContext) {
         const cvbFilePath = generateCvb(selectedFiles, userRequest);
         vscode.window.showInformationMessage(`CVB file generated at: ${cvbFilePath}`);
     });
-
-    // 用于存储当前的上传操作
-    let currentOperationController: AbortController | null = null;
 
     // 注册命令:上传 CVB 并调用 API
     let uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadCvb', async () => {
@@ -90,6 +89,11 @@ export function activate(context: vscode.ExtensionContext) {
     
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
         const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
+
+        if (currentOperationController){
+            currentOperationController.abort();
+            currentOperationController = null;
+        }
     
         // 创建新的 AbortController
         currentOperationController = new AbortController();
@@ -152,7 +156,62 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, stopOperation, outputChannel);
+    // 注册命令：分析代码
+    let analyzeCodeCommand = vscode.commands.registerCommand('codeReDesign.analyzeCode', async () => {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            vscode.window.showErrorMessage('No workspace folder found.');
+            return;
+        }
+
+        const workspacePath = workspaceFolders[0].uri.fsPath;
+        const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
+        const cvbFiles = fs.readdirSync(tmpDir).filter((file: string) => file.endsWith('.cvb'));
+
+        if (cvbFiles.length === 0) {
+            vscode.window.showErrorMessage('No CVB files found in the tmp directory.');
+            return;
+        }
+
+        // 让用户选择要分析的 CVB 文件
+        const selectedCvbFile = await vscode.window.showQuickPick(cvbFiles, {
+            placeHolder: 'Select a CVB file to analyze',
+        });
+
+        if (!selectedCvbFile) {
+            return;
+        }
+
+        // 读取 CVB 文件内容
+        const cvbFilePath = path.join(tmpDir, selectedCvbFile);
+        const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
+
+        // 获取用户的分析需求
+        const userRequest = await vscode.window.showInputBox({
+            prompt: 'Enter your analysis request',
+            placeHolder: 'e.g., Analyze the code for potential bugs',
+        });
+
+        if (!userRequest) {
+            return;
+        }
+
+        if (currentOperationController){
+            currentOperationController.abort();
+            currentOperationController = null;
+        }
+        // 创建新的 AbortController
+        currentOperationController = new AbortController();
+        // 调用分析代码功能
+        const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, currentOperationController.signal);
+        if (analysisResult) {
+            vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
+        }
+
+        vscode.window.showInformationMessage('解析完毕');
+    });
+
+    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, outputChannel);
 
     setupCvbAsMarkdown(context);
 

@@ -145,6 +145,10 @@ async function callDeepSeekApi(
 
             if (!shouldContinue) {break};
 
+            if (abortSignal?.aborted) {
+                throw new Error('operation stop by user');
+            }
+
             vscode.window.showWarningMessage('超过最大Token数，正在重试...');
 
             // 准备下一次请求
@@ -211,6 +215,38 @@ ${userRequest}
 `;
 
     return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_CVB', abortSignal); // 添加结束字符串
+}
+
+/**
+ * 分析代码
+ * @param cvbContent CVB 文件内容
+ * @param userRequest 用户输入的分析需求
+ * @param outputChannel 输出通道，用于实时显示流式内容
+ * @returns API 返回的分析结果
+ */
+export async function analyzeCode(
+    cvbContent: string,
+    userRequest: string,
+    outputChannel: vscode.OutputChannel,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const requestContent = `
+
+这是 CVB 格式的说明:
+${getCvbFormatDescription()}
+
+请读取以下 CVB 格式的代码，按照需求进行分析，
+
+输入代码:
+${cvbContent}
+
+这是我的需求:
+${userRequest}
+
+请输出分析结果:
+`;
+
+    return callDeepSeekApi(requestContent, "你是一个代码分析助手", outputChannel, true, undefined, abortSignal);
 }
 
 /**

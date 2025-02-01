@@ -16,7 +16,8 @@
     "onCommand:codeReDesign.generateCvb",
     "onCommand:codeReDesign.uploadCvb",
     "onCommand:codeReDesign.applyCvb",
-    "onCommand:codeReDesign.applyThisCvb"
+    "onCommand:codeReDesign.applyThisCvb",
+    "onCommand:codeReDesign.analyzeCode"
   ],
   "repository": {
     "type": "git",
@@ -43,6 +44,10 @@
       {
         "command": "codeReDesign.stopOperation",
         "title": "CodeReDesign: Stop Operation"
+      },
+      {
+        "command": "codeReDesign.analyzeCode",
+        "title": "CodeReDesign: Analyze Code"
       }
     ],
     "views": {
