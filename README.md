@@ -22,6 +22,24 @@ File -> Preferences -> Settings（文件 -> 首选项 -> 设置）
 
 在 `Deep Seek Api Key`（DeepSeek API 密钥）里填写你在 DeepSeek API 获取的 Key。
 
+#### 模型 API 和名称设置
+在 `CodeReDesign` 的配置中，你可以设置使用的模型 API 和名称。以下是默认选项和自定义方法：
+
+1. **默认模型配置**：
+   - `deepseek-chat`：默认的聊天模型，适用于一般的代码重构和设计任务。
+   - `deepseek-reasoner`：推理模型，适用于需要逻辑推理和复杂分析的代码任务。
+
+2. **自定义模型配置**：
+   - 如果你需要使用自定义模型，可以在 `CodeReDesign` 的配置中选择 `custom` 选项，并填写以下信息：
+     - **Custom DeepSeek Model Name**：自定义模型的名称。
+     - **Custom DeepSeek API Base URL**：自定义模型的 API 基础 URL。
+
+   设置方法：
+   - 打开 VSCode 的设置界面（File -> Preferences -> Settings）。
+   - 搜索 `coderedesign`。
+   - 在 `Model Configuration` 中选择 `custom`。
+   - 填写 `Custom DeepSeek Model Name` 和 `Custom DeepSeek API Base URL`。
+
 #### 指令：
 按下 `ctrl + shift + p` 打开指令菜单（Command Palette），有以下几个指令可用：
 
@@ -81,6 +99,24 @@ File -> Preferences -> Settings
 Search for "coderedesign"
 
 In the `Deep Seek Api Key`, enter the key you obtained from the DeepSeek API.
+
+#### Model API and Name Configuration
+In the `CodeReDesign` configuration, you can set the model API and name. Here are the default options and how to customize them:
+
+1. **Default Model Configuration**:
+   - `deepseek-chat`: The default chat model, suitable for general code refactoring and design tasks.
+   - `deepseek-reasoner`: The reasoning model, suitable for code tasks that require logical reasoning and complex analysis.
+
+2. **Custom Model Configuration**:
+   - If you need to use a custom model, you can select the `custom` option in the `CodeReDesign` configuration and fill in the following information:
+     - **Custom DeepSeek Model Name**: The name of the custom model.
+     - **Custom DeepSeek API Base URL**: The base URL of the custom model's API.
+
+   Setup Method:
+   - Open VSCode settings (File -> Preferences -> Settings).
+   - Search for "coderedesign".
+   - Select `custom` in `Model Configuration`.
+   - Fill in `Custom DeepSeek Model Name` and `Custom DeepSeek API Base URL`.
 
 #### Commands:
 Press `ctrl + shift + p` to open the Command Palette, where the following commands are available:
