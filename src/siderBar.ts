@@ -8,23 +8,22 @@ import { getCurrentOperationController,  resetCurrentOperationController, clearC
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
   // 注册右键菜单命令
-  const applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyThisCvb', (uri: vscode.Uri) => {
+  const applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyThisCvb', (cvb: CvbFile) => {
     // 获取文件路径
-    const filePath = uri.fsPath;
-
+    const filePath = cvb.resourceUri?.fsPath || "";
     // 调用处理函数
     applyThisCvb(filePath);
   });
 
   // 注册上传 CVB 命令
-  const uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadThisCvb', async (uri: vscode.Uri) => {
-    const filePath = uri.fsPath;
+  const uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadThisCvb', async (cvb: CvbFile) => {
+    const filePath = cvb.resourceUri?.fsPath || "";
     await uploadThisCvb(filePath);
   });
 
   // 注册分析 CVB 命令
-  const analyzeCvbCommand = vscode.commands.registerCommand('codeReDesign.analyzeThisCvb', async (uri: vscode.Uri) => {
-    const filePath = uri.fsPath;
+  const analyzeCvbCommand = vscode.commands.registerCommand('codeReDesign.analyzeThisCvb', async (cvb: CvbFile) => {
+    const filePath = cvb.resourceUri?.fsPath || "";
     await analyzeThisCvb(filePath);
   });
 
@@ -105,6 +104,11 @@ class CvbViewProvider implements vscode.TreeDataProvider<CvbFile> {
         });
       }
 
+        // 新增排序逻辑
+        cvbFiles.sort((a, b) => 
+          a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+      );
+
       return cvbFiles;
     }
   }
@@ -126,6 +130,8 @@ class CvbFile extends vscode.TreeItem {
 
     // 设置图标（可选）
     this.iconPath = vscode.ThemeIcon.File;
+
+    this.resourceUri = uri;
 
     // 添加上下文菜单
     this.contextValue = 'cvbFile';
