@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 // 配置常量
 const ALLOWED_FILENAMES = ['package.json']; // 文件名白名单
-const INCLUDED_EXTENSIONS = ['cpp', 'h', 'c', 'cxx', 'hpp', 'py', 'lua', 'ls', 'lh', 'ts', 'js']; // 扩展名白名单
+const INCLUDED_EXTENSIONS = ['cpp', 'h', 'c', 'cxx', 'hpp', 'py', 'lua', 'ls', 'lh', 'ts', 'js', "md"]; // 扩展名白名单
 const EXCLUDED_DIRECTORIES = ['node_modules', '.git', 'build', 'dist', 'out', 'vendor']; // 排除目录
 
 /**
