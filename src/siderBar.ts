@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { applyCvbToWorkspace } from './cvbManager';
-import { queryCodeReDesign, analyzeCode } from './deepseekApi';
+import { applyCvbToWorkspace, generateTimestamp, parseCvb } from './cvbManager';
+import { queryCodeReDesign, analyzeCode, generateFilenameFromRequest } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController} from './extension';
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
@@ -169,6 +169,24 @@ async function uploadThisCvb(filePath: string) {
     return;
   }
 
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders) {
+      vscode.window.showErrorMessage('No workspace folder found.');
+      return;
+  }
+  const workspacePath = workspaceFolders[0].uri.fsPath;
+  const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
+
+  const filenameSummary = await generateFilenameFromRequest(userPrompt);
+  const timestamp = generateTimestamp();
+  let baseFileName = `${timestamp}_${filenameSummary}.cvb`;
+  let fileName = baseFileName;
+  let i = 1;
+  while (fs.existsSync(path.join(tmpDir, fileName))) {
+      fileName = `${timestamp}_${filenameSummary}_${i}.cvb`;
+      i++;
+  }
+
   const cvbContent = fs.readFileSync(filePath, 'utf-8');
   const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
 
@@ -177,6 +195,12 @@ async function uploadThisCvb(filePath: string) {
   const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
   if (apiResponse) {
     vscode.window.showInformationMessage('API response received. Check the output channel for details.');
+  }
+  if (apiResponse) {
+      const { cvbContent: newCvbContent, metadata, files } = parseCvb(apiResponse);
+      const newCvbFilePath = path.join(tmpDir, fileName);
+      fs.writeFileSync(newCvbFilePath, newCvbContent, 'utf-8');
+      vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
   }
   clearCurrentOperationController();
 }
