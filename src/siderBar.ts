@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { applyCvbToWorkspace, generateTimestamp, parseCvb } from './cvbManager';
+import { applyCvbToWorkspace, generateTimestamp, Cvb } from './cvbManager';
 import { queryCodeReDesign, analyzeCode, generateFilenameFromRequest } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController} from './extension';
 
@@ -194,13 +194,10 @@ async function uploadThisCvb(filePath: string) {
 
   const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
   if (apiResponse) {
-    vscode.window.showInformationMessage('API response received. Check the output channel for details.');
-  }
-  if (apiResponse) {
-      const { cvbContent: newCvbContent, metadata, files } = parseCvb(apiResponse);
-      const newCvbFilePath = path.join(tmpDir, fileName);
-      fs.writeFileSync(newCvbFilePath, newCvbContent, 'utf-8');
-      vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+    const cvb = new Cvb(apiResponse);
+    const newCvbFilePath = path.join(tmpDir, fileName);
+    fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
+    vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
   }
   clearCurrentOperationController();
 }

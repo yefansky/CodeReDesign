@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
-import { generateCvb, parseCvb, applyCvbToWorkspace, generateTimestamp } from './cvbManager';
+import { generateCvb, Cvb, applyCvbToWorkspace, generateTimestamp } from './cvbManager';
 import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
@@ -116,9 +116,9 @@ export function activate(context: vscode.ExtensionContext) {
 
         const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
         if (apiResponse) {
-            const { cvbContent: newCvbContent, metadata, files } = parseCvb(apiResponse);
+            const cvb = new Cvb(apiResponse);
             const newCvbFilePath = path.join(tmpDir, fileName);
-            fs.writeFileSync(newCvbFilePath, newCvbContent, 'utf-8');
+            fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
             vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
         }
         clearCurrentOperationController();

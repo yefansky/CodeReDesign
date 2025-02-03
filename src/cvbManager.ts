@@ -18,6 +18,106 @@ const languageMapping: { [key: string]: string } = {
   'js': 'javascript'
 };
 
+export class Cvb {
+  private content: string;
+  private metadata: Record<string, string>;
+  private files: Record<string, string>;
+
+  constructor(cvbContent: string) {
+    const { cvbContent: content, metadata, files } = this.parse(cvbContent);
+    this.content = content;
+    this.metadata = metadata;
+    this.files = files;
+  }
+
+  getMetadata(): Record<string, string> {
+    return this.metadata;
+  }
+
+  getFiles(): Record<string, string> {
+    return this.files;
+  }
+
+  getUserRequest(): string {
+    return this.metadata['@用户需求'] || '';
+  }
+
+  getTimestamp(): string {
+    return this.metadata['@时间戳'] || '';
+  }
+
+  toString(): string {
+    return this.content;
+  }
+
+  private parse(cvbContent: string): {
+    cvbContent: string;
+    metadata: Record<string, string>;
+    files: Record<string, string>;
+  } {
+    // 匹配## BEGIN_CVB在行首的位置
+    const cvbStartRegex = /^## BEGIN_CVB(\s|$)/m;
+    const cvbStartMatch = cvbStartRegex.exec(cvbContent);
+    if (!cvbStartMatch) {
+      throw new Error('Invalid CVB format: missing BEGIN_CVB marker.');
+    }
+    const cvbStartIndex = cvbStartMatch.index;
+
+    // 匹配## END_CVB在行首的位置
+    const cvbEndRegex = /^## END_CVB(\s|$)/m;
+    const cvbEndMatch = cvbEndRegex.exec(cvbContent);
+    if (!cvbEndMatch) {
+      throw new Error('Invalid CVB format: missing END_CVB marker.');
+    }
+    const cvbEndIndex = cvbEndMatch.index;
+
+    // 提取CVB内容，包括## BEGIN_CVB和## END_CVB
+    const cvbContentStr = cvbContent.slice(cvbStartIndex, cvbEndIndex + cvbEndMatch[0].length);
+
+    // 提取元数据部分
+    const metaRegex = /^## META\n([\s\S]*?)^## END_META(\s|$)/m;
+    const metaMatch = metaRegex.exec(cvbContentStr);
+    if (!metaMatch) {
+      throw new Error('Invalid CVB format: missing META section.');
+    }
+    const metadata: Record<string, string> = {};
+    const metaContent = metaMatch[1].trim().split('\n');
+    metaContent.forEach(line => {
+      const parts = line.split(':');
+      if (parts.length >= 2) {
+        const key = parts.shift()?.trim();
+        const value = parts.join(':').trim();
+        if (key) {
+          metadata[key] = value;
+        }
+      }
+    });
+
+    // 提取文件内容部分
+    const files: Record<string, string> = {};
+    const fileRegex = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
+    let match: RegExpExecArray | null;
+
+    while ((match = fileRegex.exec(cvbContentStr)) !== null) {
+      const filePath = match[1];
+      let fileContent = match[2].trim();
+      // 去除代码块标记
+      const codeBlockRegex = /^```.*\n([\s\S]*?)\n```$/m;
+      const codeBlockMatch = codeBlockRegex.exec(fileContent);
+      if (codeBlockMatch) {
+        fileContent = codeBlockMatch[1];
+      }
+      files[filePath] = fileContent;
+    }
+
+    return {
+      cvbContent: cvbContentStr,
+      metadata,
+      files,
+    };
+  }
+}
+
 /**
  * 返回 CVB 格式介绍的静态字符串
  * @returns CVB 格式介绍
@@ -163,78 +263,6 @@ export async function generateCvb(filePaths: string[], userRequest: string): Pro
 }
 
 /**
- * 解析 CVB 格式内容
- * @param cvbContent CVB 内容
- * @returns 包含 CVB 字符串、元数据和文件内容的对象
- */
-export function parseCvb(cvbContent: string): {
-  cvbContent: string;
-  metadata: Record<string, string>;
-  files: Record<string, string>;
-} {
-  // 匹配## BEGIN_CVB在行首的位置
-  const cvbStartRegex = /^## BEGIN_CVB(\s|$)/m;
-  const cvbStartMatch = cvbStartRegex.exec(cvbContent);
-  if (!cvbStartMatch) {
-    throw new Error('Invalid CVB format: missing BEGIN_CVB marker.');
-  }
-  const cvbStartIndex = cvbStartMatch.index;
-
-  // 匹配## END_CVB在行首的位置
-  const cvbEndRegex = /^## END_CVB(\s|$)/m;
-  const cvbEndMatch = cvbEndRegex.exec(cvbContent);
-  if (!cvbEndMatch) {
-    throw new Error('Invalid CVB format: missing END_CVB marker.');
-  }
-  const cvbEndIndex = cvbEndMatch.index;
-
-  // 提取CVB内容，包括## BEGIN_CVB和## END_CVB
-  const cvbContentStr = cvbContent.slice(cvbStartIndex, cvbEndIndex + cvbEndMatch[0].length);
-
-  // 提取元数据部分
-  const metaRegex = /^## META\n([\s\S]*?)^## END_META(\s|$)/m;
-  const metaMatch = metaRegex.exec(cvbContentStr);
-  if (!metaMatch) {
-    throw new Error('Invalid CVB format: missing META section.');
-  }
-  const metadata: Record<string, string> = {};
-  const metaContent = metaMatch[1].trim().split('\n');
-  metaContent.forEach(line => {
-    const parts = line.split(':');
-    if (parts.length >= 2) {
-      const key = parts.shift()?.trim();
-      const value = parts.join(':').trim();
-      if (key) {
-        metadata[key] = value;
-      }
-    }
-  });
-
-  // 提取文件内容部分
-  const files: Record<string, string> = {};
-  const fileRegex = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
-  let match: RegExpExecArray | null;
-
-  while ((match = fileRegex.exec(cvbContentStr)) !== null) {
-    const filePath = match[1];
-    let fileContent = match[2].trim();
-    // 去除代码块标记
-    const codeBlockRegex = /^```.*\n([\s\S]*?)\n```$/m;
-    const codeBlockMatch = codeBlockRegex.exec(fileContent);
-    if (codeBlockMatch) {
-      fileContent = codeBlockMatch[1];
-    }
-    files[filePath] = fileContent;
-  }
-
-  return {
-    cvbContent: cvbContentStr,
-    metadata,
-    files,
-  };
-}
-
-/**
  * 将 CVB 文件内容应用到当前工作目录
  * @param cvbContent CVB 文件内容
  */
@@ -247,7 +275,8 @@ export function applyCvbToWorkspace(cvbContent: string): void {
   const workspacePath = workspaceFolders[0].uri.fsPath;
 
   // 解析 CVB 文件内容
-  const { files } = parseCvb(cvbContent);
+  const cvb = new Cvb(cvbContent);
+  const files = cvb.getFiles();
 
   // 遍历文件内容
   for (const [filePath, fileContent] of Object.entries(files)) {
