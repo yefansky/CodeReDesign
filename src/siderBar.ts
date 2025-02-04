@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { applyCvbToWorkspace, generateTimestamp, Cvb } from './cvbManager';
+import { applyCvbToWorkspace, generateTimestamp,  Cvb, TCVB, mergeCvb } from './cvbManager';
 import { queryCodeReDesign, analyzeCode, generateFilenameFromRequest } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController} from './extension';
 
@@ -194,7 +194,10 @@ async function uploadThisCvb(filePath: string) {
 
   const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
   if (apiResponse) {
-    const cvb = new Cvb(apiResponse);
+    const tcvb = new TCVB(apiResponse);
+    const oldCvb = new Cvb(cvbContent);
+    const cvb = mergeCvb(oldCvb, tcvb);
+    cvb.setMetaData("用户需求", userPrompt);
     const newCvbFilePath = path.join(tmpDir, fileName);
     fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
     vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
