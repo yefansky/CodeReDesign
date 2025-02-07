@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import { generateFilenameFromRequest } from './deepseekApi';
 
 // 语言映射表
-const languageMapping: { [key: string]: string } = {
+const g_objLanguageMapping: { [key: string]: string } = {
   'cpp': 'c++',
   'hpp': 'c++',
   'h': 'c++',
@@ -19,284 +19,422 @@ const languageMapping: { [key: string]: string } = {
 };
 
 // ================== CVB 核心类 ==================
-export class Cvb {
-  private content: string;
-  private metadata: Record<string, string>;
-  private files: Record<string, string>;
+export class Cvb
+{
+  private m_strContent : string;
+  private m_recMetadata : Record<string, string>;
+  private m_recFiles : Record<string, string>;
 
-  constructor(cvbContent: string) {
-    const { cvbContent: content, metadata, files } = this.parse(cvbContent);
-    this.content = content;
-    this.metadata = metadata;
-    this.files = files;
+  constructor(cvbContent: string)
+  {
+    const { cvbContent: m_strContent, metadata: m_recMetadata, files: m_recFiles } = this.parse(cvbContent);
+    this.m_strContent = m_strContent;
+    this.m_recMetadata = m_recMetadata;
+    this.m_recFiles = m_recFiles;
   }
 
-  getMetadata(): Record<string, string> {
-    return this.metadata;
+  public getMetadata() : Record<string, string>
+  {
+    return this.m_recMetadata;
   }
 
-  setMetaData(key: string, metadata : string) {
-    this.metadata[key] = metadata;
+  public setMetaData(strKey: string, strValue: string) : void
+  {
+    this.m_recMetadata[strKey] = strValue;
   }
 
-  getFiles(): Record<string, string> {
-    return this.files;
+  public getFiles() : Record<string, string>
+  {
+    return this.m_recFiles;
   }
 
-  getUserRequest(): string {
-    return this.metadata['@用户需求'] || '';
+  public getUserRequest() : string
+  {
+    return this.m_recMetadata['@用户需求'] || '';
   }
 
-  getTimestamp(): string {
-    return this.metadata['@时间戳'] || '';
+  public getTimestamp() : string
+  {
+    return this.m_recMetadata['@时间戳'] || '';
   }
 
-  toString(): string {
-    return this.content;
+  public toString() : string
+  {
+    return this.m_strContent;
   }
 
-  private parse(cvbContent: string): {
-    cvbContent: string;
-    metadata: Record<string, string>;
-    files: Record<string, string>;
-  } {
-    // 匹配## BEGIN_CVB在行首的位置
-    const cvbStartRegex = /^## BEGIN_CVB(\s|$)/m;
-    const cvbStartMatch = cvbStartRegex.exec(cvbContent);
-    if (!cvbStartMatch) {
+  private parse(strCvbContent: string) : { cvbContent: string, metadata: Record<string, string>, files: Record<string, string> }
+  {
+    // 查找 CVB 开始与结束标记
+    const regCvbStart: RegExp = /^## BEGIN_CVB(\s|$)/m;
+    const arrStartMatch = regCvbStart.exec(strCvbContent);
+    if (!arrStartMatch)
+    {
       throw new Error('Invalid CVB format: missing BEGIN_CVB marker.');
     }
-    const cvbStartIndex = cvbStartMatch.index;
+    const iCvbStartIndex = arrStartMatch.index;
 
-    // 匹配## END_CVB在行首的位置
-    const cvbEndRegex = /^## END_CVB(\s|$)/m;
-    const cvbEndMatch = cvbEndRegex.exec(cvbContent);
-    if (!cvbEndMatch) {
+    const regCvbEnd: RegExp = /^## END_CVB(\s|$)/m;
+    const arrEndMatch = regCvbEnd.exec(strCvbContent);
+    if (!arrEndMatch)
+    {
       throw new Error('Invalid CVB format: missing END_CVB marker.');
     }
-    const cvbEndIndex = cvbEndMatch.index;
+    const iCvbEndIndex = arrEndMatch.index;
 
-    // 提取CVB内容，包括## BEGIN_CVB和## END_CVB
-    const cvbContentStr = cvbContent.slice(cvbStartIndex, cvbEndIndex + cvbEndMatch[0].length);
+    // 提取 CVB 部分内容
+    const strCvbContentPart = strCvbContent.slice(iCvbStartIndex, iCvbEndIndex + arrEndMatch[0].length);
 
-    // 提取元数据部分
-    const metaRegex = /^## META\n([\s\S]*?)^## END_META(\s|$)/m;
-    const metaMatch = metaRegex.exec(cvbContentStr);
-    if (!metaMatch) {
+    // 解析 META 部分
+    const regMeta: RegExp = /^## META\n([\s\S]*?)^## END_META(\s|$)/m;
+    const arrMetaMatch = regMeta.exec(strCvbContentPart);
+    if (!arrMetaMatch)
+    {
       throw new Error('Invalid CVB format: missing META section.');
     }
-    const metadata: Record<string, string> = {};
-    const metaContent = metaMatch[1].trim().split('\n');
-    metaContent.forEach(line => {
-      const parts = line.split(':');
-      if (parts.length >= 2) {
-        const key = parts.shift()?.trim();
-        const value = parts.join(':').trim();
-        if (key) {
-          metadata[key] = value;
+    const recMetadata: Record<string, string> = { };
+    const arrMetaLines = arrMetaMatch[1].trim().split('\n');
+    for (const strLine of arrMetaLines)
+    {
+      const arrParts = strLine.split(':');
+      if (arrParts.length >= 2)
+      {
+        const strKey = arrParts.shift()?.trim();
+        const strValue = arrParts.join(':').trim();
+        if (strKey)
+        {
+          recMetadata[strKey] = strValue;
         }
       }
-    });
+    }
 
-    // 提取文件内容部分
-    const files: Record<string, string> = {};
-    const fileRegex = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
-    let match: RegExpExecArray | null;
-
-    while ((match = fileRegex.exec(cvbContentStr)) !== null) {
-      const filePath = match[1];
-      let fileContent = match[2].trim();
+    // 解析文件部分
+    const recFiles: Record<string, string> = { };
+    const regFile: RegExp = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
+    let arrFileMatch: RegExpExecArray | null;
+    while ((arrFileMatch = regFile.exec(strCvbContentPart)) !== null)
+    {
+      const strFilePath: string = arrFileMatch[1];
+      let strFileContent: string = arrFileMatch[2].trim();
       // 去除代码块标记
-      const codeBlockRegex = /^```.*\n([\s\S]*?)\n```$/m;
-      const codeBlockMatch = codeBlockRegex.exec(fileContent);
-      if (codeBlockMatch) {
-        fileContent = codeBlockMatch[1];
+      const regCodeBlock: RegExp = /^```.*\n([\s\S]*?)\n```$/m;
+      const arrCodeMatch = regCodeBlock.exec(strFileContent);
+      if (arrCodeMatch)
+      {
+        strFileContent = arrCodeMatch[1];
       }
-      files[filePath] = fileContent;
+      recFiles[strFilePath] = strFileContent;
     }
 
     return {
-      cvbContent: cvbContentStr,
-      metadata,
-      files,
+      cvbContent: strCvbContentPart,
+      metadata: recMetadata,
+      files: recFiles
     };
   }
 
-  static getFormatDescription(): string {
+  public static getFormatDescription() : string
+  {
     return `
-  CVB 格式介绍:
-  - 文件以 "## BEGIN_CVB" 开头，以 "## END_CVB" 结尾。
-  - 元数据部分以 "## META" 开头，以 "## END_META" 结尾，包含用户需求和时间戳。
-  - 每个文件以 "## FILE:文件路径" 开头，紧接着是 Markdown 格式的代码块，包含文件内容。
-  - 多个文件按顺序拼接在一起。
-    `;
+CVB 格式介绍:
+- 文件以 "## BEGIN_CVB" 开头，以 "## END_CVB" 结尾。
+- 元数据部分以 "## META" 开头，以 "## END_META" 结尾，包含用户需求和时间戳。
+- 每个文件以 "## FILE:文件路径" 开头，紧接着是 Markdown 格式的代码块，包含文件内容。
+- 多个文件按顺序拼接在一起。
+`;
   }
 }
 
 // ================== TCVB 差量格式 ==================
-abstract class CvbOperation {
-  constructor(
-    public readonly filePath: string,
-    public readonly type: 'replace' | 'insert' | 'delete'
-  ) {}
-}
 
-class ReplaceOperation extends CvbOperation {
+// 抽象操作类，使用匈牙利命名法
+abstract class TcvbOperation
+{
   constructor(
-    filePath: string,
-    public readonly beforeAnchor: string,
-    public readonly afterAnchor: string,
-    public readonly oldContent: string,
-    public readonly newContent: string
-  ) {
-    super(filePath, 'replace');
+    public readonly m_strFilePath: string,
+    public readonly m_strType: 'single-replace' | 'global-replace' | 'insert' | 'delete' | 'create'
+  )
+  {
   }
 }
 
-class InsertOperation extends CvbOperation {
+// 1. 单个替换操作（SINGLE-REPLACE）
+class SingleReplaceOperation extends TcvbOperation
+{
+  public m_strBeforeAnchor: string;
+  public m_strAfterAnchor: string;
+  public m_strOldContent: string;
+  public m_strNewContent: string;
+
   constructor(
-    filePath: string,
-    public readonly beforeAnchor: string,
-    public readonly afterAnchor: string,
-    public readonly content: string
-  ) {
-    super(filePath, 'insert');
+    m_strFilePath: string,
+    m_strBeforeAnchor: string,
+    m_strAfterAnchor: string,
+    m_strOldContent: string,
+    m_strNewContent: string
+  )
+  {
+    super(m_strFilePath, 'single-replace');
+    this.m_strBeforeAnchor = m_strBeforeAnchor;
+    this.m_strAfterAnchor = m_strAfterAnchor;
+    this.m_strOldContent = m_strOldContent;
+    this.m_strNewContent = m_strNewContent;
   }
 }
 
-class DeleteOperation extends CvbOperation {
+// 2. 全局替换操作（GLOBAL-REPLACE）
+class GlobalReplaceOperation extends TcvbOperation
+{
+  public m_strOldContent: string;
+  public m_strNewContent: string;
+
   constructor(
-    filePath: string,
-    public readonly beforeAnchor: string,
-    public readonly afterAnchor: string,
-    public readonly oldContent: string
-  ) {
-    super(filePath, 'delete');
+    m_strFilePath: string,
+    m_strOldContent: string,
+    m_strNewContent: string
+  )
+  {
+    super(m_strFilePath, 'global-replace');
+    this.m_strOldContent = m_strOldContent;
+    this.m_strNewContent = m_strNewContent;
   }
 }
 
-export class TCVB {
-  private operations: CvbOperation[] = [];
+// 3. 插入操作（INSERT）
+class InsertOperation extends TcvbOperation
+{
+  public m_strBeforeAnchor: string;
+  public m_strAfterAnchor: string;
+  public m_strInsertContent: string;
 
-  constructor(tcvbContent: string) {
-    this.parse(tcvbContent);
+  constructor(
+    m_strFilePath: string,
+    m_strBeforeAnchor: string,
+    m_strAfterAnchor: string,
+    m_strInsertContent: string
+  )
+  {
+    super(m_strFilePath, 'insert');
+    this.m_strBeforeAnchor = m_strBeforeAnchor;
+    this.m_strAfterAnchor = m_strAfterAnchor;
+    this.m_strInsertContent = m_strInsertContent;
+  }
+}
+
+// 4. 删除操作（DELETE）
+class DeleteOperation extends TcvbOperation
+{
+  public m_strBeforeAnchor: string;
+  public m_strAfterAnchor: string;
+  public m_strDeleteContent: string;
+
+  constructor(
+    m_strFilePath: string,
+    m_strBeforeAnchor: string,
+    m_strAfterAnchor: string,
+    m_strDeleteContent: string
+  )
+  {
+    super(m_strFilePath, 'delete');
+    this.m_strBeforeAnchor = m_strBeforeAnchor;
+    this.m_strAfterAnchor = m_strAfterAnchor;
+    this.m_strDeleteContent = m_strDeleteContent;
+  }
+}
+
+// 5. 创建操作（CREATE）——新写文件，后面直接跟正文内容即可
+class CreateOperation extends TcvbOperation
+{
+  public m_strContent: string;
+
+  constructor(
+    m_strFilePath: string,
+    m_strContent: string
+  )
+  {
+    super(m_strFilePath, 'create');
+    this.m_strContent = m_strContent;
+  }
+}
+
+export class TCVB
+{
+  private m_arrOperations: TcvbOperation[] = [ ];
+
+  constructor(tcStrContent: string)
+  {
+    this.parse(tcStrContent);
   }
 
-  private parse(content: string) {
-    const fileBlockRegex = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_TCVB)/gm;
-    let fileMatch: RegExpExecArray | null;
-    
-    while ((fileMatch = fileBlockRegex.exec(content)) !== null) {
-      const filePath = filePathNormalize(fileMatch[1]);
-      const operationsBlock = fileMatch[2];
-      
-      const operationRegex = /^## OPERATION:(\w+)(?:\s+FILE:(.*?))?\n([\s\S]*?)(?=^## OPERATION:|^## FILE:|^## END_TCVB)/gm;
-      let opMatch: RegExpExecArray | null;
-
-      while ((opMatch = operationRegex.exec(operationsBlock)) !== null) {
-        const type = opMatch[1].toLowerCase();
-        const explicitFilePath = opMatch[2] ? filePathNormalize(opMatch[2]) : null;
-        const operationContent = opMatch[3].trim();
-
-        const finalFilePath = explicitFilePath || filePath;
-        this.parseOperation(finalFilePath, type, operationContent);
+  private parse(tcStrContent: string) : void
+  {
+    // 匹配文件块，每个文件块以 "## FILE:" 开头
+    const regFileBlock: RegExp = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_TCVB)/gm;
+    let arrFileMatch: RegExpExecArray | null;
+    while ((arrFileMatch = regFileBlock.exec(tcStrContent)) !== null)
+    {
+      const strFilePath: string = filePathNormalize(arrFileMatch[1]);
+      const strOperationsBlock: string = arrFileMatch[2];
+      // 支持操作类型中含有 "-" 符号（如 single-replace 等）
+      const regOperation: RegExp = /^## OPERATION:([\w-]+)(?:\s+FILE:(.*?))?\n([\s\S]*?)(?=^## OPERATION:|^## FILE:|^## END_TCVB)/gm;
+      let arrOpMatch: RegExpExecArray | null;
+      while ((arrOpMatch = regOperation.exec(strOperationsBlock)) !== null)
+      {
+        const strType: string = arrOpMatch[1].toLowerCase();
+        const strExplicitFilePath: string | null = arrOpMatch[2] ? filePathNormalize(arrOpMatch[2]) : null;
+        const strOpContent: string = arrOpMatch[3].trim();
+        const strFinalFilePath: string = strExplicitFilePath || strFilePath;
+        this.parseOperation(strFinalFilePath, strType, strOpContent);
       }
     }
   }
 
-  private parseOperation(filePath: string, type: string, content: string) {
-    try {
-      switch (type) {
-        case 'replace':
-          this.parseReplace(filePath, content);
+  private parseOperation(strFilePath: string, strType: string, strContent: string) : void
+  {
+    try
+    {
+      switch (strType)
+      {
+        case 'single-replace':
+          this.parseSingleReplace(strFilePath, strContent);
+          break;
+        case 'global-replace':
+          this.parseGlobalReplace(strFilePath, strContent);
           break;
         case 'insert':
-          this.parseInsert(filePath, content);
+          this.parseInsert(strFilePath, strContent);
           break;
         case 'delete':
-          this.parseDelete(filePath, content);
+          this.parseDelete(strFilePath, strContent);
+          break;
+        case 'create':
+          this.parseCreate(strFilePath, strContent);
           break;
         default:
-          throw new Error(`Unknown operation type: ${type}`);
+          throw new Error(`未知的操作类型: ${strType}`);
       }
-    } catch (e) {
-      console.error(`Failed to parse ${type} operation for ${filePath}: ${e}`);
+    }
+    catch (err)
+    {
+      console.error(`解析 ${strType} 操作时出错, 文件: ${strFilePath}, 错误: ${err}`);
     }
   }
 
-  private parseReplace(filePath: string, content: string) {
-    const sections = this.parseSections(content, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'OLD_CONTENT', 'NEW_CONTENT']);
-    this.operations.push(new ReplaceOperation(
-      filePath,
-      sections.BEFORE_ANCHOR,
-      sections.AFTER_ANCHOR,
-      sections.OLD_CONTENT,
-      sections.NEW_CONTENT
+  // SINGLE-REPLACE 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、OLD_CONTENT、NEW_CONTENT 四个段落
+  private parseSingleReplace(strFilePath: string, strContent: string) : void
+  {
+    const recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'OLD_CONTENT', 'NEW_CONTENT']);
+    this.m_arrOperations.push(new SingleReplaceOperation(
+      strFilePath,
+      recSections['BEFORE_ANCHOR'],
+      recSections['AFTER_ANCHOR'],
+      recSections['OLD_CONTENT'],
+      recSections['NEW_CONTENT']
     ));
   }
 
-  private parseInsert(filePath: string, content: string) {
-    const sections = this.parseSections(content, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'INSERT_CONTENT']);
-    this.operations.push(new InsertOperation(
-      filePath,
-      sections.BEFORE_ANCHOR,
-      sections.AFTER_ANCHOR,
-      sections.INSERT_CONTENT
+  // GLOBAL-REPLACE 操作解析：仅要求 OLD_CONTENT 与 NEW_CONTENT
+  private parseGlobalReplace(strFilePath: string, strContent: string) : void
+  {
+    const recSections = this.parseSections(strContent, ['OLD_CONTENT', 'NEW_CONTENT']);
+    this.m_arrOperations.push(new GlobalReplaceOperation(
+      strFilePath,
+      recSections['OLD_CONTENT'],
+      recSections['NEW_CONTENT']
     ));
   }
 
-  private parseDelete(filePath: string, content: string) {
-    const sections = this.parseSections(content, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'DELETE_CONTENT']);
-    this.operations.push(new DeleteOperation(
-      filePath,
-      sections.BEFORE_ANCHOR,
-      sections.AFTER_ANCHOR,
-      sections.DELETE_CONTENT
+  // INSERT 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、INSERT_CONTENT 三个段落
+  private parseInsert(strFilePath: string, strContent: string) : void
+  {
+    const recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'INSERT_CONTENT']);
+    this.m_arrOperations.push(new InsertOperation(
+      strFilePath,
+      recSections['BEFORE_ANCHOR'],
+      recSections['AFTER_ANCHOR'],
+      recSections['INSERT_CONTENT']
     ));
   }
 
-  private parseSections(content: string, expectedSections: string[]): Record<string, string> {
-    const result: Record<string, string> = {};
-    let currentSection: string | null = null;
-    let buffer: string[] = [];
+  // DELETE 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、DELETE_CONTENT 三个段落
+  private parseDelete(strFilePath: string, strContent: string) : void
+  {
+    const recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'DELETE_CONTENT']);
+    this.m_arrOperations.push(new DeleteOperation(
+      strFilePath,
+      recSections['BEFORE_ANCHOR'],
+      recSections['AFTER_ANCHOR'],
+      recSections['DELETE_CONTENT']
+    ));
+  }
 
-    for (const line of content.split('\n')) {
-      const sectionMatch = line.match(/^## ([A-Z_]+)/);
-      if (sectionMatch) {
-        if (currentSection) {
-          result[currentSection] = buffer.join('\n').trim();
-          buffer = [];
+  // CREATE 操作解析：直接将正文内容作为新文件内容，可选地去除 Markdown 代码块
+  private parseCreate(strFilePath: string, strContent: string) : void
+  {
+    let strNewContent: string = strContent;
+    const regCodeBlock: RegExp = /^```.*\n([\s\S]*?)\n```$/m;
+    const arrMatch = regCodeBlock.exec(strNewContent);
+    if (arrMatch)
+    {
+      strNewContent = arrMatch[1];
+    }
+    this.m_arrOperations.push(new CreateOperation(
+      strFilePath,
+      strNewContent
+    ));
+  }
+
+  // 辅助方法：解析操作正文中的各个段落（段落标记格式为 "## 段落名称"）
+  private parseSections(strContent: string, arrExpectedSections: string[]) : Record<string, string>
+  {
+    const recResult: Record<string, string> = { };
+    let strCurrentSection: string | null = null;
+    const arrBuffer: string[] = [ ];
+    const arrLines: string[] = strContent.split('\n');
+    for (const strLine of arrLines)
+    {
+      const arrSectionMatch = strLine.match(/^## ([A-Z_]+)/);
+      if (arrSectionMatch)
+      {
+        if (strCurrentSection)
+        {
+          recResult[strCurrentSection] = arrBuffer.join('\n').trim();
+          arrBuffer.length = 0;
         }
-        currentSection = sectionMatch[1];
-        if (!expectedSections.includes(currentSection)) {
-          throw new Error(`Unexpected section: ${currentSection}`);
+        strCurrentSection = arrSectionMatch[1];
+        if (arrExpectedSections.indexOf(strCurrentSection) === -1)
+        {
+          throw new Error(`意外的段落: ${strCurrentSection}`);
         }
-      } else if (currentSection) {
-        buffer.push(line);
+      }
+      else if (strCurrentSection)
+     	{
+        arrBuffer.push(strLine);
       }
     }
-
-    if (currentSection) {
-      result[currentSection] = buffer.join('\n').trim();
+    if (strCurrentSection)
+    {
+      recResult[strCurrentSection] = arrBuffer.join('\n').trim();
     }
-
-    // Validate required sections
-    for (const section of expectedSections) {
-      if (!(section in result)) {
-        throw new Error(`Missing required section: ${section}`);
+    for (const strSection of arrExpectedSections)
+    {
+      if (!(strSection in recResult))
+      {
+        throw new Error(`缺失必需的段落: ${strSection}`);
       }
     }
-
-    return result;
+    return recResult;
   }
 
-  getOperations(): CvbOperation[] {
-    return [...this.operations];
+  public getOperations() : TcvbOperation[]
+  {
+    return [ ...this.m_arrOperations ];
   }
 
-  static getFormatDescription(): string {
+  public static getFormatDescription() : string
+  {
     return `
-TCVB 格式规范（版本2.0）：
+TCVB 格式规范：
 
 ## BEGIN_TCVB
 [文件块1]
@@ -311,209 +449,241 @@ TCVB 格式规范（版本2.0）：
 ...
 
 操作类型：
-1. 替换操作（REPLACE）:
-## OPERATION:REPLACE
+1. 单个替换操作（SINGLE-REPLACE）:
+## OPERATION:SINGLE-REPLACE
 ## BEFORE_ANCHOR
-[前锚点内容]
+\`\`\`
+前锚点内容,用来划定范围，避免混淆
+\`\`\`
 ## AFTER_ANCHOR
-[后锚点内容]
+\`\`\`
+后锚点内容,用来划定范围，避免混淆
+\`\`\`
 ## OLD_CONTENT
-[被替换内容]
+\`\`\`
+被替换内容
+\`\`\`
 ## NEW_CONTENT
-[新内容]
+\`\`\`
+新内容
+\`\`\`
 
-2. 插入操作（INSERT）:
+2. 全局替换操作（GLOBAL-REPLACE）:
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+\`\`\`
+被替换内容
+\`\`\`
+## NEW_CONTENT
+\`\`\`
+新内容
+\`\`\`
+
+3. 插入操作（INSERT）:
 ## OPERATION:INSERT
 ## BEFORE_ANCHOR
-[插入位置前锚点]
+\`\`\`
+插入位置前的锚点内容
+\`\`\`
 ## AFTER_ANCHOR
-[插入位置后锚点]
+\`\`\`
+插入位置后的锚点内容
+\`\`\`
 ## INSERT_CONTENT
-[插入内容]
+\`\`\`
+插入内容
+\`\`\`
 
-3. 删除操作（DELETE）:
+4. 删除操作（DELETE）:
 ## OPERATION:DELETE
 ## BEFORE_ANCHOR
-[被删内容前锚点]
+\`\`\`
+被删内容前的锚点内容
+\`\`\`
 ## AFTER_ANCHOR
-[被删内容后锚点]
+\`\`\`
+被删内容后的锚点内容
+\`\`\`
 ## DELETE_CONTENT
-[被删除内容]
+\`\`\`
+被删除内容
+\`\`\`
 
-高级特性：
-1. 文件路径复用：同一文件下的多个操作共享FILE声明
+5. 创建操作（CREATE）:
+## OPERATION:CREATE
+直接跟正文内容，表示新文件的全部内容
+
+注意：
+1. 文件路径复用：同一文件下的多个操作共享 FILE 声明
 2. 混合操作：允许在文件块内任意顺序组合操作类型
-3. 精准锚点：使用至少3行唯一文本作为锚点
-4. 跨文件操作：可通过## OPERATION:TYPE FILE:path 临时指定其他文件
-
-示例：
-## BEGIN_TCVB
-## FILE:src/app.js
-## OPERATION:REPLACE
-## BEFORE_ANCHOR
-function legacy() {
-  console.log('old');
-## AFTER_ANCHOR
-}
-
-## OLD_CONTENT
-  return 100;
-## NEW_CONTENT
-  return 200;
-
-## OPERATION:INSERT
-## BEFORE_ANCHOR
-// == 配置开始 ==
-## AFTER_ANCHOR
-// == 配置结束 ==
-## INSERT_CONTENT
-  timeout: 3000,
-
-## FILE:README.md
-## OPERATION:DELETE
-## BEFORE_ANCHOR
-<!-- DEPRECATED SECTION -->
-## AFTER_ANCHOR
-<!-- END DEPRECATED -->
-## DELETE_CONTENT
-...旧内容...
-## END_TCVB
+3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆
+4. 代码块用 markdown 格式包裹
 `;
   }
 }
 
 // ================== 合并函数 ==================
-export function mergeCvb(baseCvb: Cvb, tcvb: TCVB): Cvb {
-  const mergedFiles = new Map<string, string>(Object.entries(baseCvb.getFiles()));
 
-  // 按文件分组操作
-  const operationsByFile = new Map<string, CvbOperation[]>();
-  for (const op of tcvb.getOperations()) {
-    if (!operationsByFile.has(op.filePath)) {
-      operationsByFile.set(op.filePath, []);
+export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
+{
+  // 先将 baseCvb 中的所有文件内容存入 Map
+  const mapMergedFiles: Map<string, string> = new Map<string, string>(Object.entries(baseCvb.getFiles()));
+
+  // 按文件分组 TCVB 操作
+  const mapOperationsByFile: Map<string, TcvbOperation[]> = new Map<string, TcvbOperation[]>();
+  for (const op of tcvb.getOperations())
+  {
+    if (!mapOperationsByFile.has(op.m_strFilePath))
+    {
+      mapOperationsByFile.set(op.m_strFilePath, [ ]);
     }
-    operationsByFile.get(op.filePath)!.push(op);
+    mapOperationsByFile.get(op.m_strFilePath)!.push(op);
   }
 
-  // 处理每个文件的修改
-  for (const [filePath, operations] of operationsByFile) {
-    let content = mergedFiles.get(filePath) || '';
-    
-    // 按操作顺序执行修改
-    for (const op of operations) {
-      if (op instanceof ReplaceOperation) {
-        content = applyReplace(content, op);
-      } else if (op instanceof InsertOperation) {
-        content = applyInsert(content, op);
-      } else if (op instanceof DeleteOperation) {
-        content = applyDelete(content, op);
+  // 对每个文件执行所有操作（按顺序执行）
+  for (const [strFilePath, arrOperations] of mapOperationsByFile)
+  {
+    let strContent: string = mapMergedFiles.get(strFilePath) || '';
+    for (const op of arrOperations)
+    {
+      if (op instanceof SingleReplaceOperation)
+      {
+        strContent = applySingleReplace(strContent, op);
+      }
+      else if (op instanceof GlobalReplaceOperation)
+      {
+        strContent = applyGlobalReplace(strContent, op);
+      }
+      else if (op instanceof InsertOperation)
+      {
+        strContent = applyInsert(strContent, op);
+      }
+      else if (op instanceof DeleteOperation)
+      {
+        strContent = applyDelete(strContent, op);
+      }
+      else if (op instanceof CreateOperation)
+      {
+        // CREATE 操作：直接以新内容覆盖原有内容
+        strContent = op.m_strContent;
       }
     }
-    
-    mergedFiles.set(filePath, content);
+    mapMergedFiles.set(strFilePath, strContent);
   }
 
-  // 重新生成CVB内容
-  return rebuildCvb(baseCvb, mergedFiles);
+  return rebuildCvb(baseCvb, mapMergedFiles);
 }
 
-function applyReplace(content: string, op: ReplaceOperation): string {
-  const pattern = buildPattern(op.beforeAnchor, op.oldContent, op.afterAnchor);
-  const replacement = `${op.beforeAnchor}${op.newContent}${op.afterAnchor}`;
-  return content.replace(pattern, replacement);
+function applySingleReplace(strContent: string, op: SingleReplaceOperation) : string
+{
+  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, op.m_strOldContent, op.m_strAfterAnchor);
+  const strReplacement: string = op.m_strBeforeAnchor + op.m_strNewContent + op.m_strAfterAnchor;
+  return strContent.replace(regPattern, strReplacement);
 }
 
-function applyInsert(content: string, op: InsertOperation): string {
-  const pattern = buildPattern(op.beforeAnchor, '', op.afterAnchor);
-  const replacement = `${op.beforeAnchor}${op.content}${op.afterAnchor}`;
-  return content.replace(pattern, replacement);
+function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : string
+{
+  const regPattern: RegExp = new RegExp(escapeRegExp(op.m_strOldContent), 'gs');
+  return strContent.replace(regPattern, op.m_strNewContent);
 }
 
-function applyDelete(content: string, op: DeleteOperation): string {
-  const pattern = buildPattern(op.beforeAnchor, op.oldContent, op.afterAnchor);
-  return content.replace(pattern, `${op.beforeAnchor}${op.afterAnchor}`);
+function applyInsert(strContent: string, op: InsertOperation) : string
+{
+  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, '', op.m_strAfterAnchor);
+  const strReplacement: string = op.m_strBeforeAnchor + op.m_strInsertContent + op.m_strAfterAnchor;
+  return strContent.replace(regPattern, strReplacement);
 }
 
-function buildPattern(before: string, content: string, after: string): RegExp {
-  return new RegExp(
-    `${escapeRegExp(before)}${escapeRegExp(content)}${escapeRegExp(after)}`,
-    'gs' // 使用dotall模式匹配换行
-  );
+function applyDelete(strContent: string, op: DeleteOperation) : string
+{
+  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, op.m_strDeleteContent, op.m_strAfterAnchor);
+  return strContent.replace(regPattern, op.m_strBeforeAnchor + op.m_strAfterAnchor);
 }
 
-function rebuildCvb(baseCvb: Cvb, files: Map<string, string>): Cvb {
-  let newContent = `## BEGIN_CVB\n## META\n`;
-  
-  // 保留元数据
-  const metadata = baseCvb.getMetadata();
-  for (const [key, value] of Object.entries(metadata)) {
-    newContent += `${key}: ${value}\n`;
+// 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）
+function buildPattern(strBefore: string, strContent: string, strAfter: string) : RegExp
+{
+  return new RegExp(escapeRegExp(strBefore) + escapeRegExp(strContent) + escapeRegExp(strAfter), 'gs');
+}
+
+function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>) : Cvb
+{
+  let strNewContent: string = `## BEGIN_CVB\n## META\n`;
+
+  const recMetadata = baseCvb.getMetadata();
+  for (const [strKey, strValue] of Object.entries(recMetadata))
+  {
+    strNewContent += `${strKey}: ${strValue}\n`;
   }
-  newContent += `## END_META\n\n`;
+  strNewContent += `## END_META\n\n`;
 
-  // 重建文件内容
-  for (const [filePath, content] of files) {
-    const ext = path.extname(filePath).slice(1).toLowerCase();
-    const lang = languageMapping[ext] || 'text';
-    newContent += `## FILE:${filePath}\n\`\`\`${lang}\n${content}\n\`\`\`\n\n`;
+  for (const [strFilePath, strContent] of mapFiles)
+  {
+    const strExt: string = path.extname(strFilePath).slice(1).toLowerCase();
+    const strLang: string = g_objLanguageMapping[strExt] || 'text';
+    strNewContent += `## FILE:${strFilePath}\n\`\`\`${strLang}\n${strContent}\n\`\`\`\n\n`;
   }
 
-  newContent += `## END_CVB`;
-  const cvb = new Cvb(newContent);
+  strNewContent += `## END_CVB`;
+  const cvb = new Cvb(strNewContent);
 
   cvb.setMetaData("时间戳", generateTimestamp());
   return cvb;
 }
 
 // ================== 工具函数 ==================
-function escapeRegExp(str: string): string {
+
+function escapeRegExp(str: string) : string
+{
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function filePathNormalize(rawPath: string): string {
-  return path.normalize(rawPath.replace(/^[\\/]+/, ''));
+function filePathNormalize(strRawPath: string) : string
+{
+  return path.normalize(strRawPath.replace(/^[\\/]+/, ''));
 }
 
 /**
  * 检测文件编码并转换为 UTF-8
- * @param filePath 文件路径
- * @returns 转换后的 UTF-8 内容
  */
-function readFileWithEncoding(filePath: string): string {
-  const buffer = fs.readFileSync(filePath);
-  const detected = jschardet.detect(buffer);
-  let encoding = detected.encoding.toLowerCase();
+function readFileWithEncoding(strFilePath: string) : string
+{
+  const bufFile = fs.readFileSync(strFilePath);
+  const objDetected = jschardet.detect(bufFile);
+  let strEncoding: string = objDetected.encoding.toLowerCase();
 
-  // 如果检测结果为 ascii，进一步判断是否为 GBK
-  if (encoding === 'ascii') {
-    if (isLikelyGBK(buffer)) {
-      encoding = 'gbk';
-    } else {
-      encoding = 'utf-8'; // 默认使用 UTF-8
+  if (strEncoding === 'ascii')
+  {
+    if (isLikelyGBK(bufFile))
+    {
+      strEncoding = 'gbk';
+    }
+    else
+    {
+      strEncoding = 'utf-8';
     }
   }
 
-  // 根据编码进行转换
-  if (encoding === 'utf-8') {
-    return buffer.toString('utf-8');
+  if (strEncoding === 'utf-8')
+  {
+    return bufFile.toString('utf-8');
+  }
+  if (strEncoding === 'gbk' || strEncoding === 'gb2312' || strEncoding === 'windows-1252')
+  {
+    return iconv.decode(bufFile, 'gbk');
   }
 
-  if (encoding === 'gbk' || encoding === 'gb2312' || encoding === 'windows-1252') {
-    return iconv.decode(buffer, 'gbk');
-  }
-
-  throw new Error(`Unsupported encoding: ${encoding}`);
+  throw new Error(`Unsupported encoding: ${strEncoding}`);
 }
 
-/**
- * 判断 buffer 是否可能是 GBK 编码
- * @param buffer 文件内容的 buffer
- * @returns 是否为 GBK 编码
- */
-function isLikelyGBK(buffer: Buffer): boolean {
-  for (let i = 0; i < buffer.length; i++) {
-    if (buffer[i] >= 0x81 && buffer[i] <= 0xFE) {
-      if (i + 1 < buffer.length && (buffer[i + 1] >= 0x40 && buffer[i + 1] <= 0xFE)) {
+function isLikelyGBK(buf: Buffer) : boolean
+{
+  for (let i = 0; i < buf.length; i++)
+  {
+    if (buf[i] >= 0x81 && buf[i] <= 0xFE)
+    {
+      if (i + 1 < buf.length && (buf[i + 1] >= 0x40 && buf[i + 1] <= 0xFE))
+      {
         return true;
       }
     }
@@ -521,125 +691,108 @@ function isLikelyGBK(buffer: Buffer): boolean {
   return false;
 }
 
-export function generateTimestamp(): string {
-    const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const hour = now.getHours().toString().padStart(2, '0');
-    const minute = now.getMinutes().toString().padStart(2, '0');
-    const second = now.getSeconds().toString().padStart(2, '0');
-    return `${year}${month}${day}${hour}${minute}${second}`;
+export function generateTimestamp() : string
+{
+  const dtNow = new Date();
+  const strYear = dtNow.getFullYear().toString().slice(-2);
+  const strMonth = (dtNow.getMonth() + 1).toString().padStart(2, '0');
+  const strDay = dtNow.getDate().toString().padStart(2, '0');
+  const strHour = dtNow.getHours().toString().padStart(2, '0');
+  const strMinute = dtNow.getMinutes().toString().padStart(2, '0');
+  const strSecond = dtNow.getSeconds().toString().padStart(2, '0');
+  return `${strYear}${strMonth}${strDay}${strHour}${strMinute}${strSecond}`;
 }
 
 /**
  * 生成 CVB 格式的文件
- * @param filePaths 文件路径数组
- * @param userRequest 用户输入的重构需求
- * @returns 生成的 CVB 文件路径
  */
-export async function generateCvb(filePaths: string[], userRequest: string): Promise<string> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-        throw new Error('No workspace folder found.');
+export async function generateCvb(arrFilePaths: string[], strUserRequest: string) : Promise<string>
+{
+  const arrWorkspaceFolders = vscode.workspace.workspaceFolders;
+  if (!arrWorkspaceFolders)
+  {
+    throw new Error('No workspace folder found.');
+  }
+
+  const strWorkspacePath = arrWorkspaceFolders[0].uri.fsPath;
+  const strTmpDir = path.join(strWorkspacePath, '.CodeReDesignWorkSpace');
+  if (!fs.existsSync(strTmpDir))
+  {
+    fs.mkdirSync(strTmpDir, { recursive: true });
+  }
+
+  const strTimestamp = generateTimestamp();
+  let strCvbContent: string = `## BEGIN_CVB\n`;
+  strCvbContent += `## META\n`;
+  strCvbContent += `@用户需求: ${strUserRequest}\n`;
+  strCvbContent += `@时间戳: ${strTimestamp}\n`;
+  strCvbContent += `## END_META\n\n`;
+
+  for (const strFilePath of arrFilePaths)
+  {
+    try
+    {
+      const strFileContent = readFileWithEncoding(strFilePath);
+      const strExt = path.extname(strFilePath).slice(1).toLowerCase();
+      const strLang = g_objLanguageMapping[strExt] || 'text';
+      strCvbContent += `## FILE:${strFilePath}\n`;
+      strCvbContent += '```' + strLang + '\n';
+      strCvbContent += strFileContent + '\n';
+      strCvbContent += '```\n\n';
     }
-
-    const workspacePath = workspaceFolders[0].uri.fsPath;
-
-    // Create temporary directory (if not exists)
-    const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
-    if (!fs.existsSync(tmpDir)) {
-        fs.mkdirSync(tmpDir, { recursive: true });
+    catch (error)
+    {
+      console.error(`Failed to read file ${strFilePath}:`, error);
     }
+  }
 
-    // Generate CVB header
-    const timestamp = generateTimestamp();
-    let cvbContent = `## BEGIN_CVB\n`;
-    cvbContent += `## META\n`;
-    cvbContent += `@用户需求: ${userRequest}\n`;
-    cvbContent += `@时间戳: ${timestamp}\n`;
-    cvbContent += `## END_META\n\n`;
+  strCvbContent += `## END_CVB\n`;
 
-    // Generate CVB body (file contents)
-    for (const filePath of filePaths) {
-        try {
-            const fileContent = readFileWithEncoding(filePath);
-            const ext = path.extname(filePath).slice(1).toLowerCase();
-            const lang = languageMapping[ext] || 'text';
-            cvbContent += `## FILE:${filePath}\n`;
-            cvbContent += '```' + lang + '\n';
-            cvbContent += fileContent + '\n';
-            cvbContent += '```\n\n';
-        } catch (error) {
-            console.error(`Failed to read file ${filePath}:`, error);
-        }
-    }
-
-    // 添加 CVB 结束标记
-    cvbContent += `## END_CVB\n`;
-    
-    // Get summary of user request for filename
-    let summary = await generateFilenameFromRequest (userRequest);
-    if (!summary || summary.length === 0) {
-        summary = 'default';
-    }
-
-    // Create the base filename
-    let baseFileName = `${timestamp}_${summary}.cvb`;
-
-    // Ensure the filename is unique
-    let fileName = baseFileName;
-    let i = 1;
-    while (fs.existsSync(path.join(tmpDir, fileName))) {
-        fileName = `${timestamp}_${summary}_${i}.cvb`;
-        i++;
-    }
-
-    // Full path for the CVB file
-    const cvbFilePath = path.join(tmpDir, fileName);
-
-    // Write CVB content to file
-    fs.writeFileSync(cvbFilePath, cvbContent, 'utf-8');
-
-    return cvbFilePath;
+  let strSummary = await generateFilenameFromRequest(strUserRequest);
+  if (!strSummary || strSummary.length === 0)
+  {
+    strSummary = 'default';
+  }
+  let strBaseFileName = `${strTimestamp}_${strSummary}.cvb`;
+  let strFileName = strBaseFileName;
+  let iCounter = 1;
+  while (fs.existsSync(path.join(strTmpDir, strFileName)))
+  {
+    strFileName = `${strTimestamp}_${strSummary}_${iCounter}.cvb`;
+    iCounter++;
+  }
+  const strCvbFilePath = path.join(strTmpDir, strFileName);
+  fs.writeFileSync(strCvbFilePath, strCvbContent, 'utf-8');
+  return strCvbFilePath;
 }
 
 /**
  * 将 CVB 文件内容应用到当前工作目录
- * @param cvbContent CVB 文件内容
  */
-export function applyCvbToWorkspace(cvbContent: string): void {
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (!workspaceFolders) {
+export function applyCvbToWorkspace(strCvbContent: string) : void
+{
+  const arrWorkspaceFolders = vscode.workspace.workspaceFolders;
+  if (!arrWorkspaceFolders)
+  {
     throw new Error('No workspace folder found.');
   }
-
-  const workspacePath = workspaceFolders[0].uri.fsPath;
-
-  // 解析 CVB 文件内容
-  const cvb = new Cvb(cvbContent);
-  const files = cvb.getFiles();
-
-  // 遍历文件内容
-  for (const [filePath, fileContent] of Object.entries(files)) {
-    // 解析文件路径
-    const normalizedFilePath = path.normalize(filePath);
-
-    // 安全检查：确保文件路径不会超出当前工作目录
-    const absoluteFilePath = path.resolve(workspacePath, normalizedFilePath);
-    if (!absoluteFilePath.startsWith(workspacePath)) {
-      throw new Error(`Invalid file path: ${filePath}. File path is outside the workspace.`);
+  const strWorkspacePath = arrWorkspaceFolders[0].uri.fsPath;
+  const cvb = new Cvb(strCvbContent);
+  const recFiles = cvb.getFiles();
+  for (const [strFilePath, strFileContent] of Object.entries(recFiles))
+  {
+    const strNormalizedPath = path.normalize(strFilePath);
+    const strAbsoluteFilePath = path.resolve(strWorkspacePath, strNormalizedPath);
+    if (!strAbsoluteFilePath.startsWith(strWorkspacePath))
+    {
+      throw new Error(`Invalid file path: ${strFilePath}. File path is outside the workspace.`);
     }
-
-    // 创建目录（如果不存在）
-    const dirPath = path.dirname(absoluteFilePath);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
+    const strDirPath = path.dirname(strAbsoluteFilePath);
+    if (!fs.existsSync(strDirPath))
+    {
+      fs.mkdirSync(strDirPath, { recursive: true });
     }
-
-    // 写入文件
-    fs.writeFileSync(absoluteFilePath, fileContent, 'utf-8');
+    fs.writeFileSync(strAbsoluteFilePath, strFileContent, 'utf-8');
   }
-
   vscode.window.showInformationMessage('CVB applied successfully!');
 }
