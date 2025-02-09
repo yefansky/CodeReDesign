@@ -170,7 +170,8 @@ async function uploadThisCvb(filePath: string) {
     }
     const workspacePath = workspaceFolders[0].uri.fsPath;
     const filepath = path.join(workspacePath, "/prompt/testdata.txt");
-    const tcvbContent = fs.readFileSync(filepath, 'utf-8');
+    let tcvbContent = fs.readFileSync(filepath, 'utf-8');
+    tcvbContent = tcvbContent.replace(/\r\n?/g, "\n");
     const tcvb = new TCVB(tcvbContent);
     const cvbContent = fs.readFileSync(filePath, 'utf-8');
     const oldCvb = new Cvb(cvbContent);

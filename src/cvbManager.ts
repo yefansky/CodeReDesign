@@ -276,7 +276,7 @@ export class TCVB
       const strFilePath: string = filePathNormalize(arrFileMatch[1]);
       const strOperationsBlock: string = arrFileMatch[2];
       // 支持操作类型中含有 "-" 符号（如 single-replace 等）
-      const regOperation: RegExp = /^## OPERATION:([\w-]+)\n([\s\S]*?)(?=^## OPERATION:)/gm;
+      const regOperation: RegExp = /^## OPERATION:([\w-]+)\n([\s\S]*?)(?=^## OPERATION:|(?![\s\S]))/gm;
       let arrOpMatch: RegExpExecArray | null;
       while ((arrOpMatch = regOperation.exec(strOperationsBlock)) !== null)
       {
@@ -488,10 +488,9 @@ TCVB 格式规范：
 [代码块:直接跟正文内容，表示新文件的全部内容]
 
 注意：
-1. 文件路径复用：同一文件下的多个操作共享 FILE 声明
-2. 混合操作：允许在文件块内任意顺序组合操作类型
-3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆
-4. 代码块用 markdown 格式包裹
+1. 文件路径复用：同一文件下## FILE ,可以有多个## OPERATION，不用每次重复相同的## FILE
+2. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆
+3. 代码块,(规则中的[代码块:...]) 用 markdown 格式包裹
 `;
   }
 }
