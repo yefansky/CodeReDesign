@@ -1,153 +1,153 @@
-# �����ع����� VSCode ����ĵ�
+﻿# 代码重构助手 VSCode 插件文档
 
-## ����
-�����ع�������һ�� VSCode �����ּ�ڰ��������߸���Ч���� DeepSeek API ���н�����֧�ֶ��ļ������ع����汾�������ļ��Աȵȹ��ܡ�ͨ�� CVB��Code Version Backup���ļ���ʽ������ܹ�����������ļ��ϲ�Ϊһ���ļ�����֧���ϴ��ع����󡢽��� API �������汾���ݵȲ�����
+## 概述
+代码重构助手是一个 VSCode 插件，旨在帮助开发者更高效地与 DeepSeek API 进行交互，支持多文件代码重构、版本管理、文件对比等功能。通过 CVB（Code Version Backup）文件格式，插件能够将多个代码文件合并为一个文件，并支持上传重构请求、解析 API 反馈、版本回溯等操作。
 
-## �����б�
+## 功能列表
 
-### 1. �ļ��б�����������
-����ǰ����Ŀ¼�µĴ���Դ�ļ�ȫѡ�򲿷�ѡ������һ���ļ��б���
+### 1. 文件列表生成与排序
+将当前工作目录下的代码源文件全选或部分选择，生成一个文件列表。
 
-�ļ��б������ֵ�������
+文件列表根据字典序排序。
 
-### 2. �����ļ��ϲ�
-��ѡ�еĴ����ļ���˳��ϲ�Ϊһ�� CVB �ļ���
+### 2. 代码文件合并
+将选中的代码文件按顺序合并为一个 CVB 文件。
 
-�ļ���ʽ����:
+文件格式如下:
 @@@BEGIN_CVB@@@
 @@@META@@@
-@�û�����:�û�������ع�����
-@ʱ���:����ʱ��
+@用户需求:用户输入的重构需求
+@时间戳:生成时间
 @@@END_META@@@
 
-@@@FILE:�ļ�·��1@@@
-�ļ�1����
+@@@FILE:文件路径1@@@
+文件1内容
 @@@END_FILE@@@
 
-@@@FILE:�ļ�·��2@@@
-�ļ�2����
+@@@FILE:文件路径2@@@
+文件2内容
 @@@END_FILE@@@
 @@@END_CVB@@@
 
-����
+复制
 
-�ϲ�����ļ���������ʱ����Ŀ¼�У�����Ϊ `ʱ���.cvb`��
+合并后的文件保存在临时工作目录中，命名为 `时间戳.cvb`。
 
-### 3. �ع������ϴ�
-�û������ع������硰����������¼����������ƶ���һ���ļ��С�����
+### 3. 重构请求上传
+用户输入重构需求（如“将所有鼠标事件处理代码移动到一个文件中”）。
 
-�� CVB �ļ��������û�����ƴ�ӣ����� DeepSeek API �ϴ�����
+将 CVB 文件内容与用户需求拼接，调用 DeepSeek API 上传请求。
 
-### 4. API ��������
-���� DeepSeek API ���ص��ַ��������������� CVB ��ʽ�����ݡ�
+### 4. API 反馈解析
+接收 DeepSeek API 返回的字符串，解析出符合 CVB 格式的内容。
 
-��ȡԪ���ݣ����û�����ʱ��������ļ����ݡ�
+提取元数据（如用户需求、时间戳）和文件内容。
 
-��������� CVB ���ݱ���Ϊ�µ� `.cvb` �ļ���
+将解析后的 CVB 内容保存为新的 `.cvb` 文件。
 
-### 5. �汾����
-�ṩһ�� CVB �ļ��б�����ʱ��˳����ʾ�������ɵ� CVB �ļ���
+### 5. 版本管理
+提供一个 CVB 文件列表，按时间顺序显示所有生成的 CVB 文件。
 
-֧�ֲ鿴��Ӧ�û�ɾ��ĳ�� CVB �ļ���
+支持查看、应用或删除某个 CVB 文件。
 
-### 6. �ļ��Ա�
-֧�ֶԱȲ�ͬ�汾�� CVB �ļ���
+### 6. 文件对比
+支持对比不同版本的 CVB 文件。
 
-�������ⲿ Diff ���ߣ��� Beyond Compare�������ļ��Աȡ�
+可配置外部 Diff 工具（如 Beyond Compare）进行文件对比。
 
-## ʹ�ó���
+## 使用场景
 
-### �ع� C++ ����
-���� MVC ģ�����²�ִ��룬���ⲿ���봦�������ƶ��������ļ��С�
-���������߼����Ż��������Ľṹ��
+### 重构 C++ 工程
+按照 MVC 模型重新拆分代码，将外部输入处理代码移动到单独文件中。
+梳理代码逻辑，优化不合理的结构。
 
-### ��д�µ� VSCode ���
-�ṩ���ģ��Ĵ����ع�֧�֣����������߿�����������ṹ��
+### 编写新的 VSCode 插件
+提供多个模块的代码重构支持，帮助开发者快速整理代码结构。
 
-### �ں� C++ ����
-���ɻ�ͼ�⣨�� xdraw���滻Ϊ�·�װ�� IMGUI ��ͼ�⡣
+### 融合 C++ 工程
+将旧绘图库（如 xdraw）替换为新封装的 IMGUI 绘图库。
 
-�滻�ɵ��ⲿ���봦���߼���ʹ���¹��̵��߼���
+替换旧的外部输入处理逻辑，使用新工程的逻辑。
 
-## ����ṹ
+## 代码结构
 
 ### `extension.ts`
-�������ļ�������ע������ʹ����û�������
-��Ҫ����:
+插件入口文件，负责注册命令和处理用户交互。
+主要功能:
 
-- ���� CVB �ļ���
-- �ϴ� CVB �ļ������� DeepSeek API��
-- ���� API ���ص� CVB ���ݲ����档
+- 生成 CVB 文件。
+- 上传 CVB 文件并调用 DeepSeek API。
+- 解析 API 返回的 CVB 内容并保存。
 
 ### `cvbManager.ts`
-���� CVB �ļ��������������
-��Ҫ����:
+负责 CVB 文件的生成与解析。
+主要功能:
 
-- ����������ļ��ϲ�Ϊ CVB ��ʽ��
-- ���� API ���ص��ַ�������ȡ CVB ���ݡ�Ԫ���ݺ��ļ����ݡ�
+- 将多个代码文件合并为 CVB 格式。
+- 解析 API 返回的字符串，提取 CVB 内容、元数据和文件内容。
 
 ### `deepseekApi.ts`
-������ DeepSeek API �Ľ�����
-��Ҫ����:
+负责与 DeepSeek API 的交互。
+主要功能:
 
-- ���� DeepSeek API���ϴ� CVB ���ݺ��û�����
-- ���� API ����Ӧ���ݡ�
+- 调用 DeepSeek API，上传 CVB 内容和用户需求。
+- 返回 API 的响应内容。
 
 ### `fileSelector.ts`
-�ṩ�ļ�ѡ���ܣ�֧���û�ѡ����Ҫ�ع��Ĵ����ļ���
+提供文件选择功能，支持用户选择需要重构的代码文件。
 
-## ������
+## 配置项
 
 ### DeepSeek API Key
-�� VSCode ���������� `codeReDesign.deepSeekApiKey`�����ڵ��� DeepSeek API��
+在 VSCode 设置中配置 `codeReDesign.deepSeekApiKey`，用于调用 DeepSeek API。
 
-### Diff ����
-֧�������ⲿ Diff ���ߣ��� Beyond Compare�������ڶԱȲ�ͬ�汾�� CVB �ļ���
+### Diff 工具
+支持配置外部 Diff 工具（如 Beyond Compare），用于对比不同版本的 CVB 文件。
 
-## ʹ��ʾ��
+## 使用示例
 
-### ���� CVB �ļ�
-1. �� VSCode���Ҽ������������ѡ�� `CodeReDesign: Generate CVB File`��
-2. ѡ����Ҫ�ع��Ĵ����ļ���
-3. �����ع������硰����������¼����������ƶ���һ���ļ��С�����
-4. ���������һ�� `.cvb` �ļ��������浽��ʱĿ¼��
+### 生成 CVB 文件
+1. 打开 VSCode，右键点击工作区，选择 `CodeReDesign: Generate CVB File`。
+2. 选择需要重构的代码文件。
+3. 输入重构需求（如“将所有鼠标事件处理代码移动到一个文件中”）。
+4. 插件会生成一个 `.cvb` 文件，并保存到临时目录。
 
-### �ϴ� CVB �ļ������� API
-1. �Ҽ������������ѡ�� `CodeReDesign: Upload CVB and Call API`��
-2. ѡ����Ҫ�ϴ��� `.cvb` �ļ���
-3. ������ʾ�ʣ��硰�ع���������߿ɶ��ԡ�����
-4. �������� DeepSeek API���������ص� CVB ���ݱ���Ϊ���ļ���
+### 上传 CVB 文件并调用 API
+1. 右键点击工作区，选择 `CodeReDesign: Upload CVB and Call API`。
+2. 选择需要上传的 `.cvb` 文件。
+3. 输入提示词（如“重构代码以提高可读性”）。
+4. 插件会调用 DeepSeek API，并将返回的 CVB 内容保存为新文件。
 
-### �鿴�汾��ʷ
-1. ����ʱĿ¼�в鿴�������ɵ� `.cvb` �ļ���
-2. ѡ��ĳ���ļ����鿴��Ԫ���ݺ��ļ����ݡ�
-3. ֧��Ӧ�û�ɾ��ĳ���汾��
+### 查看版本历史
+1. 在临时目录中查看所有生成的 `.cvb` 文件。
+2. 选择某个文件，查看其元数据和文件内容。
+3. 支持应用或删除某个版本。
 
-## CVB �ļ���ʽ
+## CVB 文件格式
 
-### �ļ��ṹ
+### 文件结构
 @@@BEGIN_CVB@@@
 @@@META@@@
-@�û�����:�û�������ع�����
-@ʱ���:����ʱ��
+@用户需求:用户输入的重构需求
+@时间戳:生成时间
 @@@END_META@@@
 
-@@@FILE:�ļ�·��1@@@
-�ļ�1����
+@@@FILE:文件路径1@@@
+文件1内容
 @@@END_FILE@@@
 
-@@@FILE:�ļ�·��2@@@
-�ļ�2����
+@@@FILE:文件路径2@@@
+文件2内容
 @@@END_FILE@@@
 @@@END_CVB@@@
 
-����
+复制
 
-### ʾ��
+### 示例
 @@@BEGIN_CVB@@@
 @@@META@@@
-@�û�����:����������¼����������ƶ���һ���ļ���
-@ʱ���:2023-10-01T12:00:00Z
+@用户需求:将所有鼠标事件处理代码移动到一个文件中
+@时间戳:2023-10-01T12:00:00Z
 @@@END_META@@@
 
 @@@FILE:src /main.cpp@@@
@@ -159,23 +159,23 @@ return 0;
 
 @@@FILE:src /input_handlers.cpp@@@
 void handleMouseEvent() {
-// ����¼������߼�
+// 鼠标事件处理逻辑
 }
 @@@END_FILE@@@
 @@@END_CVB@@@
 
-����
+复制
 
-## ע������
+## 注意事项
 
-### API Key ����
-ȷ���� VSCode ��������ȷ���� `codeReDesign.deepSeekApiKey`�������޷����� DeepSeek API��
+### API Key 配置
+确保在 VSCode 设置中正确配置 `codeReDesign.deepSeekApiKey`，否则无法调用 DeepSeek API。
 
-### CVB �ļ���ʽ
-API ���ص��ַ���������� `@@@BEGIN_CVB@@@` �� `@@@END_CVB@@@` ��ǣ����������ʧ�ܡ�
+### CVB 文件格式
+API 返回的字符串必须包含 `@@@BEGIN_CVB@@@` 和 `@@@END_CVB@@@` 标记，否则解析会失败。
 
-### �ļ�����
-���֧���Զ�����ת���ļ����루�� UTF-8��GBK����ȷ������������ȷ��ȡ��
+### 文件编码
+插件支持自动检测和转换文件编码（如 UTF-8、GBK），确保代码内容正确读取。
 
-### �汾����
-ÿ�����ɵ� CVB �ļ����ᱣ�浽��ʱĿ¼�����鶨�������ɰ汾�ļ���
+### 版本管理
+每次生成的 CVB 文件都会保存到临时目录，建议定期清理旧版本文件。
