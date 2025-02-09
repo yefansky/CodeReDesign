@@ -382,46 +382,80 @@ export class TCVB
     ));
   }
 
+  // 辅助方法：剥离 Markdown 代码块外部包裹的 ``` 标记
+  private RemoveMarkdownCodeBlock(strContent: string) : string
+  {
+      let strTrimmedContent: string = strContent.trim();
+      const arrLines: string[] = strTrimmedContent.split('\n');
+      
+      if (arrLines.length >= 2)
+      {
+          const strFirstLine: string = arrLines[0].trim();
+          const strLastLine: string = arrLines[arrLines.length - 1].trim();
+          
+          // 检查第一行和最后一行是否为代码块标记
+          if (strFirstLine.startsWith("```") && strLastLine.startsWith("```"))
+          {
+              // 去除第一行和最后一行后，重新拼接内容
+              arrLines.shift();
+              arrLines.pop();
+              strTrimmedContent = arrLines.join('\n').trim();
+          }
+      }
+      
+      return strTrimmedContent;
+  }
+
   // 辅助方法：解析操作正文中的各个段落（段落标记格式为 "## 段落名称"）
   private parseSections(strContent: string, arrExpectedSections: string[]) : Record<string, string>
   {
-    const recResult: Record<string, string> = { };
-    let strCurrentSection: string | null = null;
-    const arrBuffer: string[] = [ ];
-    const arrLines: string[] = strContent.split('\n');
-    for (const strLine of arrLines)
-    {
-      const arrSectionMatch = strLine.match(/^## ([A-Z_]+)/);
-      if (arrSectionMatch)
+      const recResult: Record<string, string> = { };
+      let strCurrentSection: string | null = null;
+      const arrBuffer: string[] = [ ];
+      const arrLines: string[] = strContent.split('\n');
+      
+      for (const strLine of arrLines)
       {
-        if (strCurrentSection)
-        {
-          recResult[strCurrentSection] = arrBuffer.join('\n').trim();
-          arrBuffer.length = 0;
-        }
-        strCurrentSection = arrSectionMatch[1];
-        if (arrExpectedSections.indexOf(strCurrentSection) === -1)
-        {
-          throw new Error(`意外的段落: ${strCurrentSection}`);
-        }
+          const arrSectionMatch = strLine.match(/^## ([A-Z_]+)/);
+          
+          if (arrSectionMatch)
+          {
+              if (strCurrentSection)
+              {
+                  // 拼接当前段落内容，并剥离 Markdown 代码块包裹的 ``` 标记
+                  recResult[strCurrentSection] = this.RemoveMarkdownCodeBlock(arrBuffer.join('\n').trim());
+                  arrBuffer.length = 0;
+              }
+              
+              strCurrentSection = arrSectionMatch[1];
+              
+              if (arrExpectedSections.indexOf(strCurrentSection) === -1)
+              {
+                  throw new Error(`意外的段落: ${strCurrentSection}`);
+              }
+          }
+          else if (strCurrentSection)
+          {
+              arrBuffer.push(strLine);
+          }
       }
-      else if (strCurrentSection)
-     	{
-        arrBuffer.push(strLine);
-      }
-    }
-    if (strCurrentSection)
-    {
-      recResult[strCurrentSection] = arrBuffer.join('\n').trim();
-    }
-    for (const strSection of arrExpectedSections)
-    {
-      if (!(strSection in recResult))
+      
+      // 处理最后一个段落
+      if (strCurrentSection)
       {
-        throw new Error(`缺失必需的段落: ${strSection}`);
+          recResult[strCurrentSection] = this.RemoveMarkdownCodeBlock(arrBuffer.join('\n').trim());
       }
-    }
-    return recResult;
+      
+      // 检查是否缺少必需的段落
+      for (const strSection of arrExpectedSections)
+      {
+          if (!(strSection in recResult))
+          {
+              throw new Error(`缺失必需的段落: ${strSection}`);
+          }
+      }
+      
+      return recResult;
   }
 
   public getOperations() : TcvbOperation[]
