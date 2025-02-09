@@ -1,0 +1,229 @@
+## BEGIN_TCVB
+## FILE:k:\lab\CodeReDesign\src\guidePage.ts
+## OPERATION:CREATE
+```typescript
+import * as vscode from 'vscode';
+
+export class GuidePage {
+    private static readonly viewType = 'codeReDesign.guidePage';
+    private static panel: vscode.WebviewPanel | undefined;
+
+    public static show(context: vscode.ExtensionContext) {
+        if (this.panel) {
+            this.panel.reveal(vscode.ViewColumn.One);
+            return;
+        }
+
+        this.panel = vscode.window.createWebviewPanel(
+            this.viewType,
+            'CodeReDesign Guide',
+            vscode.ViewColumn.One,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true
+            }
+        );
+
+        this.panel.webview.html = this.getWebviewContent();
+
+        this.panel.onDidDispose(() => {
+            this.panel = undefined;
+        }, null, context.subscriptions);
+    }
+
+    private static getWebviewContent(): string {
+        return 
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>CodeReDesign Guide</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        padding: 20px;
+                    }
+                    h1 {
+                        color: #0078d7;
+                    }
+                    .command {
+                        margin: 10px 0;
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    }
+                    .command:hover {
+                        background-color: #f5f5f5;
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>Welcome to CodeReDesign</h1>
+                <p>This guide will help you get started with the CodeReDesign extension.</p>
+                
+                <h2>Quick Commands</h2>
+                <div class="command" onclick="executeCommand('codeReDesign.generateCvb')">
+                    <strong>Generate CVB File</strong>
+                    <p>Package the code you want to refactor into CVB format.</p>
+                </div>
+                <div class="command" onclick="executeCommand('codeReDesign.uploadCvb')">
+                    <strong>Upload CVB File</strong>
+                    <p>Upload a CVB file and call the DeepSeek API for refactoring suggestions.</p>
+                </div>
+                <div class="command" onclick="executeCommand('codeReDesign.applyCvb')">
+                    <strong>Apply CVB File</strong>
+                    <p>Apply the changes from a CVB file to your workspace.</p>
+                </div>
+                <div class="command" onclick="executeCommand('codeReDesign.analyzeCode')">
+                    <strong>Analyze Code</strong>
+                    <p>Analyze your code with DeepSeek API.</p>
+                </div>
+
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    function executeCommand(command) {
+                        vscode.postMessage({
+                            command: 'execute',
+                            text: command
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        ;
+    }
+
+    public static register(context: vscode.ExtensionContext) {
+        const showGuideCommand = vscode.commands.registerCommand('codeReDesign.showGuide', () => {
+            GuidePage.show(context);
+        });
+
+        context.subscriptions.push(showGuideCommand);
+
+        if (vscode.window.registerWebviewPanelSerializer) {
+            vscode.window.registerWebviewPanelSerializer(GuidePage.viewType, {
+                async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+                    GuidePage.panel = webviewPanel;
+                    webviewPanel.webview.html = GuidePage.getWebviewContent();
+                }
+            });
+        }
+    }
+}
+```
+## FILE:k:\lab\CodeReDesign\src\extension.ts
+## OPERATION:INSERT
+## BEFORE_ANCHOR
+```typescript
+import { registerCvbContextMenu } from './siderBar';
+```
+## AFTER_ANCHOR
+```typescript
+import { GuidePage } from './guidePage';
+```
+## INSERT_CONTENT
+```typescript
+import { GuidePage } from './guidePage';
+```
+## OPERATION:INSERT
+## BEFORE_ANCHOR
+```
+typescript
+    // 注册右键菜单
+    registerCvbContextMenu(context);
+```
+## AFTER_ANCHOR
+```typescript
+}
+```
+## INSERT_CONTENT
+```typescript
+    // 注册引导页
+    GuidePage.register(context);
+```
+## FILE:k:\lab\CodeReDesign\package.json
+## OPERATION:INSERT
+## BEFORE_ANCHOR
+```json
+        {
+          "command": "codeReDesign.analyzeThisCvb",
+          "title": "CodeReDesign: Analyze this CVB"
+        }
+```
+## AFTER_ANCHOR
+```json
+      ]
+    },
+    "views": {
+```
+## INSERT_CONTENT
+```json
+        {
+          "command": "codeReDesign.showGuide",
+          "title": "CodeReDesign: Show Guide"
+        }
+```
+## OPERATION:INSERT
+## BEFORE_ANCHOR
+```json
+        {
+          "command": "codeReDesign.analyzeThisCvb",
+          "when": "resourceExtname  == .cvb",
+          "group": "cvb@1"
+        }
+```
+## AFTER_ANCHOR
+```json
+      ],
+      "commandPalette": [
+```
+## INSERT_CONTENT
+```json
+        {
+          "command": "codeReDesign.showGuide",
+          "when": "view == codeReDesign.cvbView"
+        }
+```
+## FILE:k:\lab\CodeReDesign\src\siderBar.ts
+## OPERATION:INSERT
+## BEFORE_ANCHOR
+```typescript
+    // 设置图标（可选）
+    this.iconPath = vscode.ThemeIcon.File;
+```
+## AFTER_ANCHOR
+```typescript
+    this.resourceUri = uri;
+```
+## INSERT_CONTENT
+```typescript
+    // 添加引导按钮
+    if (label === 'Guide') {
+      this.iconPath = new vscode.ThemeIcon('book');
+      this.command = {
+        command: 'codeReDesign.showGuide',
+        title: 'Show Guide',
+        arguments: []
+      };
+    }
+```
+## OPERATION:INSERT
+## BEFORE_ANCHOR
+```typescript
+      // 新增排序逻辑
+      cvbFiles.sort((a, b) => 
+        a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+      );
+```
+## AFTER_ANCHOR
+```typescript
+      return cvbFiles;
+```
+## INSERT_CONTENT
+```typescript
+      // 添加引导按钮
+      cvbFiles.unshift(new CvbFile('Guide', vscode.Uri.parse('codeReDesign:guide')));
+```
+## END_TCVB

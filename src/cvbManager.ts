@@ -276,15 +276,13 @@ export class TCVB
       const strFilePath: string = filePathNormalize(arrFileMatch[1]);
       const strOperationsBlock: string = arrFileMatch[2];
       // 支持操作类型中含有 "-" 符号（如 single-replace 等）
-      const regOperation: RegExp = /^## OPERATION:([\w-]+)(?:\s+FILE:(.*?))?\n([\s\S]*?)(?=^## OPERATION:|^## FILE:|^## END_TCVB)/gm;
+      const regOperation: RegExp = /^## OPERATION:([\w-]+)\n([\s\S]*?)(?=^## OPERATION:)/gm;
       let arrOpMatch: RegExpExecArray | null;
       while ((arrOpMatch = regOperation.exec(strOperationsBlock)) !== null)
       {
         const strType: string = arrOpMatch[1].toLowerCase();
-        const strExplicitFilePath: string | null = arrOpMatch[2] ? filePathNormalize(arrOpMatch[2]) : null;
-        const strOpContent: string = arrOpMatch[3].trim();
-        const strFinalFilePath: string = strExplicitFilePath || strFilePath;
-        this.parseOperation(strFinalFilePath, strType, strOpContent);
+        const strOpContent: string = arrOpMatch[2].trim();
+        this.parseOperation(strFilePath, strType, strOpContent);
       }
     }
   }
