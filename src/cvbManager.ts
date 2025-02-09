@@ -525,6 +525,7 @@ TCVB 格式规范：
 1. 文件路径复用：同一文件下## FILE ,可以有多个## OPERATION，不用每次重复相同的## FILE
 2. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆
 3. 代码块,(规则中的[代码块:...]) 用 markdown 格式包裹
+4. 注意，所有的OPERATION操作都是以行为单位的
 `;
   }
 }
@@ -596,7 +597,7 @@ function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : st
 
 function applyInsert(strContent: string, op: InsertOperation) : string
 {
-  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, '', op.m_strAfterAnchor);
+  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, "((?:[ \\t]*(?:\\r?\\n))*)" , op.m_strAfterAnchor);
   const strReplacement: string = op.m_strBeforeAnchor + op.m_strInsertContent + op.m_strAfterAnchor;
   return strContent.replace(regPattern, strReplacement);
 }

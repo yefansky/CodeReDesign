@@ -121,7 +121,7 @@ import { registerCvbContextMenu } from './siderBar';
 ```
 ## AFTER_ANCHOR
 ```typescript
-import { GuidePage } from './guidePage';
+let currentOperationController: AbortController | null = null;
 ```
 ## INSERT_CONTENT
 ```typescript
