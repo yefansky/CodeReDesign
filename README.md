@@ -30,9 +30,10 @@ File -> Preferences -> Settings（文件 -> 首选项 -> 设置）
    - `deepseek-reasoner`：推理模型，适用于需要逻辑推理和复杂分析的代码任务。
 
 2. **自定义模型配置**：
-   - 如果你需要使用自定义模型，可以在 `CodeReDesign` 的配置中选择 `custom` 选项，并填写以下信息：
-     - **Custom DeepSeek Model Name**：自定义模型的名称。
-     - **Custom DeepSeek API Base URL**：自定义模型的 API 基础 URL。
+   - 如果你需要使用自定义模型，可以在 `CodeReDesign` 的配置中选择 `custom1`、`custom2` ... , 并填写以下信息：
+     - **Custom DeepSeek Model Name ?**：自定义模型的名称。
+     - **Custom DeepSeek API Base URL ?**：自定义模型的 API 基础 URL。
+     - **Custom DeepSeek API Key ?**：自定义模型的 API Key。
 
    设置方法：
    - 打开 VSCode 的设置界面（File -> Preferences -> Settings）。
@@ -107,10 +108,11 @@ In the `CodeReDesign` configuration, you can set the model API and name. Here ar
    - `deepseek-chat`: The default chat model, suitable for general code refactoring and design tasks.
    - `deepseek-reasoner`: The reasoning model, suitable for code tasks that require logical reasoning and complex analysis.
 
-2. **Custom Model Configuration**:
-   - If you need to use a custom model, you can select the `custom` option in the `CodeReDesign` configuration and fill in the following information:
-     - **Custom DeepSeek Model Name**: The name of the custom model.
-     - **Custom DeepSeek API Base URL**: The base URL of the custom model's API.
+2. **Custom model configuration**:
+   - If you need to use a custom model, you can select `custom1`, `custom2`... in the configuration of `CodeReDesign` and fill in the following information:
+     - **Custom DeepSeek model name ?**: The name of the custom model.
+     - **Custom DeepSeek API Base URL?**: API base URL of the custom model.
+     - **Custom DeepSeek API Key ?**: API Key of the custom model.
 
    Setup Method:
    - Open VSCode settings (File -> Preferences -> Settings).
