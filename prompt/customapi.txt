@@ -1,0 +1,5 @@
+自定义模型的 APIKey 改为可以独立设置
+扩充可以自定义的模型数量为5个（BaseURL， ModelName，APIKey）
+并且可以选择这些模型中的一个 （Custom1，Custom2, ...）
+可以给模型取nickname，但是不能重复
+选择的时候如果有NickName就显示Nickname来选择，不然就是CostomXXX
