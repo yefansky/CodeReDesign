@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.26 (2025-02-10)
+
+
+### Features
+
+* 允许自定义apikey ([e514fa4](https://github.com/yefansky/CodeReDesign/commit/e514fa49e09bc60932633626279a2e6f7492561c))
+
 ### 0.0.25 (2025-02-10)
 
 ### 0.0.24 (2025-02-10)
