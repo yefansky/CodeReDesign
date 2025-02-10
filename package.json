@@ -112,23 +112,112 @@
           "enum": [
             "deepseek-chat",
             "deepseek-reasoner",
-            "custom"
+            "custom1",
+            "custom2",
+            "custom3",
+            "custom4",
+            "custom5"
           ]
         },
-        "codeReDesign.customModelName": {
-          "type": "string",
-          "default": "",
-          "description": "Custom DeepSeek Model Name"
-        },
-        "codeReDesign.customApiBaseURL": {
-          "type": "string",
-          "default": "",
-          "description": "Custom DeepSeek API Base URL"
-        },
-        "codeReDesign.customApiKey":{
+        "codeReDesign.custom1APIKey": {
           "type": "string",
           "default": null,
-          "description": "Custom DeepSeek API Key"
+          "description": "Custom DeepSeek API Key 1"
+        },
+        "codeReDesign.custom1BaseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek API Base URL 1"
+        },
+        "codeReDesign.custom1ModelName": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Name 1"
+        },
+        "codeReDesign.custom1ModelNickname": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Nickname 1"
+        },
+        "codeReDesign.custom2APIKey": {
+          "type": "string",
+          "default": null,
+          "description": "Custom DeepSeek API Key 2"
+        },
+        "codeReDesign.custom2BaseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek API Base URL 2"
+        },
+        "codeReDesign.custom2ModelName": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Name 2"
+        },
+        "codeReDesign.custom2ModelNickname": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Nickname 2"
+        },
+        "codeReDesign.custom3APIKey": {
+          "type": "string",
+          "default": null,
+          "description": "Custom DeepSeek API Key 3"
+        },
+        "codeReDesign.custom3BaseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek API Base URL 3"
+        },
+        "codeReDesign.custom3ModelName": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Name 3"
+        },
+        "codeReDesign.custom3ModelNickname": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Nickname 3"
+        },
+        "codeReDesign.custom4APIKey": {
+          "type": "string",
+          "default": null,
+          "description": "Custom DeepSeek API Key 4"
+        },
+        "codeReDesign.custom4BaseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek API Base URL 4"
+        },
+        "codeReDesign.custom4ModelName": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Name 4"
+        },
+        "codeReDesign.custom4ModelNickname": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Nickname 4"
+        },
+        "codeReDesign.custom5APIKey": {
+          "type": "string",
+          "default": null,
+          "description": "Custom DeepSeek API Key 5"
+        },
+        "codeReDesign.custom5BaseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek API Base URL 5"
+        },
+        "codeReDesign.custom5ModelName": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Name 5"
+        },
+        "codeReDesign.custom5ModelNickname": {
+          "type": "string",
+          "default": "",
+          "description": "Custom DeepSeek Model Nickname 5"
         }
       }
     }

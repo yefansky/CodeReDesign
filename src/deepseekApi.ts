@@ -11,10 +11,10 @@ function getDeepSeekModelConfig(): { modelName: string, apiBaseURL: string, apiK
     const modelConfig = config.get<string>('modelConfig') || 'deepseek-chat';
     const apiKey = config.get<string>('deepSeekApiKey') || null;
 
-    if (modelConfig === 'custom') {
-        const customModelName = config.get<string>('customModelName') || '';
-        const customApiBaseURL = config.get<string>('customApiBaseURL') || '';
-        const apiKey = config.get<string>('customApiKey') || null;
+    if (modelConfig.startsWith('custom')) {
+        const customModelName = config.get<string>(`${modelConfig}ModelName`) || '';
+        const customApiBaseURL = config.get<string>(`${modelConfig}BaseURL`) || '';
+        const apiKey = config.get<string>(`${modelConfig}APIKey`) || null;
         return {
             modelName: customModelName,
             apiBaseURL: customApiBaseURL,
