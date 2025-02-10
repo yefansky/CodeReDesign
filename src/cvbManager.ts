@@ -484,9 +484,9 @@ TCVB 格式规范：
 1. 单个替换操作（SINGLE-REPLACE）:
 ## OPERATION:SINGLE-REPLACE
 ## BEFORE_ANCHOR
-[代码块:前锚点内容,用来划定范围，避免混淆]
+[代码块:前锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换串]
 ## AFTER_ANCHOR
-[代码块:后锚点内容,用来划定范围，避免混淆]
+[代码块:后锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换串]
 ## OLD_CONTENT
 [代码块:被替换内容]
 ## NEW_CONTENT
@@ -495,7 +495,7 @@ TCVB 格式规范：
 2. 全局替换操作（GLOBAL-REPLACE）:
 ## OPERATION:GLOBAL-REPLACE
 ## OLD_CONTENT
-[代码块:被替换内容]
+[代码块:被全局替换的内容]
 ## NEW_CONTENT
 [代码块:新内容]
 
@@ -511,11 +511,11 @@ TCVB 格式规范：
 4. 删除操作（DELETE）:
 ## OPERATION:DELETE
 ## BEFORE_ANCHOR
-[代码块:被删内容前的锚点内容]
+[代码块:被删除行前的锚点内容]
 ## AFTER_ANCHOR
-[代码块:被删内容后的锚点内容]
+[代码块:被删除行后的锚点内容]
 ## DELETE_CONTENT
-[代码块:被删除内容]
+[代码块:被删除行的内容]
 
 5. 创建操作（CREATE）:
 ## OPERATION:CREATE
@@ -582,36 +582,72 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
   return rebuildCvb(baseCvb, mapMergedFiles);
 }
 
-function applySingleReplace(strContent: string, op: SingleReplaceOperation) : string
-{
-  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, op.m_strOldContent, op.m_strAfterAnchor);
-  const strReplacement: string = op.m_strBeforeAnchor + op.m_strNewContent + op.m_strAfterAnchor;
+function applySingleReplace(strContent: string, op: SingleReplaceOperation): string {
+  // 构建匹配模式：前锚点 + 中间内容1 + 旧内容 + 中间内容2 + 后锚点
+  const regPattern = buildPattern(op.m_strBeforeAnchor, op.m_strOldContent, op.m_strAfterAnchor);
+  // 替换为：前锚点 + 中间内容1 + 新内容 + 中间内容2 + 后锚点
+  const strReplacement = op.m_strBeforeAnchor + '$1' + op.m_strNewContent + '$2' + op.m_strAfterAnchor;
   return strContent.replace(regPattern, strReplacement);
 }
 
 function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : string
 {
+  if ( op.m_strOldContent === "" )
+  {
+    throw new Error(`全局替换为空`);
+  }
+
   const regPattern: RegExp = new RegExp(escapeRegExp(op.m_strOldContent), 'gs');
   return strContent.replace(regPattern, op.m_strNewContent);
 }
 
-function applyInsert(strContent: string, op: InsertOperation) : string
+function applyInsert( strContent: string, op: InsertOperation ) : string
 {
-  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, "((?:[ \\t]*(?:\\r?\\n))*)" , op.m_strAfterAnchor);
-  const strReplacement: string = op.m_strBeforeAnchor + op.m_strInsertContent + op.m_strAfterAnchor;
-  return strContent.replace(regPattern, strReplacement);
+    if ( op.m_strBeforeAnchor === "" || op.m_strAfterAnchor === "" )
+    {
+        throw new Error( "插入操作的前锚点或后锚点为空" );
+    }
+
+    // 将前后锚点转义后使用
+    const strBeforeRegex: string = escapeRegExp( op.m_strBeforeAnchor );
+    const strAfterRegex: string  = escapeRegExp( op.m_strAfterAnchor );
+    // 中间部分直接作为正则片段，不做转义
+    const strMiddlePattern: string = "((?:[ \\t]*(?:\\r?\\n))*)";
+
+    const regPattern: RegExp = new RegExp( strBeforeRegex + strMiddlePattern + strAfterRegex, 'gs' );
+    const strReplacement: string = op.m_strBeforeAnchor + op.m_strInsertContent + op.m_strAfterAnchor;
+
+    return strContent.replace( regPattern, strReplacement );
 }
 
-function applyDelete(strContent: string, op: DeleteOperation) : string
+function applyDelete( strContent: string, op: DeleteOperation ) : string
 {
-  const regPattern: RegExp = buildPattern(op.m_strBeforeAnchor, op.m_strDeleteContent, op.m_strAfterAnchor);
-  return strContent.replace(regPattern, op.m_strBeforeAnchor + op.m_strAfterAnchor);
+    if ( op.m_strBeforeAnchor === "" || op.m_strAfterAnchor === "" )
+    {
+        throw new Error( "删除操作的前锚点或后锚点为空" );
+    }
+    if ( op.m_strDeleteContent === "" )
+    {
+        throw new Error( "删除操作的内容为空" );
+    }
+
+    const regPattern: RegExp = buildPattern( op.m_strBeforeAnchor, op.m_strDeleteContent, op.m_strAfterAnchor );
+    // 使用捕获组 $1 和 $2 来保留匹配到的前后附加内容（不删除）
+    const strReplacement: string = op.m_strBeforeAnchor + "$1" + "$2" + op.m_strAfterAnchor;
+
+    return strContent.replace( regPattern, strReplacement );
 }
 
 // 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）
-function buildPattern(strBefore: string, strContent: string, strAfter: string) : RegExp
-{
-  return new RegExp(escapeRegExp(strBefore) + escapeRegExp(strContent) + escapeRegExp(strAfter), 'gs');
+function buildPattern(strBefore: string, strContent: string, strAfter: string): RegExp {
+  return new RegExp(
+    escapeRegExp(strBefore) + 
+    '([\\s\\S]*?)' +   // 捕获前锚点与旧内容之间的任意字符（非贪婪）
+    escapeRegExp(strContent) + 
+    '([\\s\\S]*?)' +   // 捕获旧内容与后锚点之间的任意字符（非贪婪）
+    escapeRegExp(strAfter), 
+    'gs'  // 全局匹配且允许跨行
+  );
 }
 
 function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>) : Cvb

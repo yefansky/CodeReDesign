@@ -161,6 +161,7 @@ function applyThisCvb(filePath: string) {
  */
 async function uploadThisCvb(filePath: string) {
 
+  /*
   // 测试 begin
   {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -173,11 +174,13 @@ async function uploadThisCvb(filePath: string) {
     let tcvbContent = fs.readFileSync(filepath, 'utf-8');
     tcvbContent = tcvbContent.replace(/\r\n?/g, "\n");
     const tcvb = new TCVB(tcvbContent);
-    const cvbContent = fs.readFileSync(filePath, 'utf-8');
+    let cvbContent = fs.readFileSync(filePath, 'utf-8');
+    cvbContent = cvbContent.replace(/\r\n?/g, "\n");
     const oldCvb = new Cvb(cvbContent);
     const cvb = mergeCvb(oldCvb, tcvb);
   }
   // 测试 end
+  */
 
   const userPrompt = await vscode.window.showInputBox({
     prompt: 'Enter your prompt for the refactoring',
@@ -206,13 +209,14 @@ async function uploadThisCvb(filePath: string) {
       i++;
   }
 
-  const cvbContent = fs.readFileSync(filePath, 'utf-8');
+  const cvbContent = fs.readFileSync(filePath, 'utf-8').replace(/\r\n?/g, "\n");
   const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
 
   resetCurrentOperationController();
 
-  const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+  let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
   if (apiResponse) {
+    apiResponse = apiResponse.replace(/\r\n?/g, "\n");
     const tcvb = new TCVB(apiResponse);
     const oldCvb = new Cvb(cvbContent);
     const cvb = mergeCvb(oldCvb, tcvb);
