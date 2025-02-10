@@ -124,6 +124,11 @@
           "type": "string",
           "default": "",
           "description": "Custom DeepSeek API Base URL"
+        },
+        "codeReDesign.customApiKey":{
+          "type": "string",
+          "default": null,
+          "description": "Custom DeepSeek API Key"
         }
       }
     }

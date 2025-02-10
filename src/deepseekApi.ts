@@ -3,44 +3,36 @@ import * as vscode from 'vscode';
 import { Cvb, TCVB } from './cvbManager';
 
 /**
- * 获取 DeepSeek API Key
- * @returns DeepSeek API Key
- */
-function getDeepSeekApiKey(): string | null {
-    const apiKey = vscode.workspace.getConfiguration('codeReDesign').get<string>('deepSeekApiKey');
-    if (!apiKey) {
-        vscode.window.showErrorMessage('DeepSeek API Key is not configured. Please set it in the settings.');
-        return null;
-    }
-    return apiKey;
-}
-
-/**
  * 获取 DeepSeek 模型配置
  * @returns { modelName: string, apiBaseURL: string }
  */
-function getDeepSeekModelConfig(): { modelName: string, apiBaseURL: string } {
+function getDeepSeekModelConfig(): { modelName: string, apiBaseURL: string, apiKey: string | null} {
     const config = vscode.workspace.getConfiguration('codeReDesign');
     const modelConfig = config.get<string>('modelConfig') || 'deepseek-chat';
+    const apiKey = config.get<string>('deepSeekApiKey') || null;
 
     if (modelConfig === 'custom') {
         const customModelName = config.get<string>('customModelName') || '';
         const customApiBaseURL = config.get<string>('customApiBaseURL') || '';
+        const apiKey = config.get<string>('customApiKey') || null;
         return {
             modelName: customModelName,
-            apiBaseURL: customApiBaseURL
+            apiBaseURL: customApiBaseURL,
+            apiKey: apiKey
         };
     }
 
     // 默认配置
-    const defaultConfigs : { [key: string]: { modelName: string, apiBaseURL: string } }  = {
+    const defaultConfigs : { [key: string]: { modelName: string, apiBaseURL: string, apiKey: string | null} }  = {
         'deepseek-chat': {
             modelName: 'deepseek-chat',
-            apiBaseURL: 'https://api.deepseek.com'
+            apiBaseURL: 'https://api.deepseek.com',
+            apiKey
         },
         'deepseek-reasoner': {
             modelName: 'deepseek-reasoner',
-            apiBaseURL: 'https://api.deepseek.com'
+            apiBaseURL: 'https://api.deepseek.com',
+            apiKey
         }
     };
 
@@ -65,14 +57,13 @@ async function callDeepSeekApi(
     endstring?: string,
     abortSignal?: AbortSignal
 ): Promise<string | null> {
-    const apiKey = getDeepSeekApiKey();
+    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig();
+    const userStopException = 'operation stop by user';
+
     if (!apiKey) {
-        vscode.window.showWarningMessage('请先设置DeepSeek API Key');
+        vscode.window.showErrorMessage('DeepSeek API Key is not configured. Please set it in the settings.');
         return null;
     }
-
-    const { modelName, apiBaseURL } = getDeepSeekModelConfig();
-    const userStopException = 'operation stop by user';
 
     if (!modelName || !apiBaseURL) {
         vscode.window.showErrorMessage('DeepSeek Model Name or API Base URL is not configured.');
