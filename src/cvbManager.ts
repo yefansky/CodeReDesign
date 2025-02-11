@@ -114,7 +114,7 @@ export class Cvb
     let arrFileMatch: RegExpExecArray | null;
     while ((arrFileMatch = regFile.exec(strCvbContentPart)) !== null)
     {
-      const strFilePath: string = arrFileMatch[1];
+      const strFilePath: string = filePathNormalize(arrFileMatch[1]);
       let strFileContent: string = arrFileMatch[2].trim();
       // 去除代码块标记
       const regCodeBlock: RegExp = /^```.*\n([\s\S]*?)\n```$/m;
@@ -152,14 +152,14 @@ abstract class TcvbOperation
 {
   constructor(
     public readonly m_strFilePath: string,
-    public readonly m_strType: 'single-replace' | 'global-replace' | 'insert' | 'delete' | 'create'
+    public readonly m_strType: 'exact-replace' | 'global-replace' | 'create'
   )
   {
   }
 }
 
-// 1. 单个替换操作（SINGLE-REPLACE）
-class SingleReplaceOperation extends TcvbOperation
+// 1. 单个替换操作（EXACT-REPLACE）
+class ExactReplaceOperation extends TcvbOperation
 {
   public m_strBeforeAnchor: string;
   public m_strAfterAnchor: string;
@@ -174,7 +174,7 @@ class SingleReplaceOperation extends TcvbOperation
     m_strNewContent: string
   )
   {
-    super(m_strFilePath, 'single-replace');
+    super(m_strFilePath, 'exact-replace');
     this.m_strBeforeAnchor = m_strBeforeAnchor;
     this.m_strAfterAnchor = m_strAfterAnchor;
     this.m_strOldContent = m_strOldContent;
@@ -200,49 +200,7 @@ class GlobalReplaceOperation extends TcvbOperation
   }
 }
 
-// 3. 插入操作（INSERT）
-class InsertOperation extends TcvbOperation
-{
-  public m_strBeforeAnchor: string;
-  public m_strAfterAnchor: string;
-  public m_strInsertContent: string;
-
-  constructor(
-    m_strFilePath: string,
-    m_strBeforeAnchor: string,
-    m_strAfterAnchor: string,
-    m_strInsertContent: string
-  )
-  {
-    super(m_strFilePath, 'insert');
-    this.m_strBeforeAnchor = m_strBeforeAnchor;
-    this.m_strAfterAnchor = m_strAfterAnchor;
-    this.m_strInsertContent = m_strInsertContent;
-  }
-}
-
-// 4. 删除操作（DELETE）
-class DeleteOperation extends TcvbOperation
-{
-  public m_strBeforeAnchor: string;
-  public m_strAfterAnchor: string;
-  public m_strDeleteContent: string;
-
-  constructor(
-    m_strFilePath: string,
-    m_strBeforeAnchor: string,
-    m_strAfterAnchor: string,
-    m_strDeleteContent: string
-  )
-  {
-    super(m_strFilePath, 'delete');
-    this.m_strBeforeAnchor = m_strBeforeAnchor;
-    this.m_strAfterAnchor = m_strAfterAnchor;
-    this.m_strDeleteContent = m_strDeleteContent;
-  }
-}
-
-// 5. 创建操作（CREATE）——新写文件，后面直接跟正文内容即可
+// 3. 创建操作（CREATE）——新写文件，后面直接跟正文内容即可
 class CreateOperation extends TcvbOperation
 {
   public m_strContent: string;
@@ -275,7 +233,7 @@ export class TCVB
     {
       const strFilePath: string = filePathNormalize(arrFileMatch[1]);
       const strOperationsBlock: string = arrFileMatch[2];
-      // 支持操作类型中含有 "-" 符号（如 single-replace 等）
+      // 支持操作类型中含有 "-" 符号（如 exact-replace 等）
       const regOperation: RegExp = /^## OPERATION:([\w-]+)\n([\s\S]*?)(?=^## OPERATION:|(?![\s\S]))/gm;
       let arrOpMatch: RegExpExecArray | null;
       while ((arrOpMatch = regOperation.exec(strOperationsBlock)) !== null)
@@ -293,18 +251,12 @@ export class TCVB
     {
       switch (strType)
       {
-        case 'single-replace':
-          this.parseSingleReplace(strFilePath, strContent);
-          break;
         case 'global-replace':
           this.parseGlobalReplace(strFilePath, strContent);
           break;
-        case 'insert':
-          this.parseInsert(strFilePath, strContent);
-          break;
-        case 'delete':
-          this.parseDelete(strFilePath, strContent);
-          break;
+        case 'exact-replace':
+            this.parseExactReplace(strFilePath, strContent);
+            break;
         case 'create':
           this.parseCreate(strFilePath, strContent);
           break;
@@ -318,11 +270,11 @@ export class TCVB
     }
   }
 
-  // SINGLE-REPLACE 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、OLD_CONTENT、NEW_CONTENT 四个段落
-  private parseSingleReplace(strFilePath: string, strContent: string) : void
+  // Exact-REPLACE 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、OLD_CONTENT、NEW_CONTENT 四个段落
+  private parseExactReplace(strFilePath: string, strContent: string) : void
   {
     const recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'OLD_CONTENT', 'NEW_CONTENT']);
-    this.m_arrOperations.push(new SingleReplaceOperation(
+    this.m_arrOperations.push(new ExactReplaceOperation(
       strFilePath,
       recSections['BEFORE_ANCHOR'],
       recSections['AFTER_ANCHOR'],
@@ -339,30 +291,6 @@ export class TCVB
       strFilePath,
       recSections['OLD_CONTENT'],
       recSections['NEW_CONTENT']
-    ));
-  }
-
-  // INSERT 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、INSERT_CONTENT 三个段落
-  private parseInsert(strFilePath: string, strContent: string) : void
-  {
-    const recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'INSERT_CONTENT']);
-    this.m_arrOperations.push(new InsertOperation(
-      strFilePath,
-      recSections['BEFORE_ANCHOR'],
-      recSections['AFTER_ANCHOR'],
-      recSections['INSERT_CONTENT']
-    ));
-  }
-
-  // DELETE 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、DELETE_CONTENT 三个段落
-  private parseDelete(strFilePath: string, strContent: string) : void
-  {
-    const recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'DELETE_CONTENT']);
-    this.m_arrOperations.push(new DeleteOperation(
-      strFilePath,
-      recSections['BEFORE_ANCHOR'],
-      recSections['AFTER_ANCHOR'],
-      recSections['DELETE_CONTENT']
     ));
   }
 
@@ -481,44 +409,26 @@ TCVB 格式规范：
 ...
 
 操作类型：
-1. 单个替换操作（SINGLE-REPLACE）:
-## OPERATION:SINGLE-REPLACE
-## BEFORE_ANCHOR
-[markdown代码块:被替换行之前的锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换行]
-## AFTER_ANCHOR
-[markdown代码块:被替换行之后的锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换行]
-## OLD_CONTENT
-[markdown代码块:被替换内容]
-## NEW_CONTENT
-[markdown代码块:新内容]
 
-2. 全局替换操作（GLOBAL-REPLACE）:
+1. 全局替换操作(GLOBAL-REPLACE):
 ## OPERATION:GLOBAL-REPLACE
 ## OLD_CONTENT
 [markdown代码块:被全局替换的内容]
 ## NEW_CONTENT
 [markdown代码块:新内容]
 
-3. 插入操作（INSERT）:
-## OPERATION:INSERT
+2. 精确替换操作(EXACT-REPLACE),用于替换全局替换无法精准定位的情况:
+## OPERATION:EXACT-REPLACE
+## OLD_CONTENT
+[markdown代码块:被替换内容]
+## NEW_CONTENT
+[markdown代码块:新内容]
 ## BEFORE_ANCHOR
-[markdown码块:插入位置前的锚点内容，要紧挨着插入的行位置]
+[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围上半段锚点，避免有多个类似匹配, 注意这个不需要紧挨着被替换行。 不能和OLD_CONTENT重合]
 ## AFTER_ANCHOR
-[markdown代码块:插入位置后的锚点内容, 要紧挨着插入的行位置，注意不要与插入的新内容相同，是原始内容插入位置之后的内容]
-## INSERT_CONTENT
-[markdown代码块:插入的新内容]
+[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围下半段锚点，避免有多个类似匹配, 注意这个不需要紧挨着被替换行。 不能和OLD_CONTENT重合]
 
-4. 删除操作（DELETE）:
-## OPERATION:DELETE
-## BEFORE_ANCHOR
-[markdown代码块:被删除行前的锚点内容]
-## AFTER_ANCHOR
-[markdown代码块:被删除行后的锚点内容，注意不要与要删除的内容相同，是原始内容被删除代码块之后的内容]
-## DELETE_CONTENT
-[markdown代码块:被删除行的内容]
-
-
-5. 创建操作（CREATE）:
+3. 创建操作(CREATE):
 ## OPERATION:CREATE
 [markdown代码块:直接跟正文内容，表示新文件的全部内容]
 
@@ -528,6 +438,8 @@ TCVB 格式规范：
 3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆(如果需要可以超过3行)
 4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉
 5. 注意TCVB和CVB的区别。CVB是完整的内容，而TCVB是用来生成差量同步的，通过多个OPERATION去操作已有CVB合成新CVB
+6. 插入和删除操作都可以转化为替换操作
+7. 用来匹配的锚点必须和原始传入的数据一致，不能有缺失，比如不能丢弃注释。
 `;
   }
 }
@@ -557,21 +469,13 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
           let strContent: string = mapMergedFiles.get(strFilePath) || '';
           for (const op of arrOperations)
           {
-            if (op instanceof SingleReplaceOperation)
+            if (op instanceof ExactReplaceOperation)
             {
-              strContent = applySingleReplace(strContent, op);
+              strContent = applyExactReplace(strContent, op);
             }
             else if (op instanceof GlobalReplaceOperation)
             {
               strContent = applyGlobalReplace(strContent, op);
-            }
-            else if (op instanceof InsertOperation)
-            {
-              strContent = applyInsert(strContent, op);
-            }
-            else if (op instanceof DeleteOperation)
-            {
-              strContent = applyDelete(strContent, op);
             }
             else if (op instanceof CreateOperation)
             {
@@ -589,7 +493,7 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
   return rebuildCvb(baseCvb, mapMergedFiles);
 }
 
-function applySingleReplace(strContent: string, op: SingleReplaceOperation): string {
+function applyExactReplace(strContent: string, op: ExactReplaceOperation): string {
   // 构建匹配模式：前锚点 + 中间内容1 + 旧内容 + 中间内容2 + 后锚点
   const regPattern = buildPattern(op.m_strBeforeAnchor, op.m_strOldContent, op.m_strAfterAnchor);
   // 替换为：前锚点 + 中间内容1 + 新内容 + 中间内容2 + 后锚点
@@ -597,7 +501,8 @@ function applySingleReplace(strContent: string, op: SingleReplaceOperation): str
 
   regPattern.lastIndex = 0; // 重置正则表达式的状态
   if (!regPattern.test(strContent)) {
-    throw new Error(`Single-replace操作失败：文件 "${op.m_strFilePath}" 中未找到匹配项。请检查前后锚点及旧内容是否正确。`);
+    console.log("以下表达式:\n" + regPattern + "\n 为何无法匹配到原文:\n" + strContent);
+    throw new Error(`Exact-replace操作失败：文件 "${op.m_strFilePath}" 中未找到匹配项。请检查前后锚点及旧内容是否正确。`);
   }
   regPattern.lastIndex = 0; // 再次重置以备替换
 
@@ -615,61 +520,12 @@ function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : st
 
   regPattern.lastIndex = 0;
   if (!regPattern.test(strContent)) {
+    console.log("以下表达式:\n" + regPattern + "\n 为何无法匹配到原文:\n" + strContent);
     throw new Error(`全局替换失败：文件 "${op.m_strFilePath}" 中未找到旧内容 "${op.m_strOldContent}"。`);
   }
   regPattern.lastIndex = 0;
 
   return strContent.replace(regPattern, op.m_strNewContent);
-}
-
-function applyInsert( strContent: string, op: InsertOperation ) : string
-{
-    if ( op.m_strBeforeAnchor === "" || op.m_strAfterAnchor === "" )
-    {
-        throw new Error( "插入操作的前锚点或后锚点为空" );
-    }
-
-    // 将前后锚点转义后使用
-    const strBeforeRegex: string = normalizeLineWhitespace(escapeRegExp( op.m_strBeforeAnchor ));
-    const strAfterRegex: string  = normalizeLineWhitespace(escapeRegExp( op.m_strAfterAnchor ));
-    // 中间部分直接作为正则片段，不做转义
-    const strMiddlePattern: string = "[ \\t\\r\\n]*";
-
-    const regPattern: RegExp = new RegExp( strBeforeRegex + strMiddlePattern + strAfterRegex, 'gs' );
-    const strReplacement: string = op.m_strBeforeAnchor + op.m_strInsertContent + op.m_strAfterAnchor;
-
-    console.log(regPattern);
-    regPattern.lastIndex = 0;
-    if (!regPattern.test(strContent)) {
-      throw new Error(`插入失败：文件 "${op.m_strFilePath}" 插入前锚点:"${op.m_strBeforeAnchor}", 插入内容: "${op.m_strInsertContent}", 插入后锚点: "${op.m_strAfterAnchor}"`);
-    }
-    regPattern.lastIndex = 0;
-
-    return strContent.replace( regPattern, strReplacement );
-}
-
-function applyDelete( strContent: string, op: DeleteOperation ) : string
-{
-    if ( op.m_strBeforeAnchor === "" || op.m_strAfterAnchor === "" )
-    {
-        throw new Error( "删除操作的前锚点或后锚点为空" );
-    }
-    if ( op.m_strDeleteContent === "" )
-    {
-        throw new Error( "删除操作的内容为空" );
-    }
-
-    const regPattern: RegExp = buildPattern( op.m_strBeforeAnchor, op.m_strDeleteContent, op.m_strAfterAnchor );
-    // 使用捕获组 $1 和 $2 来保留匹配到的前后附加内容（不删除）
-    const strReplacement: string = op.m_strBeforeAnchor + "$1" + "$2" + op.m_strAfterAnchor;
-
-    regPattern.lastIndex = 0;
-    if (!regPattern.test(strContent)) {
-      throw new Error(`删除失败：文件 "${op.m_strFilePath}" 需要删除的内容:"${op.m_strDeleteContent}"`);
-    }
-    regPattern.lastIndex = 0;
-
-    return strContent.replace( regPattern, strReplacement );
 }
 
 // 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）
@@ -727,7 +583,7 @@ function normalizeLineWhitespace(anchor: string): string {
 
 function filePathNormalize(strRawPath: string) : string
 {
-  return path.normalize(strRawPath.replace(/^[\\/]+/, ''));
+  return path.normalize(strRawPath.replace(/^[\\/]+/, '').trim());
 }
 
 /**
