@@ -502,7 +502,7 @@ function applyExactReplace(strContent: string, op: ExactReplaceOperation): strin
   regPattern.lastIndex = 0; // 重置正则表达式的状态
   if (!regPattern.test(strContent)) {
     console.log("以下表达式:\n" + regPattern + "\n 无法匹配:\n");
-    throw new Error(`Exact-replace操作失败：文件 "${op.m_strFilePath}" 中未找到匹配项。请检查前后锚点及旧内容是否正确。`);
+    throw new Error(`Exact-replace操作失败：文件 "${op.m_strFilePath}" 中未找到匹配项。请检查前后锚点及旧内容是否正确。## OLD_CONTENT\n${op.m_strOldContent}\n\n## BEFORE_ANCHOR\n${op.m_strBeforeAnchor}\n\n## AFTER_ANCHOR\n${op.m_strAfterAnchor} `);
   }
   regPattern.lastIndex = 0; // 再次重置以备替换
 
