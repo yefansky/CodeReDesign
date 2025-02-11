@@ -475,7 +475,7 @@ TCVB 格式规范：
 ## END_TCVB
 
 文件块格式：
-## FILE:<文件路径>
+## FILE:<文件绝对路径>
 [操作1]
 [操作2]
 ...
@@ -484,48 +484,49 @@ TCVB 格式规范：
 1. 单个替换操作（SINGLE-REPLACE）:
 ## OPERATION:SINGLE-REPLACE
 ## BEFORE_ANCHOR
-[代码块:被替换行之前的锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换行]
+[markdown代码块:被替换行之前的锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换行]
 ## AFTER_ANCHOR
-[代码块:被替换行之后的锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换行]
+[markdown代码块:被替换行之后的锚点内容,用来划定范围，避免混淆, 注意这个不需要紧挨着被替换行]
 ## OLD_CONTENT
-[代码块:被替换内容]
+[markdown代码块:被替换内容]
 ## NEW_CONTENT
-[代码块:新内容]
+[markdown代码块:新内容]
 
 2. 全局替换操作（GLOBAL-REPLACE）:
 ## OPERATION:GLOBAL-REPLACE
 ## OLD_CONTENT
-[代码块:被全局替换的内容]
+[markdown代码块:被全局替换的内容]
 ## NEW_CONTENT
-[代码块:新内容]
+[markdown代码块:新内容]
 
 3. 插入操作（INSERT）:
 ## OPERATION:INSERT
 ## BEFORE_ANCHOR
-[代码块:插入位置前的锚点内容]
+[markdown码块:插入位置前的锚点内容，要紧挨着插入的行位置]
 ## AFTER_ANCHOR
-[代码块:插入位置后的锚点内容]
+[markdown代码块:插入位置后的锚点内容, 要紧挨着插入的行位置，注意不要与插入的新内容相同，是原始内容插入位置之后的内容]
 ## INSERT_CONTENT
-[代码块:插入内容]
+[markdown代码块:插入的新内容]
 
 4. 删除操作（DELETE）:
 ## OPERATION:DELETE
 ## BEFORE_ANCHOR
-[代码块:被删除行前的锚点内容]
+[markdown代码块:被删除行前的锚点内容]
 ## AFTER_ANCHOR
-[代码块:被删除行后的锚点内容]
+[markdown代码块:被删除行后的锚点内容，注意不要与要删除的内容相同，是原始内容被删除代码块之后的内容]
 ## DELETE_CONTENT
-[代码块:被删除行的内容]
+[markdown代码块:被删除行的内容]
+
 
 5. 创建操作（CREATE）:
 ## OPERATION:CREATE
-[代码块:直接跟正文内容，表示新文件的全部内容]
+[markdown代码块:直接跟正文内容，表示新文件的全部内容]
 
 注意：
 1. 所有OPERATION操作以行为单位
 2. 一个'## FILE'下可以有多个'## OPERATION'
 3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆(如果需要可以超过3行)
-4. 代码块,(规则中的[代码块:...]) 用 markdown 格式包裹
+4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉
 5. 注意TCVB和CVB的区别。CVB是完整的内容，而TCVB是用来生成差量同步的，通过多个OPERATION去操作已有CVB合成新CVB
 `;
   }
@@ -549,35 +550,40 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
     mapOperationsByFile.get(op.m_strFilePath)!.push(op);
   }
 
-  // 对每个文件执行所有操作（按顺序执行）
-  for (const [strFilePath, arrOperations] of mapOperationsByFile)
-  {
-    let strContent: string = mapMergedFiles.get(strFilePath) || '';
-    for (const op of arrOperations)
-    {
-      if (op instanceof SingleReplaceOperation)
+  try {
+      // 对每个文件执行所有操作（按顺序执行）
+      for (const [strFilePath, arrOperations] of mapOperationsByFile)
       {
-        strContent = applySingleReplace(strContent, op);
+          let strContent: string = mapMergedFiles.get(strFilePath) || '';
+          for (const op of arrOperations)
+          {
+            if (op instanceof SingleReplaceOperation)
+            {
+              strContent = applySingleReplace(strContent, op);
+            }
+            else if (op instanceof GlobalReplaceOperation)
+            {
+              strContent = applyGlobalReplace(strContent, op);
+            }
+            else if (op instanceof InsertOperation)
+            {
+              strContent = applyInsert(strContent, op);
+            }
+            else if (op instanceof DeleteOperation)
+            {
+              strContent = applyDelete(strContent, op);
+            }
+            else if (op instanceof CreateOperation)
+            {
+              // CREATE 操作：直接以新内容覆盖原有内容
+              strContent = op.m_strContent;
+            }
+          }
+          mapMergedFiles.set(strFilePath, strContent);
       }
-      else if (op instanceof GlobalReplaceOperation)
-      {
-        strContent = applyGlobalReplace(strContent, op);
-      }
-      else if (op instanceof InsertOperation)
-      {
-        strContent = applyInsert(strContent, op);
-      }
-      else if (op instanceof DeleteOperation)
-      {
-        strContent = applyDelete(strContent, op);
-      }
-      else if (op instanceof CreateOperation)
-      {
-        // CREATE 操作：直接以新内容覆盖原有内容
-        strContent = op.m_strContent;
-      }
-    }
-    mapMergedFiles.set(strFilePath, strContent);
+  }
+  catch (err: any) {
+    throw new Error(`合并CVB失败: ${err.message}`);
   }
 
   return rebuildCvb(baseCvb, mapMergedFiles);
@@ -588,6 +594,13 @@ function applySingleReplace(strContent: string, op: SingleReplaceOperation): str
   const regPattern = buildPattern(op.m_strBeforeAnchor, op.m_strOldContent, op.m_strAfterAnchor);
   // 替换为：前锚点 + 中间内容1 + 新内容 + 中间内容2 + 后锚点
   const strReplacement = op.m_strBeforeAnchor + '$1' + op.m_strNewContent + '$2' + op.m_strAfterAnchor;
+
+  regPattern.lastIndex = 0; // 重置正则表达式的状态
+  if (!regPattern.test(strContent)) {
+    throw new Error(`Single-replace操作失败：文件 "${op.m_strFilePath}" 中未找到匹配项。请检查前后锚点及旧内容是否正确。`);
+  }
+  regPattern.lastIndex = 0; // 再次重置以备替换
+
   return strContent.replace(regPattern, strReplacement);
 }
 
@@ -598,7 +611,14 @@ function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : st
     throw new Error(`全局替换为空`);
   }
 
-  const regPattern: RegExp = new RegExp(escapeRegExp(op.m_strOldContent), 'gs');
+  const regPattern: RegExp = new RegExp(normalizeLineWhitespace(escapeRegExp(op.m_strOldContent)), 'gs');
+
+  regPattern.lastIndex = 0;
+  if (!regPattern.test(strContent)) {
+    throw new Error(`全局替换失败：文件 "${op.m_strFilePath}" 中未找到旧内容 "${op.m_strOldContent}"。`);
+  }
+  regPattern.lastIndex = 0;
+
   return strContent.replace(regPattern, op.m_strNewContent);
 }
 
@@ -610,13 +630,20 @@ function applyInsert( strContent: string, op: InsertOperation ) : string
     }
 
     // 将前后锚点转义后使用
-    const strBeforeRegex: string = escapeRegExp( op.m_strBeforeAnchor );
-    const strAfterRegex: string  = escapeRegExp( op.m_strAfterAnchor );
+    const strBeforeRegex: string = normalizeLineWhitespace(escapeRegExp( op.m_strBeforeAnchor ));
+    const strAfterRegex: string  = normalizeLineWhitespace(escapeRegExp( op.m_strAfterAnchor ));
     // 中间部分直接作为正则片段，不做转义
-    const strMiddlePattern: string = "((?:[ \\t]*(?:\\r?\\n))*)";
+    const strMiddlePattern: string = "[ \\t\\r\\n]*";
 
     const regPattern: RegExp = new RegExp( strBeforeRegex + strMiddlePattern + strAfterRegex, 'gs' );
     const strReplacement: string = op.m_strBeforeAnchor + op.m_strInsertContent + op.m_strAfterAnchor;
+
+    console.log(regPattern);
+    regPattern.lastIndex = 0;
+    if (!regPattern.test(strContent)) {
+      throw new Error(`插入失败：文件 "${op.m_strFilePath}" 插入前锚点:"${op.m_strBeforeAnchor}", 插入内容: "${op.m_strInsertContent}", 插入后锚点: "${op.m_strAfterAnchor}"`);
+    }
+    regPattern.lastIndex = 0;
 
     return strContent.replace( regPattern, strReplacement );
 }
@@ -636,17 +663,23 @@ function applyDelete( strContent: string, op: DeleteOperation ) : string
     // 使用捕获组 $1 和 $2 来保留匹配到的前后附加内容（不删除）
     const strReplacement: string = op.m_strBeforeAnchor + "$1" + "$2" + op.m_strAfterAnchor;
 
+    regPattern.lastIndex = 0;
+    if (!regPattern.test(strContent)) {
+      throw new Error(`删除失败：文件 "${op.m_strFilePath}" 需要删除的内容:"${op.m_strDeleteContent}"`);
+    }
+    regPattern.lastIndex = 0;
+
     return strContent.replace( regPattern, strReplacement );
 }
 
 // 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）
 function buildPattern(strBefore: string, strContent: string, strAfter: string): RegExp {
   return new RegExp(
-    escapeRegExp(strBefore) + 
+    normalizeLineWhitespace(escapeRegExp(strBefore)) + 
     '([\\s\\S]*?)' +   // 捕获前锚点与旧内容之间的任意字符（非贪婪）
-    escapeRegExp(strContent) + 
+    normalizeLineWhitespace(escapeRegExp(strContent)) + 
     '([\\s\\S]*?)' +   // 捕获旧内容与后锚点之间的任意字符（非贪婪）
-    escapeRegExp(strAfter), 
+    normalizeLineWhitespace(escapeRegExp(strAfter)), 
     'gs'  // 全局匹配且允许跨行
   );
 }
@@ -681,6 +714,15 @@ function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>) : Cvb
 function escapeRegExp(str: string) : string
 {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeLineWhitespace(anchor: string): string {
+  return anchor.split('\n')
+    .map(line => {
+      // 对每一行的空白字符做更精确的处理
+      return `\\s*${line.trim()}\\s*`; // 保留行首和行尾的空白字符处理
+    })
+    .join('\n'); // 行与行之间允许有空白字符（空格、换行符等）
 }
 
 function filePathNormalize(strRawPath: string) : string

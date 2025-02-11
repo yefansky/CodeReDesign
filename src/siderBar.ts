@@ -160,8 +160,7 @@ function applyThisCvb(filePath: string) {
  * @param filePath .cvb 文件的路径
  */
 async function uploadThisCvb(filePath: string) {
-
-  /*
+/*
   // 测试 begin
   {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -170,7 +169,7 @@ async function uploadThisCvb(filePath: string) {
       return;
     }
     const workspacePath = workspaceFolders[0].uri.fsPath;
-    const filepath = path.join(workspacePath, "/prompt/testdata.txt");
+    const filepath = path.join(workspacePath, "/prompt/testdata2.txt");
     let tcvbContent = fs.readFileSync(filepath, 'utf-8');
     tcvbContent = tcvbContent.replace(/\r\n?/g, "\n");
     const tcvb = new TCVB(tcvbContent);
@@ -180,8 +179,7 @@ async function uploadThisCvb(filePath: string) {
     const cvb = mergeCvb(oldCvb, tcvb);
   }
   // 测试 end
-  */
-
+*/
   const userPrompt = await vscode.window.showInputBox({
     prompt: 'Enter your prompt for the refactoring',
     placeHolder: 'e.g., Refactor the code to improve readability',
