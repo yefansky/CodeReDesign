@@ -39,6 +39,8 @@ function getDeepSeekModelConfig(): { modelName: string, apiBaseURL: string, apiK
     return defaultConfigs[modelConfig] || defaultConfigs['deepseek-chat'];
 }
 
+let lastMessageBody : OpenAI.ChatCompletionMessageParam[];
+
 /**
  * 调用 DeepSeek API
  * @param userContent 用户输入内容
@@ -155,6 +157,8 @@ async function callDeepSeekApi(
             vscode.window.showWarningMessage('响应未包含结束标记');
         }
 
+        messages_body.push({ role: 'assistant', content: fullResponse });
+        lastMessageBody = messages_body;
         return fullResponse;
 
     } catch (error) {
@@ -165,6 +169,79 @@ async function callDeepSeekApi(
         vscode.window.showErrorMessage('API调用失败: ' + (error as Error).message);
         return null;
     }
+}
+
+export async function callDeepSeekFixApi(
+    errorInfo: string,
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig();
+    const userStopException = 'operation stop by user';
+
+    if (!apiKey) {
+        vscode.window.showErrorMessage('DeepSeek API Key is not configured. Please set it in the settings.');
+        return null;
+    }
+
+    if (!modelName || !apiBaseURL) {
+        vscode.window.showErrorMessage('DeepSeek Model Name or API Base URL is not configured.');
+        return null;
+    }
+
+    const openai = new OpenAI({
+        apiKey: apiKey,
+        baseURL: apiBaseURL,
+    });
+
+    if (outputChannel) {
+        outputChannel.clear();
+        outputChannel.show();
+    }
+
+    let messages_body = lastMessageBody;
+
+    messages_body.push(
+        { role: 'user', content:`接收的数据格式有错误: ${errorInfo}, 修正后重新完整输出:`}
+    );
+
+    let fullResponse = '';
+    let chunkResponse = '';
+    let finishReason: string | null = null;
+
+    vscode.window.showInformationMessage('开始上传DeepSeek API, 进行修复');
+
+    const response = await openai.chat.completions.create({
+        model: modelName,
+        messages: messages_body,
+        stream: streamMode,
+        max_tokens: 8192,
+        temperature: 0
+    });
+
+    if (streamMode) {
+        for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+            if (abortSignal?.aborted) {
+                throw new Error(userStopException);
+            }
+            const content = chunk.choices[0]?.delta?.content || '';
+            chunkResponse += content;
+            if (outputChannel) {
+                outputChannel.append(content);
+            }
+            finishReason = chunk.choices[0]?.finish_reason || null;
+        }
+    } else {
+        const completion = response as OpenAI.Chat.Completions.ChatCompletion;
+        chunkResponse = completion.choices[0].message.content || "";
+        finishReason = completion.choices[0].finish_reason || null;
+        if (outputChannel) {
+            outputChannel.append(chunkResponse);
+        }
+    }
+
+    return fullResponse;
 }
 
 /**

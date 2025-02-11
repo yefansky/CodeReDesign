@@ -21,14 +21,12 @@ const g_objLanguageMapping: { [key: string]: string } = {
 // ================== CVB 核心类 ==================
 export class Cvb
 {
-  private m_strContent : string;
   private m_recMetadata : Record<string, string>;
   private m_recFiles : Record<string, string>;
 
   constructor(cvbContent: string)
   {
-    const { cvbContent: m_strContent, metadata: m_recMetadata, files: m_recFiles } = this.parse(cvbContent);
-    this.m_strContent = m_strContent;
+    const { metadata: m_recMetadata, files: m_recFiles } = this.parse(cvbContent);
     this.m_recMetadata = m_recMetadata;
     this.m_recFiles = m_recFiles;
   }
@@ -58,9 +56,27 @@ export class Cvb
     return this.m_recMetadata['@时间戳'] || '';
   }
 
-  public toString() : string
-  {
-    return this.m_strContent;
+  public toString(): string {
+    // 将元数据转换成字符串
+    let metaStr = '## META\n';
+    for (const key in this.m_recMetadata) {
+      metaStr += `${key}: ${this.m_recMetadata[key]}\n`;
+    }
+    metaStr += '## END_META\n';
+  
+    // 将文件内容转换成字符串
+    let filesStr = '';
+    for (const filePath in this.m_recFiles) {
+      // 这里假设文件内容不需要包裹代码块标记，如果需要，可自行添加
+      filesStr += `## FILE:${filePath}\n${this.m_recFiles[filePath]}\n`;
+    }
+  
+    // 重新组装整个 CVB 内容
+    const cvbContent = `## BEGIN_CVB
+  ${metaStr}
+  ${filesStr}
+  ## END_CVB`;
+    return cvbContent;
   }
 
   private parse(strCvbContent: string) : { cvbContent: string, metadata: Record<string, string>, files: Record<string, string> }
@@ -479,6 +495,9 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
             }
             else if (op instanceof CreateOperation)
             {
+              if (mapMergedFiles.has(strFilePath)){
+                throw new Error(`${strFilePath} 已经存在，不可以使用 ## OPERATION:CREATE`)
+              }
               // CREATE 操作：直接以新内容覆盖原有内容
               strContent = op.m_strContent;
             }

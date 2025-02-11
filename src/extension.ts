@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
 import { generateCvb, applyCvbToWorkspace, generateTimestamp, Cvb, TCVB, mergeCvb} from './cvbManager';
-import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode } from './deepseekApi';
+import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode, callDeepSeekFixApi } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
 
@@ -29,6 +29,55 @@ export function clearCurrentOperationController() {
         currentOperationController.abort(); // 中止操作
         currentOperationController = null; // 清除引用
     }
+}
+
+export async function doUploadCommand(cvbFilePath: string, userPrompt: string, outputChannel: vscode.OutputChannel){
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+    }
+    
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
+
+    const filenameSummary = await generateFilenameFromRequest(userPrompt);
+    const timestamp = generateTimestamp();
+    let baseFileName = `${timestamp}_${filenameSummary}.cvb`;
+    let fileName = baseFileName;
+    let i = 1;
+    while (fs.existsSync(path.join(tmpDir, fileName))) {
+        fileName = `${timestamp}_${filenameSummary}_${i}.cvb`;
+        i++;
+    }
+
+    const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
+
+    resetCurrentOperationController();
+
+    let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+    let processSuccess = true;
+    do {
+        try {
+            if (apiResponse) {
+                const tcvb = new TCVB(apiResponse);
+                const oldCvb = new Cvb(cvbContent);
+                const cvb = mergeCvb(oldCvb, tcvb);
+
+                processSuccess = true;
+
+                cvb.setMetaData("用户需求", userPrompt);
+                const newCvbFilePath = path.join(tmpDir, fileName);
+                fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
+                vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+            }
+        } catch (err : any){
+            apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
+            processSuccess = false;
+        }
+    } while (!processSuccess);
+
+    clearCurrentOperationController();
 }
 
 // 插件激活时调用
@@ -98,33 +147,10 @@ export function activate(context: vscode.ExtensionContext) {
         if (!userPrompt) {
             return;
         }
-    
-        const filenameSummary = await generateFilenameFromRequest(userPrompt);
-        const timestamp = generateTimestamp();
-        let baseFileName = `${timestamp}_${filenameSummary}.cvb`;
-        let fileName = baseFileName;
-        let i = 1;
-        while (fs.existsSync(path.join(tmpDir, fileName))) {
-            fileName = `${timestamp}_${filenameSummary}_${i}.cvb`;
-            i++;
-        }
-    
+
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
-        const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
-
-        resetCurrentOperationController();
-
-        const apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
-        if (apiResponse) {
-            const tcvb = new TCVB(apiResponse);
-            const oldCvb = new Cvb(cvbContent);
-            const cvb = mergeCvb(oldCvb, tcvb);
-            cvb.setMetaData("用户需求", userPrompt);
-            const newCvbFilePath = path.join(tmpDir, fileName);
-            fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
-            vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
-        }
-        clearCurrentOperationController();
+    
+        doUploadCommand(cvbFilePath, userPrompt, outputChannel);
     });
 
     // 注册命令：中断当前的上传操作
