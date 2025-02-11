@@ -424,9 +424,9 @@ TCVB 格式规范：
 ## NEW_CONTENT
 [markdown代码块:新内容]
 ## BEFORE_ANCHOR
-[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围上半段锚点，避免有多个类似匹配, 注意这个不需要紧挨着被替换行。 不能和OLD_CONTENT重合]
+[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围上半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合]
 ## AFTER_ANCHOR
-[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围下半段锚点，避免有多个类似匹配, 注意这个不需要紧挨着被替换行。 不能和OLD_CONTENT重合]
+[markdown代码块:OLD_CONTENT之后的几行内容, 用来划定范围下半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合]
 
 3. 创建操作(CREATE):
 ## OPERATION:CREATE
