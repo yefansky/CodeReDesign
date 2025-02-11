@@ -1,0 +1,9 @@
+有时候输出的tcvb格式不对，merge的时候会抛异常，里面带了信息。
+请帮我改成catch异常，然后把收到的数据再回传，带上错误信息，让他自我修复。
+你需要存储最后一次和api交互的数据，在后面拼接上收到的信息和错误提示，让他重新输出cvb
+callDeepSeekApi 执行完以后，会有一个接口获取最后一次的通讯数据， 也就是 messages_body，里面还拼接了最后一次收到的数据
+queryCodeReDesign 之后处理respond 一直到 merge完，try catch，如果有错误，就调用一个 callDeepSeekApiFix 传入错误信息（Error中带的）
+callDeepSeekApiFix 会拼接传入的错误信息，和一个需求（让他再次纠正并完整输出）， 把messages_body后面push上错误信息和需求，让他重新输出
+输出以后再走一遍流程看有没有抛异常
+外面套个循环，最大重复3次，来修复。每次收到后重新走接受和merge操作，看有没有错
+你可以把接受和merge变成一个函数方便重复调用

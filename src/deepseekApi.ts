@@ -146,7 +146,7 @@ async function callDeepSeekApi(
             // 准备下一次请求
             messages_body.push(
                 { role: 'assistant', content: fullResponse },
-                { role: 'user', content: '你的输出被截断了，请继续输出剩余部分, 不需要```做起始，直接继续输出纯cvb格式内容就行:' }
+                { role: 'user', content: '你的输出被截断了，请继续输出剩余部分, 不需要```做起始，直接继续输出纯内容:' }
             );
         }
 
