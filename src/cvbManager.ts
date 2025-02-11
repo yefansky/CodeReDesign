@@ -436,10 +436,10 @@ TCVB 格式规范：
 1. 所有OPERATION操作以行为单位
 2. 一个'## FILE'下可以有多个'## OPERATION'
 3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆(如果需要可以超过3行)
-4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉
+4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉。
 5. 注意TCVB和CVB的区别。CVB是完整的内容，而TCVB是用来生成差量同步的，通过多个OPERATION去操作已有CVB合成新CVB
 6. 插入和删除操作都可以转化为替换操作
-7. 用来匹配的锚点必须和原始传入的数据一致，不能有缺失，比如不能丢弃注释。
+7. 用来匹配的锚点必须和原始传入的数据完全一致，不能有缺失，不能丢弃注释。
 `;
   }
 }
@@ -501,7 +501,7 @@ function applyExactReplace(strContent: string, op: ExactReplaceOperation): strin
 
   regPattern.lastIndex = 0; // 重置正则表达式的状态
   if (!regPattern.test(strContent)) {
-    console.log("以下表达式:\n" + regPattern + "\n 为何无法匹配到原文:\n" + strContent);
+    console.log("以下表达式:\n" + regPattern + "\n 无法匹配:\n");
     throw new Error(`Exact-replace操作失败：文件 "${op.m_strFilePath}" 中未找到匹配项。请检查前后锚点及旧内容是否正确。`);
   }
   regPattern.lastIndex = 0; // 再次重置以备替换
@@ -520,7 +520,7 @@ function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : st
 
   regPattern.lastIndex = 0;
   if (!regPattern.test(strContent)) {
-    console.log("以下表达式:\n" + regPattern + "\n 为何无法匹配到原文:\n" + strContent);
+    console.log("以下表达式:\n" + regPattern + "\n 无法匹配");
     throw new Error(`全局替换失败：文件 "${op.m_strFilePath}" 中未找到旧内容 "${op.m_strOldContent}"。`);
   }
   regPattern.lastIndex = 0;
