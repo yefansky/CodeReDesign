@@ -110,7 +110,7 @@ export class Cvb
 
     // 解析文件部分
     const recFiles: Record<string, string> = { };
-    const regFile: RegExp = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
+    const regFile: RegExp = /^## FILE:([^<\r\n]+)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
     let arrFileMatch: RegExpExecArray | null;
     while ((arrFileMatch = regFile.exec(strCvbContentPart)) !== null)
     {

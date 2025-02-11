@@ -1,123 +1,72 @@
-﻿## BEGIN_TCVB
+﻿```TCVB
+## BEGIN_TCVB
+
 ## FILE:k:\lab\CodeReDesign-dummy\src\siderBar.ts
 ## OPERATION:INSERT
 ## BEFORE_ANCHOR
 ```typescript
-  getTreeItem(element: CvbFile): vscode.TreeItem {
-    return element;
-  }
+export function registerCvbContextMenu(context: vscode.ExtensionContext) {
+
+  // 注册右键菜单命令
+  const applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyThisCvb', (cvb: CvbFile) => {
 ```
 ## AFTER_ANCHOR
 ```typescript
-  async getChildren(element?: CvbFile): Promise<CvbFile[]> {
-    if (element) {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders) {
+    const targetFolder = path.join(workspaceFolders[0].uri.fsPath, '.CodeReDesignWorkSpace'); // 替换为你的子文件夹名称
+
+    // 创建文件系统监听器
 ```
 ## INSERT_CONTENT
 ```typescript
-  // 新增文件类型过滤
-  private isSupportedFileType(filename: string): boolean {
-    return filename.endsWith('.cvb') || filename.endsWith('.tcvb') || filename.endsWith('.md');
-  }
-```
+    // 监听 .tcvb 和 .md 文件变化
+    const markdownWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(targetFolder, '**/*.md')
+    );
 
-## OPERATION:SINGLE-REPLACE
-## BEFORE_ANCHOR
-```typescript
-          if (file.endsWith('.cvb')) {
-            const filePath = path.join(targetFolder, file);
-            cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
-          }
-```
-## AFTER_ANCHOR
-```typescript
-        // 新增排序逻辑
-        cvbFiles.sort((a, b) => 
-```
-## OLD_CONTENT
-```typescript
-          if (file.endsWith('.cvb')) {
-            const filePath = path.join(targetFolder, file);
-            cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
-          }
-```
-## NEW_CONTENT
-```typescript
-          if (this.isSupportedFileType(file)) {
-            const filePath = path.join(targetFolder, file);
-            cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
-          }
+    const tcvbWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(targetFolder, '**/*.tcvb')
+    );
+
+    // 当文件变化时刷新视图
+    markdownWatcher.onDidCreate(() => cvbViewProvider.refresh());
+    markdownWatcher.onDidDelete(() => cvbViewProvider.refresh());
+    markdownWatcher.onDidChange(() => cvvViewProvider.refresh());
+
+    tcvbWatcher.onDidCreate(() => cvbViewProvider.refresh());
+    tcvbWatcher.onDidDelete(() => cvbViewProvider.refresh());
+    tcvbWatcher.onDidChange(() => cvbViewProvider.refresh());
+
+    // 将监听器添加到订阅中，确保扩展销毁时清理资源
+    context.subscriptions.push(markdownWatcher, tcvbWatcher);
+  }
 ```
 
 ## FILE:k:\lab\CodeReDesign-dummy\src\deepseekApi.ts
 ## OPERATION:INSERT
 ## BEFORE_ANCHOR
 ```typescript
-            fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
-            vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+  if (apiResponse) {
+    apiResponse = apiResponse.replace(/\r\n?/g, "\n");
+    const tcvb = new TCVB(apiResponse);
 ```
 ## AFTER_ANCHOR
 ```typescript
-          }
-          clearCurrentOperationController();
+    cvb.setMetaData("用户需求", userPrompt);
+    const newCvbFilePath = path.join(tmpDir, fileName);
+    fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
 ```
 ## INSERT_CONTENT
 ```typescript
-            // 保存原始TCVB内容
-            const tcvbFilePath = path.join(tmpDir, fileName.replace(/\.cvb$/, '.tcvb'));
-            fs.writeFileSync(tcvbFilePath, apiResponse, 'utf-8');
-```
+    // 保存 TCVB 文件
+    const tcvbFilename = path.join(tmpDir, `${path.basename(fileName, '.cvb')}.tcvb`);
+    fs.writeFileSync(tcvbFilename, apiResponse, 'utf-8');
 
-## OPERATION:INSERT
-## BEFORE_ANCHOR
-```typescript
-        if (analysisResult) {
-          vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
-```
-## AFTER_ANCHOR
-```typescript
-        }
-        clearCurrentOperationController();
-```
-## INSERT_CONTENT
-```typescript
-          // 保存分析结果到Markdown
-          const mdFileName = path.basename(filePath).replace(/\.cvb$/, '_analysis.md');
-          const mdFilePath = path.join(path.dirname(filePath), mdFileName);
-          fs.writeFileSync(mdFilePath, `# Analysis Report\n\n${analysisResult}`, 'utf-8');
-```
-
-## FILE:k:\lab\CodeReDesign-dummy\src\cvbManager.ts
-## OPERATION:INSERT
-## BEFORE_ANCHOR
-```typescript
-class CvbFile extends vscode.TreeItem {
-  constructor(
-    public readonly label: string,
-    public readonly uri: vscode.Uri
-  ) {
-```
-## AFTER_ANCHOR
-```typescript
-    // 设置图标（可选）
-    this.iconPath = vscode.ThemeIcon.File;
-```
-## INSERT_CONTENT
-```typescript
-    // 根据文件类型设置不同图标
-    if (uri.fsPath.endsWith('.tcvb')) {
-      this.iconPath = new vscode.ThemeIcon('diff');
-    } else if (uri.fsPath.endsWith('.md')) {
-      this.iconPath = new vscode.ThemeIcon('markdown');
-    }
+    // 保存分析结果
+    const analysisFilename = path.join(tmpDir, `${path.basename(fileName, '.cvb')}_analysis.md`);
+    fs.writeFileSync(analysisFilename, '分析结果\n\n' + analysisResult, 'utf-8');
 ```
 
 ## END_TCVB
-
-这个TCVB实现了：
-1. 在侧边栏增加.tcvb和.md文件支持
-2. 上传TCVB时保存原始TCVB文件
-3. 分析结果保存为Markdown文件
-4. 不同文件类型显示不同图标
-5. 文件名保持与CVB文件一致（自动替换扩展名）
-
-所有修改都保持原有功能完整，新增文件会在.CodReDesignWorkSpace目录生成，并能在侧边栏正确显示和操作。
+```
