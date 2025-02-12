@@ -137,7 +137,7 @@ async function callDeepSeekApi(
                 finishReason === 'length' || 
                 (endstring && !fullResponse.includes(endstring));
 
-            if (!shouldContinue) {break};
+            if (!shouldContinue) {break;};
 
             if (abortSignal?.aborted) {
                 throw new Error(userStopException);
@@ -203,7 +203,7 @@ export async function callDeepSeekFixApi(
     let messages_body = lastMessageBody;
 
     messages_body.push(
-        { role: 'user', content:`接收的数据格式有错误: ${errorInfo}, 仔细检查，分析输出错误的原因。然后重新完整输出:`}
+        { role: 'user', content:`接收的数据格式有错误: ${errorInfo}, 仔细检查，分析输出错误的原因。然后根据分析重新完整输出， 注意不能有省略:`}
     );
 
     let fullResponse = '';
@@ -362,7 +362,7 @@ export async function generateFilenameFromRequest(userRequest: string): Promise<
 
     // 清理文件名
     summary = cleanFilename(summary);
-    summary = summary.replace(/\s+/g, '')     // 去除所有空格
+    summary = summary.replace(/\s+/g, '');     // 去除所有空格
     summary = summary.replace(/^\.+|\.+$/g, ''); // 移除开头和结尾的点
     summary = summary.replace(/^ +| +$/g, '');   // 移除开头和结尾的空格
     summary = summary.substring(0, 15);           // 截取前15个字符

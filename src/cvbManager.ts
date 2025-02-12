@@ -237,88 +237,110 @@ export class TCVB
 
   private parse(tcStrContent: string) : void
   {
-    // 匹配文件块，每个文件块以 "## FILE:" 开头
-    const regFileBlock: RegExp = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_TCVB)/gm;
-    let arrFileMatch: RegExpExecArray | null;
-    while ((arrFileMatch = regFileBlock.exec(tcStrContent)) !== null)
-    {
-      const strFilePath: string = filePathNormalize(arrFileMatch[1]);
-      const strOperationsBlock: string = arrFileMatch[2];
-      // 支持操作类型中含有 "-" 符号（如 exact-replace 等）
-      const regOperation: RegExp = /^## OPERATION:([\w-]+)\n([\s\S]*?)(?=^## OPERATION:|(?![\s\S]))/gm;
-      let arrOpMatch: RegExpExecArray | null;
-      while ((arrOpMatch = regOperation.exec(strOperationsBlock)) !== null)
+      // 从文件内容中提取 "## BEGIN_TCVB" 和 "## END_TCVB" 之间的部分
+      const regTCVB: RegExp = /##\s*BEGIN_TCVB\s*([\s\S]*?)\s*##\s*END_TCVB/;
+      const arrTCVBMatch: RegExpExecArray | null = regTCVB.exec( tcStrContent );
+      if ( !arrTCVBMatch )
       {
-        const strType: string = arrOpMatch[1].toLowerCase();
-        const strOpContent: string = arrOpMatch[2].trim();
-        this.parseOperation(strFilePath, strType, strOpContent);
+          throw new Error( "文件内容必须包含 '## BEGIN_TCVB' 和 '## END_TCVB' 之间的内容，文件不完整" );
       }
-    }
+      // 重新赋值 tcStrContent 为 BEGIN_TCVB 与 END_TCVB 之间的内容
+      tcStrContent = arrTCVBMatch[1];
+
+      // 匹配文件块，每个文件块以 "## FILE:" 开头
+      const regFileBlock: RegExp = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_TCVB)/gm;
+      let arrFileMatch: RegExpExecArray | null;
+      while ((arrFileMatch = regFileBlock.exec(tcStrContent)) !== null)
+      {
+          const strFilePath: string = filePathNormalize(arrFileMatch[1]);
+          const strOperationsBlock: string = arrFileMatch[2];
+          // 支持操作类型中含有 "-" 符号（如 exact-replace 等）
+          const regOperation: RegExp = /^## OPERATION:([\w-]+)\n([\s\S]*?)(?=^## OPERATION:|(?![\s\S]))/gm;
+          let arrOpMatch: RegExpExecArray | null;
+          while ((arrOpMatch = regOperation.exec(strOperationsBlock)) !== null)
+          {
+              const strType: string = arrOpMatch[1].toLowerCase();
+              const strOpContent: string = arrOpMatch[2].trim();
+              this.parseOperation(strFilePath, strType, strOpContent);
+          }
+      }
   }
 
   private parseOperation(strFilePath: string, strType: string, strContent: string) : void
   {
-    try
-    {
       switch (strType)
       {
-        case 'global-replace':
-          this.parseGlobalReplace(strFilePath, strContent);
-          break;
-        case 'exact-replace':
-            this.parseExactReplace(strFilePath, strContent);
-            break;
-        case 'create':
-          this.parseCreate(strFilePath, strContent);
-          break;
-        default:
-          throw new Error(`未知的操作类型: ${strType}`);
+          case 'global-replace':
+              this.parseGlobalReplace(strFilePath, strContent);
+              break;
+          case 'exact-replace':
+              this.parseExactReplace(strFilePath, strContent);
+              break;
+          case 'create':
+              this.parseCreate(strFilePath, strContent);
+              break;
+          default:
+              throw new Error(`未知的操作类型: ${strType}，文件: ${strFilePath}`);
       }
-    }
-    catch (err)
-    {
-      console.error(`解析 ${strType} 操作时出错, 文件: ${strFilePath}, 错误: ${err}`);
-    }
   }
 
   // Exact-REPLACE 操作解析：要求 BEFORE_ANCHOR、AFTER_ANCHOR、OLD_CONTENT、NEW_CONTENT 四个段落
   private parseExactReplace(strFilePath: string, strContent: string) : void
   {
-    const recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'OLD_CONTENT', 'NEW_CONTENT']);
-    this.m_arrOperations.push(new ExactReplaceOperation(
-      strFilePath,
-      recSections['BEFORE_ANCHOR'],
-      recSections['AFTER_ANCHOR'],
-      recSections['OLD_CONTENT'],
-      recSections['NEW_CONTENT']
-    ));
+      let recSections: { [key: string]: string } = { };
+      try
+      {
+          recSections = this.parseSections(strContent, ['BEFORE_ANCHOR', 'AFTER_ANCHOR', 'OLD_CONTENT', 'NEW_CONTENT']);
+      }
+      catch (err : any)
+      {
+          throw new Error(`解析 exact-replace 操作时，文件 "${strFilePath}" 的内容解析失败，原因: ${err.message}`);
+      }
+
+      this.m_arrOperations.push(new ExactReplaceOperation(
+          strFilePath,
+          recSections['BEFORE_ANCHOR'],
+          recSections['AFTER_ANCHOR'],
+          recSections['OLD_CONTENT'],
+          recSections['NEW_CONTENT']
+      ));
   }
 
   // GLOBAL-REPLACE 操作解析：仅要求 OLD_CONTENT 与 NEW_CONTENT
   private parseGlobalReplace(strFilePath: string, strContent: string) : void
   {
-    const recSections = this.parseSections(strContent, ['OLD_CONTENT', 'NEW_CONTENT']);
-    this.m_arrOperations.push(new GlobalReplaceOperation(
-      strFilePath,
-      recSections['OLD_CONTENT'],
-      recSections['NEW_CONTENT']
-    ));
+      let recSections: { [key: string]: string } = { };
+      try
+      {
+          recSections = this.parseSections(strContent, ['OLD_CONTENT', 'NEW_CONTENT']);
+      }
+      catch (err : any)
+      {
+          throw new Error(`解析 global-replace 操作时，文件 "${strFilePath}" 的内容解析失败，原因: ${err.message}`);
+      }
+
+      this.m_arrOperations.push(new GlobalReplaceOperation(
+          strFilePath,
+          recSections['OLD_CONTENT'],
+          recSections['NEW_CONTENT']
+      ));
   }
 
   // CREATE 操作解析：直接将正文内容作为新文件内容，可选地去除 Markdown 代码块
   private parseCreate(strFilePath: string, strContent: string) : void
   {
-    let strNewContent: string = strContent;
-    const regCodeBlock: RegExp = /^```.*\n([\s\S]*?)\n```$/m;
-    const arrMatch = regCodeBlock.exec(strNewContent);
-    if (arrMatch)
-    {
-      strNewContent = arrMatch[1];
-    }
-    this.m_arrOperations.push(new CreateOperation(
-      strFilePath,
-      strNewContent
-    ));
+      let strNewContent: string = strContent;
+      const regCodeBlock: RegExp = /^```.*\n([\s\S]*?)\n```$/m;
+      const arrMatch: RegExpExecArray | null = regCodeBlock.exec(strNewContent);
+      if (arrMatch)
+      {
+          strNewContent = arrMatch[1];
+      }
+
+      this.m_arrOperations.push(new CreateOperation(
+          strFilePath,
+          strNewContent
+      ));
   }
 
   // 辅助方法：剥离 Markdown 代码块外部包裹的 ``` 标记
@@ -345,8 +367,8 @@ export class TCVB
       return strTrimmedContent;
   }
 
-  // 辅助方法：解析操作正文中的各个段落（段落标记格式为 "## 段落名称"）
-  private parseSections(strContent: string, arrExpectedSections: string[]) : Record<string, string>
+   // 辅助方法：解析操作正文中的各个段落（段落标记格式为 "## 段落名称"）
+  private parseSections( strContent: string , arrExpectedSections: string[] ) : Record<string, string>
   {
       const recResult: Record<string, string> = { };
       let strCurrentSection: string | null = null;
@@ -370,7 +392,11 @@ export class TCVB
               
               if (arrExpectedSections.indexOf(strCurrentSection) === -1)
               {
-                  throw new Error(`意外的段落: ${strCurrentSection}`);
+                  const cMaxLen: number = 50;
+                  const strSnippet: string = strContent.length <= cMaxLen 
+                                              ? strContent 
+                                              : strContent.substring( 0 , cMaxLen ) + '...';
+                  throw new Error(`意外的段落: ${strCurrentSection}，操作原始内容部分为: ${strSnippet}`);
               }
           }
           else if (strCurrentSection)
@@ -388,9 +414,13 @@ export class TCVB
       // 检查是否缺少必需的段落
       for (const strSection of arrExpectedSections)
       {
-          if (!(strSection in recResult))
+          if (!( strSection in recResult))
           {
-              throw new Error(`缺失必需的段落: ${strSection}`);
+              const cMaxLen: number = 50;
+              const strSnippet: string = strContent.length <= cMaxLen 
+                                          ? strContent 
+                                          : strContent.substring( 0 , cMaxLen ) + '...';
+              throw new Error( `缺失必需的段落: ${strSection}，操作原始内容部分为: ${strSnippet}` );
           }
       }
       
@@ -493,7 +523,7 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
             else if (op instanceof CreateOperation)
             {
               if (mapMergedFiles.has(strFilePath)){
-                throw new Error(`${strFilePath} 已经存在，不可以使用 ## OPERATION:CREATE`)
+                throw new Error(`${strFilePath} 已经存在，不可以使用 ## OPERATION:CREATE`);
               }
               // CREATE 操作：直接以新内容覆盖原有内容
               strContent = op.m_strContent;
