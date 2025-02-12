@@ -571,7 +571,7 @@ function applyExactReplace(strContent: string, op: ExactReplaceOperation): strin
         const errorMsg = `EXACT-REPLACE 失败\n` +
             `错误:\n${diagnosticMessage}`;
 
-        console.log(errorMsg);
+        console.log(errorMsg + `\n表达式: ${regPattern}`);
         throw new Error(errorMsg);
     }
 
@@ -593,7 +593,7 @@ function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : st
   regPattern.lastIndex = 0;
   if (!regPattern.test(strContent)) {
     const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" 中未找到OLD_CONTENT: "${op.m_strOldContent}"`;
-    console.log(errorMsg);
+    console.log(errorMsg + `\n表达式: ${regPattern}`);
     throw new Error(errorMsg);
   }
   regPattern.lastIndex = 0;
@@ -646,19 +646,32 @@ function escapeRegExp(str: string) : string
 }
 
 function normalizeLineWhitespace(anchor: string): string {
-  return anchor.split('\n')
-    .map(line => {
-      line = line.trim();
-      if (line.length > 0){
-        line = line.replace(/\s+/g, '\\s*');
-        line = `\\s*${line}\\s*`;
-      }
-      else{
-        line = "\\s*";
-      }
-      return line; // 保留行首和行尾的空白字符处理
-    })
-    .join('\n'); // 行与行之间允许有空白字符（空格、换行符等）
+    // 按行拆分后对每行做空白归一化处理
+    let aszNormalized_Arr: string[] = anchor.split('\n')
+        .map((szLine_Str: string, unIndex_Uint: number, aszArr_Arr: string[]) => {
+            szLine_Str = szLine_Str.trim();
+            if (szLine_Str.length > 0) {
+                // 将行内连续空白替换为 \s*
+                szLine_Str = szLine_Str.replace(/\s+/g, '\\s*');
+                // 在每行前后各增加一个 \s*
+                szLine_Str = `\\s*${szLine_Str}\\s*`;
+            }
+            else {
+                // 空行处理：直接使用 \s*
+                szLine_Str = "\\s*";
+            }
+            return szLine_Str;
+        });
+    
+    // 去除整体结果中最开头和最末尾多余的 \s*
+    if (aszNormalized_Arr.length > 0) {
+        // 第1行：移除行首的 \s*
+        aszNormalized_Arr[0] = aszNormalized_Arr[0].replace(/^\\s\*/, '');
+        // 最后一行：移除行尾的 \s*
+        aszNormalized_Arr[aszNormalized_Arr.length - 1] = aszNormalized_Arr[aszNormalized_Arr.length - 1].replace(/\\s\*$/, '');
+    }
+    
+    return aszNormalized_Arr.join('\n');
 }
 
 function filePathNormalize(strRawPath: string) : string
