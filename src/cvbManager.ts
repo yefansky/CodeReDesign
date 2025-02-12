@@ -568,13 +568,8 @@ function applyExactReplace(strContent: string, op: ExactReplaceOperation): strin
     if (!regPattern.test(strContent)) 
     {
         const diagnosticMessage = diagnoseMatchFailure(strContent, op);
-        const errorMsg = `## EXACT-REPLACE 失败\n` +
-            `### FILE: ${op.m_strFilePath}\n` +
-            `### BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\n` +
-            `### AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\`\n` +
-            `### OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\n` +
-            `### NEW_CONTENT:\n\`\`\`\n${op.m_strNewContent}\n\`\`\`\n` +
-            `### 错误:\n${diagnosticMessage}`;
+        const errorMsg = `EXACT-REPLACE 失败\n` +
+            `错误:\n${diagnosticMessage}`;
 
         console.log(errorMsg);
         throw new Error(errorMsg);
