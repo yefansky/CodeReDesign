@@ -509,54 +509,72 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
 
 function diagnoseMatchFailure(strContent: string, op: ExactReplaceOperation): string 
 {
-    function findLineNumber(content: string, pattern: RegExp): number[] 
+    function findLineNumberRange(content: string, pattern: RegExp): [number, number] 
     {
-        const lines = content.split("\n");
-        return lines
-            .map((line, index) => (pattern.test(line) ? index + 1 : -1))
-            .filter(index => index !== -1);
+        let match;
+        let minLine = -1, maxLine = -1;
+        while ((match = pattern.exec(content)) !== null) 
+        {
+            const matchStartLine = content.substring(0, match.index).split("\n").length;
+            if (minLine === -1 || matchStartLine < minLine) 
+            {
+                minLine = matchStartLine;
+            }
+            if (matchStartLine > maxLine) 
+            {
+                maxLine = matchStartLine;
+            }
+        }
+        return [minLine, maxLine];
     }
 
     let errorMessages: string[] = [];
-    const beforeAnchorPattern = new RegExp(op.m_strBeforeAnchor, "gm");
-    const afterAnchorPattern = new RegExp(op.m_strAfterAnchor, "gm");
-    const oldContentPattern = new RegExp(op.m_strOldContent, "gm");
+    const beforeAnchorPattern = new RegExp(normalizeLineWhitespace(escapeRegExp(op.m_strBeforeAnchor)), "gs");
+    const afterAnchorPattern = new RegExp(normalizeLineWhitespace(escapeRegExp(op.m_strAfterAnchor)), "gs");
+    const oldContentPattern = new RegExp(normalizeLineWhitespace(escapeRegExp(op.m_strOldContent)), "gs");
 
-    const beforeAnchorLines = findLineNumber(strContent, beforeAnchorPattern);
-    const afterAnchorLines = findLineNumber(strContent, afterAnchorPattern);
-    const oldContentLines = findLineNumber(strContent, oldContentPattern);
+    const beforeAnchorRange = findLineNumberRange(strContent, beforeAnchorPattern);
+    const afterAnchorRange = findLineNumberRange(strContent, afterAnchorPattern);
+    const oldContentRange = findLineNumberRange(strContent, oldContentPattern);
 
-    if (beforeAnchorLines.length === 0) 
+    if (beforeAnchorRange[0] === -1) 
     {
         errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\``);
+        console.log(`FILE: ${op.m_strFilePath} 未找到 BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\n表达式\n${beforeAnchorPattern}`);
     }
-    
-    if (afterAnchorLines.length === 0) 
+
+    if (afterAnchorRange[0] === -1) 
     {
         errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
+        console.log(`FILE: ${op.m_strFilePath} 未找到 AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\`\n表达式\n${afterAnchorPattern}`);
     }
-    
-    if (oldContentLines.length === 0) 
+
+    if (oldContentRange[0] === -1) 
     {
         errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\``);
+        console.log(`FILE: ${op.m_strFilePath} 未找到 OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\n表达式\n${oldContentPattern}`);
     }
 
     if (errorMessages.length === 0) 
     {
-        const minBeforeLine = Math.min(...beforeAnchorLines);
-        const maxAfterLine = Math.max(...afterAnchorLines);
-        const minOldLine = Math.min(...oldContentLines);
-        const maxOldLine = Math.max(...oldContentLines);
+        const lastBeforeAnchorLine = beforeAnchorRange[1];  // beforeAnchorPattern 最后匹配的行号
+        const firstAfterAnchorLine = afterAnchorRange[0];   // afterAnchorPattern 第一次匹配的行号
+        const firstOldContentLine = oldContentRange[0];     // oldContentPattern 第一次匹配的行号
+        const lastOldContentLine = oldContentRange[1];      // oldContentPattern 最后匹配的行号
 
-        if (minOldLine < minBeforeLine || maxOldLine > maxAfterLine) 
+        if (firstOldContentLine < lastBeforeAnchorLine || lastOldContentLine > firstAfterAnchorLine) 
         {
             errorMessages.push(
-                `FILE: ${op.m_strFilePath} OLD_CONTENT 应该在 BEFORE_ANCHOR 和 AFTER_ANCHOR 之间:\nBEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\nOLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\nAFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``
-            );
+                `FILE: ${op.m_strFilePath} OLD_CONTENT 应该在 BEFORE_ANCHOR 和 AFTER_ANCHOR 之间:\nBEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\nOLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\nAFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
         }
     }
 
-    return errorMessages.length > 0 ? errorMessages.join("\n") : "";
+    if (errorMessages.length === 0){
+      errorMessages.push(
+        `原因未知, FILE: ${op.m_strFilePath} BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\nOLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\nAFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
+    }
+
+    return errorMessages.join("\n");
 }
 
 function applyExactReplace(strContent: string, op: ExactReplaceOperation): string 
