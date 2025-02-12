@@ -454,22 +454,11 @@ TCVB 格式规范：
 1. 全局替换操作(GLOBAL-REPLACE):
 ## OPERATION:GLOBAL-REPLACE
 ## OLD_CONTENT
-[markdown代码块:被全局替换的内容, 可以在需要被替换的文本前后包含一些上下文帮助精确替换，但是不要太长]
+[markdown代码块:被全局替换的内容, 可以在需要被替换的文本前后包含一些上下文帮助精确替换，一般是上下各3行，不要太长]
 ## NEW_CONTENT
 [markdown代码块:新内容]
 
-2. 精确替换操作(EXACT-REPLACE),用于替换全局替换无法精准定位的情况（如果GLOBAL-REPLACE可以定位到，没有歧义，就优先用GLOBAL-REPLACE）:
-## OPERATION:EXACT-REPLACE
-## BEFORE_ANCHOR
-[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围上半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合。不要太长，可以精确定位到位置即可]
-## AFTER_ANCHOR
-[markdown代码块:OLD_CONTENT之后的几行内容, 用来划定范围下半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合，不要太长，可以精确定位到位置即可]
-## OLD_CONTENT
-[markdown代码块:被替换内容]
-## NEW_CONTENT
-[markdown代码块:新内容]
-
-3. 创建操作(CREATE):
+2. 创建操作(CREATE):
 ## OPERATION:CREATE
 [markdown代码块:直接跟正文内容，表示新文件的全部内容]
 
@@ -642,7 +631,7 @@ function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : st
 
   regPattern.lastIndex = 0;
   if (!regPattern.test(strContent)) {
-    const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" 中未找到OLD_CONTENT: "${op.m_strOldContent}"`;
+    const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" 中未找到OLD_CONTENT: "${op.m_strOldContent}" 可能是和原文有细微差异，或者文件路径和别的文件搞错了`;
     console.log(errorMsg + `\n表达式: ${regPattern}`);
     throw new Error(errorMsg);
   }
