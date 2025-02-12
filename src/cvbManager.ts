@@ -648,8 +648,15 @@ function escapeRegExp(str: string) : string
 function normalizeLineWhitespace(anchor: string): string {
   return anchor.split('\n')
     .map(line => {
-      // 对每一行的空白字符做更精确的处理
-      return `\\s*${line.trim()}\\s*`; // 保留行首和行尾的空白字符处理
+      line = line.trim();
+      if (line.length > 0){
+        line = line.replace(/\s+/g, '\\s*');
+        line = `\\s*${line}\\s*`;
+      }
+      else{
+        line = "\\s*";
+      }
+      return line; // 保留行首和行尾的空白字符处理
     })
     .join('\n'); // 行与行之间允许有空白字符（空格、换行符等）
 }
