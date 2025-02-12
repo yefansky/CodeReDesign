@@ -424,20 +424,20 @@ TCVB 格式规范：
 1. 全局替换操作(GLOBAL-REPLACE):
 ## OPERATION:GLOBAL-REPLACE
 ## OLD_CONTENT
-[markdown代码块:被全局替换的内容]
+[markdown代码块:被全局替换的内容, 可以在需要被替换的文本前后包含一些上下文帮助精确替换，但是不要太长]
 ## NEW_CONTENT
 [markdown代码块:新内容]
 
-2. 精确替换操作(EXACT-REPLACE),用于替换全局替换无法精准定位的情况:
+2. 精确替换操作(EXACT-REPLACE),用于替换全局替换无法精准定位的情况（如果GLOBAL-REPLACE可以定位到，没有歧义，就优先用GLOBAL-REPLACE）:
 ## OPERATION:EXACT-REPLACE
+## BEFORE_ANCHOR
+[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围上半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合。不要太长，可以精确定位到位置即可]
+## AFTER_ANCHOR
+[markdown代码块:OLD_CONTENT之后的几行内容, 用来划定范围下半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合，不要太长，可以精确定位到位置即可]
 ## OLD_CONTENT
 [markdown代码块:被替换内容]
 ## NEW_CONTENT
 [markdown代码块:新内容]
-## BEFORE_ANCHOR
-[markdown代码块:OLD_CONTENT之前的几行内容, 用来划定范围上半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合]
-## AFTER_ANCHOR
-[markdown代码块:OLD_CONTENT之后的几行内容, 用来划定范围下半段锚点，避免有多个类似匹配, 不能和OLD_CONTENT重合]
 
 3. 创建操作(CREATE):
 ## OPERATION:CREATE
@@ -501,41 +501,105 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB) : Cvb
       }
   }
   catch (err: any) {
-    throw new Error(`合并CVB失败: ${err.message}`);
+    throw new Error(`TCVB格式可能有问题，尝试增量修改CVB时出错: ${err.message}`);
   }
 
   return rebuildCvb(baseCvb, mapMergedFiles);
 }
 
-function applyExactReplace(strContent: string, op: ExactReplaceOperation): string {
-  // 构建匹配模式：前锚点 + 中间内容1 + 旧内容 + 中间内容2 + 后锚点
-  const regPattern = buildPattern(op.m_strBeforeAnchor, op.m_strOldContent, op.m_strAfterAnchor);
-  // 替换为：前锚点 + 中间内容1 + 新内容 + 中间内容2 + 后锚点
-  const strReplacement = op.m_strBeforeAnchor + '$1' + op.m_strNewContent + '$2' + op.m_strAfterAnchor;
+function diagnoseMatchFailure(strContent: string, op: ExactReplaceOperation): string 
+{
+    function findLineNumber(content: string, pattern: RegExp): number[] 
+    {
+        const lines = content.split("\n");
+        return lines
+            .map((line, index) => (pattern.test(line) ? index + 1 : -1))
+            .filter(index => index !== -1);
+    }
 
-  regPattern.lastIndex = 0; // 重置正则表达式的状态
-  if (!regPattern.test(strContent)) {
-    console.log("以下表达式:\n" + regPattern + "\n 无法匹配:\n");
-    throw new Error(`Exact-replace操作失败：文件 "${op.m_strFilePath}" 中未找到匹配项。请检查前后锚点及旧内容是否正确。## OLD_CONTENT\n${op.m_strOldContent}\n\n## BEFORE_ANCHOR\n${op.m_strBeforeAnchor}\n\n## AFTER_ANCHOR\n${op.m_strAfterAnchor} `);
-  }
-  regPattern.lastIndex = 0; // 再次重置以备替换
+    let errorMessages: string[] = [];
+    const beforeAnchorPattern = new RegExp(op.m_strBeforeAnchor, "gm");
+    const afterAnchorPattern = new RegExp(op.m_strAfterAnchor, "gm");
+    const oldContentPattern = new RegExp(op.m_strOldContent, "gm");
 
-  return strContent.replace(regPattern, strReplacement);
+    const beforeAnchorLines = findLineNumber(strContent, beforeAnchorPattern);
+    const afterAnchorLines = findLineNumber(strContent, afterAnchorPattern);
+    const oldContentLines = findLineNumber(strContent, oldContentPattern);
+
+    if (beforeAnchorLines.length === 0) 
+    {
+        errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\``);
+    }
+    
+    if (afterAnchorLines.length === 0) 
+    {
+        errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
+    }
+    
+    if (oldContentLines.length === 0) 
+    {
+        errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\``);
+    }
+
+    if (errorMessages.length === 0) 
+    {
+        const minBeforeLine = Math.min(...beforeAnchorLines);
+        const maxAfterLine = Math.max(...afterAnchorLines);
+        const minOldLine = Math.min(...oldContentLines);
+        const maxOldLine = Math.max(...oldContentLines);
+
+        if (minOldLine < minBeforeLine || maxOldLine > maxAfterLine) 
+        {
+            errorMessages.push(
+                `FILE: ${op.m_strFilePath} OLD_CONTENT 应该在 BEFORE_ANCHOR 和 AFTER_ANCHOR 之间:\nBEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\nOLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\nAFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``
+            );
+        }
+    }
+
+    return errorMessages.length > 0 ? errorMessages.join("\n") : "";
+}
+
+function applyExactReplace(strContent: string, op: ExactReplaceOperation): string 
+{
+    const regPattern = buildPattern(op.m_strBeforeAnchor, op.m_strOldContent, op.m_strAfterAnchor);
+    const strReplacement = op.m_strBeforeAnchor + '$1' + op.m_strNewContent + '$2' + op.m_strAfterAnchor;
+
+    regPattern.lastIndex = 0;
+    if (!regPattern.test(strContent)) 
+    {
+        const diagnosticMessage = diagnoseMatchFailure(strContent, op);
+        const errorMsg = `## EXACT-REPLACE 失败\n` +
+            `### FILE: ${op.m_strFilePath}\n` +
+            `### BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\n` +
+            `### AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\`\n` +
+            `### OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\n` +
+            `### NEW_CONTENT:\n\`\`\`\n${op.m_strNewContent}\n\`\`\`\n` +
+            `### 错误:\n${diagnosticMessage}`;
+
+        console.log(errorMsg);
+        throw new Error(errorMsg);
+    }
+
+    regPattern.lastIndex = 0;
+    return strContent.replace(regPattern, strReplacement);
 }
 
 function applyGlobalReplace(strContent: string, op: GlobalReplaceOperation) : string
 {
   if ( op.m_strOldContent === "" )
   {
-    throw new Error(`全局替换为空`);
+    const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" OLD_CONTENT 是空的"`;
+    console.log(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const regPattern: RegExp = new RegExp(normalizeLineWhitespace(escapeRegExp(op.m_strOldContent)), 'gs');
 
   regPattern.lastIndex = 0;
   if (!regPattern.test(strContent)) {
-    console.log("以下表达式:\n" + regPattern + "\n 无法匹配");
-    throw new Error(`全局替换失败：文件 "${op.m_strFilePath}" 中未找到旧内容 "${op.m_strOldContent}"。`);
+    const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" 中未找到OLD_CONTENT: "${op.m_strOldContent}"`;
+    console.log(errorMsg);
+    throw new Error(errorMsg);
   }
   regPattern.lastIndex = 0;
 

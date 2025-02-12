@@ -203,7 +203,7 @@ export async function callDeepSeekFixApi(
     let messages_body = lastMessageBody;
 
     messages_body.push(
-        { role: 'user', content:`接收的数据格式有错误: ${errorInfo}, 修正后重新完整输出:`}
+        { role: 'user', content:`接收的数据格式有错误: ${errorInfo}, 根据错误信息修正错误，其他的地方保持原样。然后重新完整输出:`}
     );
 
     let fullResponse = '';
@@ -240,6 +240,11 @@ export async function callDeepSeekFixApi(
             outputChannel.append(chunkResponse);
         }
     }
+
+    fullResponse = chunkResponse;
+
+    messages_body.push({ role: 'assistant', content: fullResponse });
+    lastMessageBody = messages_body;
 
     return fullResponse;
 }

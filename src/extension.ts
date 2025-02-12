@@ -72,7 +72,7 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
                 vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
             }
         } catch (err : any){
-            vscode.window.showInformationMessage(`API response have error, try fix ...`);
+            vscode.window.showInformationMessage(`API response have error ${err.message}, try fix ...`);
             apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
             processSuccess = false;
         }
