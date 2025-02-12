@@ -248,7 +248,7 @@ export class TCVB
       tcStrContent = arrTCVBMatch[1];
 
       // 匹配文件块，每个文件块以 "## FILE:" 开头
-      const regFileBlock: RegExp = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|^## END_TCVB)/gm;
+      const regFileBlock: RegExp = /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|(?![\s\S]))/gm;
       let arrFileMatch: RegExpExecArray | null;
       while ((arrFileMatch = regFileBlock.exec(tcStrContent)) !== null)
       {

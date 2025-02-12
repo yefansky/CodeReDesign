@@ -1,107 +1,119 @@
-﻿```markdown
-## BEGIN_TCVB
-## FILE:k:\lab\CodeReDesign-dummy\src\extension.ts
+﻿## BEGIN_TCVB
+## FILE:k:\lab\CodeReDesign-dummy\src\cvbManager.ts
 ## OPERATION:GLOBAL-REPLACE
 ## OLD_CONTENT
-```typescript
-let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
-let processSuccess = true;
-do{
-    try {
-        if (apiResponse) {
-            const tcvb = new TCVB(apiResponse);
-            const oldCvb = new Cvb(cvbContent);
-            const cvb = mergeCvb(oldCvb, tcvb);
-
-            processSuccess = true;
-
-            cvb.setMetaData("用户需求", userPrompt);
-            const newCvbFilePath = path.join(tmpDir, fileName);
-            fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
-            vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
-        }
-    } catch (err : any){
-        apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
-        processSuccess = false;
+```
+export async function doUploadCommand(cvbFilePath: string, userPrompt: string, outputChannel: vscode.OutputChannel){
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
     }
-} while (!processSuccess);
-```
-## NEW_CONTENT
-```typescript
-let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
-let processSuccess = true;
-do{
-    try {
-        if (apiResponse) {
-            const tcvb = new TCVB(apiResponse);
-            const oldCvb = new Cvb(cvbContent);
-            const tcvbFilePath = path.join(tmpDir, `${fileName}.tcvb`);
-            fs.writeFileSync(tcvbFilePath, tcvb.toString(), 'utf-8');
+    
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
 
-            const cvb = mergeCvb(oldCvb, tcvb);
-
-            processSuccess = true;
-
-            cvb.setMetaData("用户需求", userPrompt);
-            const newCvbFilePath = path.join(tmpDir, fileName);
-            fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
-            vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
-        }
-    } catch (err : any){
-        apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
-        processSuccess = false;
+    const filenameSummary = await generateFilenameFromRequest(userPrompt);
+    const timestamp = generateTimestamp();
+    let baseFileName = `${timestamp}_${filenameSummary}.cvb`;
+    let fileName = baseFileName;
+    let i = 1;
+    while (fs.existsSync(path.join(tmpDir, fileName))) {
+        fileName = `${timestamp}_${filenameSummary}_${i}.cvb`;
+        i++;
     }
-} while (!processSuccess);
-```
-## OPERATION:GLOBAL-REPLACE
-## OLD_CONTENT
-```typescript
-const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, getCurrentOperationController().signal);
-if (analysisResult) {
-    vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
-}
 
-vscode.window.showInformationMessage('解析完毕');
-```
-## NEW_CONTENT
-```typescript
-const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, getCurrentOperationController().signal);
-if (analysisResult) {
-    const analysisFilePath = path.join(tmpDir, `${fileName}.md`);
-    fs.writeFileSync(analysisFilePath, analysisResult, 'utf-8');
-    vscode.window.showInformationMessage(`Analysis result saved as file: ${analysisFilePath}`);
-}
+    const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
 
-vscode.window.showInformationMessage('解析完毕');
-```
+    resetCurrentOperationController();
 
-## FILE:k:\lab\CodeReDesign-dummy\src\siderBar.ts
-## OPERATION:EXACT-REPLACE
-## OLD_CONTENT
-```typescript
-if (file.endsWith('.cvb')) {
-    const filePath = path.join(targetFolder, file);
-    cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
+    let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+    let processSuccess = true;
+    do {
+        try {
+            if (apiResponse) {
+                const tcvb = new TCVB(apiResponse);
+                const oldCvb = new Cvb(cvbContent);
+                const cvb = mergeCvb(oldCvb, tcvb);
+
+                processSuccess = true;
+
+                cvb.setMetaData("用户需求", userPrompt);
+                const newCvbFilePath = path.join(tmpDir, fileName);
+                fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
+                vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+            }
+        } catch (err : any){
+            vscode.window.showInformationMessage(`API response have error ${err.message}, try fix ...`);
+            apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
+            processSuccess = false;
+        }
+    } while (!processSuccess);
+
+    clearCurrentOperationController();
 }
 ```
 ## NEW_CONTENT
-```typescript
-if (file.endsWith('.cvb') || file.endsWith('.tcvb') || file.endsWith('.md')) {
-    const filePath = path.join(targetFolder, file);
-    cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
+```
+export async function doUploadCommand(cvbFilePath: string, userPrompt: string, outputChannel: vscode.OutputChannel){
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+    }
+    
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
+
+    const filenameSummary = await generateFilenameFromRequest(userPrompt);
+    const timestamp = generateTimestamp();
+    let baseFileName = `${timestamp}_${filenameSummary}.cvb`;
+    let fileName = baseFileName;
+    let i = 1;
+    while (fs.existsSync(path.join(tmpDir, fileName))) {
+        fileName = `${timestamp}_${filenameSummary}_${i}.cvb`;
+        i++;
+    }
+
+    const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
+
+    resetCurrentOperationController();
+
+    let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+    let processSuccess = true;
+    do {
+        try {
+            if (apiResponse) {
+                const tcvb = new TCVB(apiResponse);
+                const oldCvb = new Cvb(cvbContent);
+                const cvb = mergeCvb(oldCvb, tcvb);
+
+                processSuccess = true;
+
+                cvb.setMetaData("用户需求", userPrompt);
+                const newCvbFilePath = path.join(tmpDir, fileName);
+                fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
+                vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+
+                // 保存 TCVB 文件
+                const tcvbFilePath = path.join(tmpDir, fileName.replace(/\.cvb$/, '.tcvb'));
+                fs.writeFileSync(tcvbFilePath, apiResponse, 'utf-8');
+                
+                // 保存分析结果
+                const analysisResult = await analyzeCode(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+                if (analysisResult) {
+                    const mdFilePath = path.join(tmpDir, fileName.replace(/\.cvb$/, '.md'));
+                    fs.writeFileSync(mdFilePath, analysisResult, 'utf-8');
+                }
+            }
+        } catch (err : any){
+            vscode.window.showInformationMessage(`API response have error ${err.message}, try fix ...`);
+            apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
+            processSuccess = false;
+        }
+    } while (!processSuccess);
+
+    clearCurrentOperationController();
 }
-```
-## BEFORE_ANCHOR
-```typescript
-const files = fs.readdirSync(targetFolder);
-files.forEach(file => {
-```
-## AFTER_ANCHOR
-```typescript
-// 新增排序逻辑
-cvbFiles.sort((a, b) => 
-    a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
-);
 ```
 ## END_TCVB
-```

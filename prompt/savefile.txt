@@ -1,3 +1,3 @@
-tcvb本地接收的时候先落盘，后缀tcvb，命名和merge之后的cvb文件一样。
-analyze的结果也落盘，保存成md，命名规则也一样。
+doUploadCommand 返回的respond 离得 tcvb内容。本地确认merge可以成功后（说明tcvb格式正确），也存一份。后缀tcvb，文件名和merge之后的cvb文件一样，只是后缀不同。
+analyze的结果也落盘，保存成.md，命名规则也一样。
 注意，新加的两种落盘都要能在sidebar里显示
