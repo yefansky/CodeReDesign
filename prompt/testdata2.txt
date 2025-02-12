@@ -1,72 +1,107 @@
-﻿```TCVB
+﻿```markdown
 ## BEGIN_TCVB
+## FILE:k:\lab\CodeReDesign-dummy\src\extension.ts
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+```typescript
+let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+let processSuccess = true;
+do{
+    try {
+        if (apiResponse) {
+            const tcvb = new TCVB(apiResponse);
+            const oldCvb = new Cvb(cvbContent);
+            const cvb = mergeCvb(oldCvb, tcvb);
+
+            processSuccess = true;
+
+            cvb.setMetaData("用户需求", userPrompt);
+            const newCvbFilePath = path.join(tmpDir, fileName);
+            fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
+            vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+        }
+    } catch (err : any){
+        apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
+        processSuccess = false;
+    }
+} while (!processSuccess);
+```
+## NEW_CONTENT
+```typescript
+let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+let processSuccess = true;
+do{
+    try {
+        if (apiResponse) {
+            const tcvb = new TCVB(apiResponse);
+            const oldCvb = new Cvb(cvbContent);
+            const tcvbFilePath = path.join(tmpDir, `${fileName}.tcvb`);
+            fs.writeFileSync(tcvbFilePath, tcvb.toString(), 'utf-8');
+
+            const cvb = mergeCvb(oldCvb, tcvb);
+
+            processSuccess = true;
+
+            cvb.setMetaData("用户需求", userPrompt);
+            const newCvbFilePath = path.join(tmpDir, fileName);
+            fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
+            vscode.window.showInformationMessage(`API response saved as CVB file: ${newCvbFilePath}`);
+        }
+    } catch (err : any){
+        apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
+        processSuccess = false;
+    }
+} while (!processSuccess);
+```
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+```typescript
+const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, getCurrentOperationController().signal);
+if (analysisResult) {
+    vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
+}
+
+vscode.window.showInformationMessage('解析完毕');
+```
+## NEW_CONTENT
+```typescript
+const analysisResult = await analyzeCode(cvbContent, userRequest, outputChannel, getCurrentOperationController().signal);
+if (analysisResult) {
+    const analysisFilePath = path.join(tmpDir, `${fileName}.md`);
+    fs.writeFileSync(analysisFilePath, analysisResult, 'utf-8');
+    vscode.window.showInformationMessage(`Analysis result saved as file: ${analysisFilePath}`);
+}
+
+vscode.window.showInformationMessage('解析完毕');
+```
 
 ## FILE:k:\lab\CodeReDesign-dummy\src\siderBar.ts
-## OPERATION:INSERT
+## OPERATION:EXACT-REPLACE
+## OLD_CONTENT
+```typescript
+if (file.endsWith('.cvb')) {
+    const filePath = path.join(targetFolder, file);
+    cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
+}
+```
+## NEW_CONTENT
+```typescript
+if (file.endsWith('.cvb') || file.endsWith('.tcvb') || file.endsWith('.md')) {
+    const filePath = path.join(targetFolder, file);
+    cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
+}
+```
 ## BEFORE_ANCHOR
 ```typescript
-export function registerCvbContextMenu(context: vscode.ExtensionContext) {
-
-  // 注册右键菜单命令
-  const applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyThisCvb', (cvb: CvbFile) => {
+const files = fs.readdirSync(targetFolder);
+files.forEach(file => {
 ```
 ## AFTER_ANCHOR
 ```typescript
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (workspaceFolders) {
-    const targetFolder = path.join(workspaceFolders[0].uri.fsPath, '.CodeReDesignWorkSpace'); // 替换为你的子文件夹名称
-
-    // 创建文件系统监听器
+// 新增排序逻辑
+cvbFiles.sort((a, b) => 
+    a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+);
 ```
-## INSERT_CONTENT
-```typescript
-    // 监听 .tcvb 和 .md 文件变化
-    const markdownWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(targetFolder, '**/*.md')
-    );
-
-    const tcvbWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(targetFolder, '**/*.tcvb')
-    );
-
-    // 当文件变化时刷新视图
-    markdownWatcher.onDidCreate(() => cvbViewProvider.refresh());
-    markdownWatcher.onDidDelete(() => cvbViewProvider.refresh());
-    markdownWatcher.onDidChange(() => cvvViewProvider.refresh());
-
-    tcvbWatcher.onDidCreate(() => cvbViewProvider.refresh());
-    tcvbWatcher.onDidDelete(() => cvbViewProvider.refresh());
-    tcvbWatcher.onDidChange(() => cvbViewProvider.refresh());
-
-    // 将监听器添加到订阅中，确保扩展销毁时清理资源
-    context.subscriptions.push(markdownWatcher, tcvbWatcher);
-  }
-```
-
-## FILE:k:\lab\CodeReDesign-dummy\src\deepseekApi.ts
-## OPERATION:INSERT
-## BEFORE_ANCHOR
-```typescript
-  if (apiResponse) {
-    apiResponse = apiResponse.replace(/\r\n?/g, "\n");
-    const tcvb = new TCVB(apiResponse);
-```
-## AFTER_ANCHOR
-```typescript
-    cvb.setMetaData("用户需求", userPrompt);
-    const newCvbFilePath = path.join(tmpDir, fileName);
-    fs.writeFileSync(newCvbFilePath, cvb.toString(), 'utf-8');
-```
-## INSERT_CONTENT
-```typescript
-    // 保存 TCVB 文件
-    const tcvbFilename = path.join(tmpDir, `${path.basename(fileName, '.cvb')}.tcvb`);
-    fs.writeFileSync(tcvbFilename, apiResponse, 'utf-8');
-
-    // 保存分析结果
-    const analysisFilename = path.join(tmpDir, `${path.basename(fileName, '.cvb')}_analysis.md`);
-    fs.writeFileSync(analysisFilename, '分析结果\n\n' + analysisResult, 'utf-8');
-```
-
 ## END_TCVB
 ```

@@ -48,19 +48,19 @@ export class Cvb
 
   public getUserRequest() : string
   {
-    return this.m_recMetadata['@用户需求'] || '';
+    return this.m_recMetadata['用户需求'] || '';
   }
 
   public getTimestamp() : string
   {
-    return this.m_recMetadata['@时间戳'] || '';
+    return this.m_recMetadata['时间戳'] || '';
   }
 
   public toString(): string {
     // 将元数据转换成字符串
     let metaStr = '## META\n';
     for (const key in this.m_recMetadata) {
-      metaStr += `${key}: ${this.m_recMetadata[key]}\n`;
+      metaStr += `@${key}: ${this.m_recMetadata[key]}\n`;
     }
     metaStr += '## END_META\n';
   
@@ -72,25 +72,22 @@ export class Cvb
     }
   
     // 重新组装整个 CVB 内容
-    const cvbContent = `## BEGIN_CVB
-  ${metaStr}
-  ${filesStr}
-  ## END_CVB`;
+    const cvbContent = `## BEGIN_CVB\n${metaStr}\n${filesStr}\n## END_CVB`;
     return cvbContent;
   }
 
   private parse(strCvbContent: string) : { cvbContent: string, metadata: Record<string, string>, files: Record<string, string> }
   {
     // 查找 CVB 开始与结束标记
-    const regCvbStart: RegExp = /^## BEGIN_CVB(\s|$)/m;
+    const regCvbStart: RegExp = /^## BEGIN_CVB$/m;
     const arrStartMatch = regCvbStart.exec(strCvbContent);
     if (!arrStartMatch)
     {
       throw new Error('Invalid CVB format: missing BEGIN_CVB marker.');
     }
-    const iCvbStartIndex = arrStartMatch.index;
+    const iCvbStartIndex = arrStartMatch.index + arrStartMatch[0].length;
 
-    const regCvbEnd: RegExp = /^## END_CVB(\s|$)/m;
+    const regCvbEnd: RegExp = /^## END_CVB$/m;
     const arrEndMatch = regCvbEnd.exec(strCvbContent);
     if (!arrEndMatch)
     {
@@ -99,7 +96,7 @@ export class Cvb
     const iCvbEndIndex = arrEndMatch.index;
 
     // 提取 CVB 部分内容
-    const strCvbContentPart = strCvbContent.slice(iCvbStartIndex, iCvbEndIndex + arrEndMatch[0].length);
+    const strCvbContentPart = strCvbContent.slice(iCvbStartIndex, iCvbEndIndex);
 
     // 解析 META 部分
     const regMeta: RegExp = /^## META\n([\s\S]*?)^## END_META(\s|$)/m;
@@ -108,25 +105,23 @@ export class Cvb
     {
       throw new Error('Invalid CVB format: missing META section.');
     }
-    const recMetadata: Record<string, string> = { };
-    const arrMetaLines = arrMetaMatch[1].trim().split('\n');
-    for (const strLine of arrMetaLines)
+
+    const recMetadata: Record<string, string> = {};
+    const strMetaData = arrMetaMatch[1].trim();
+    
+    const regex = /^@([^:\n]+):([\s\S]*?)(?=^@|(?![\s\S]))/gm;
+    let match;
+    
+    while ((match = regex.exec(strMetaData)) !== null) 
     {
-      const arrParts = strLine.split(':');
-      if (arrParts.length >= 2)
-      {
-        const strKey = arrParts.shift()?.trim();
-        const strValue = arrParts.join(':').trim();
-        if (strKey)
-        {
-          recMetadata[strKey] = strValue;
-        }
-      }
+      const strKey = match[1].trim();
+      const strValue = match[2].trim();
+      recMetadata[strKey] = strValue;
     }
 
     // 解析文件部分
     const recFiles: Record<string, string> = { };
-    const regFile: RegExp = /^## FILE:([^<\r\n]+)\n([\s\S]*?)(?=^## FILE:|^## END_CVB)/gm;
+    const regFile: RegExp = /^## FILE:([^<\r\n]+)\n([\s\S]*?)(?=^## FILE:([^<\r\n]+)|(?![\s\S]))/gm;
     let arrFileMatch: RegExpExecArray | null;
     while ((arrFileMatch = regFile.exec(strCvbContentPart)) !== null)
     {
@@ -566,7 +561,7 @@ function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>) : Cvb
   const recMetadata = baseCvb.getMetadata();
   for (const [strKey, strValue] of Object.entries(recMetadata))
   {
-    strNewContent += `${strKey}: ${strValue}\n`;
+    strNewContent += `@${strKey}: ${strValue}\n`;
   }
   strNewContent += `## END_META\n\n`;
 
