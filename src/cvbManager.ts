@@ -450,7 +450,9 @@ TCVB 格式规范：
 4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉。
 5. 注意TCVB和CVB的区别。CVB是完整的内容，而TCVB是用来生成差量同步的，通过多个OPERATION去操作已有CVB合成新CVB
 6. 插入和删除操作都可以转化为替换操作
-7. 用来匹配的锚点必须和原始传入的数据完全一致，不能有缺失，不能丢弃注释。
+7. 用来匹配的锚点必须和原文的格式完全一致，不能有缺失，不能丢弃注释。
+8. 注意不要丢失OPERATION而直接输出代码块
+9. 不要私自加入不必要的空行
 `;
   }
 }
@@ -539,19 +541,19 @@ function diagnoseMatchFailure(strContent: string, op: ExactReplaceOperation): st
 
     if (beforeAnchorRange[0] === -1) 
     {
-        errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\``);
+        errorMessages.push(`FILE: ${op.m_strFilePath} 无法精确匹配(有和原文不一致的地方) BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\``);
         console.log(`FILE: ${op.m_strFilePath} 未找到 BEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\n表达式\n${beforeAnchorPattern}`);
     }
 
     if (afterAnchorRange[0] === -1) 
     {
-        errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
+        errorMessages.push(`FILE: ${op.m_strFilePath} 无法精确匹配(有和原文不一致的地方) AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
         console.log(`FILE: ${op.m_strFilePath} 未找到 AFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\`\n表达式\n${afterAnchorPattern}`);
     }
 
     if (oldContentRange[0] === -1) 
     {
-        errorMessages.push(`FILE: ${op.m_strFilePath} 未找到 OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\``);
+        errorMessages.push(`FILE: ${op.m_strFilePath} 无法精确匹配(有和原文不一致的地方) OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\``);
         console.log(`FILE: ${op.m_strFilePath} 未找到 OLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\n表达式\n${oldContentPattern}`);
     }
 
@@ -565,7 +567,7 @@ function diagnoseMatchFailure(strContent: string, op: ExactReplaceOperation): st
         if (firstOldContentLine < lastBeforeAnchorLine || lastOldContentLine > firstAfterAnchorLine) 
         {
             errorMessages.push(
-                `FILE: ${op.m_strFilePath} OLD_CONTENT 应该在 BEFORE_ANCHOR 和 AFTER_ANCHOR 之间:\nBEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\nOLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\nAFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
+                `FILE: ${op.m_strFilePath} OLD_CONTENT 应该在 BEFORE_ANCHOR 和 AFTER_ANCHOR 之间, 且不能有重叠 :\nBEFORE_ANCHOR:\n\`\`\`\n${op.m_strBeforeAnchor}\n\`\`\`\nOLD_CONTENT:\n\`\`\`\n${op.m_strOldContent}\n\`\`\`\nAFTER_ANCHOR:\n\`\`\`\n${op.m_strAfterAnchor}\n\`\`\``);
         }
     }
 

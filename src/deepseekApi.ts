@@ -203,7 +203,7 @@ export async function callDeepSeekFixApi(
     let messages_body = lastMessageBody;
 
     messages_body.push(
-        { role: 'user', content:`接收的数据格式有错误: ${errorInfo}, 根据错误信息修正错误，其他的地方保持原样。然后重新完整输出:`}
+        { role: 'user', content:`接收的数据格式有错误: ${errorInfo}, 仔细检查，分析输出错误的原因。然后重新完整输出:`}
     );
 
     let fullResponse = '';
@@ -278,7 +278,7 @@ ${TCVB.getFormatDescription()}
 任何时候都要保证修改完的代码是完整的可执行的，不能有省略
 先列出你的方案，然后再行动，注意输出一定要严格匹配要求格式
 
-最后的输出需要是 TCVB 格式，用用来做差量修改， 
+最后的输出需要是 TCVB 格式，用来做差量修改合成CVB (为了节省通讯用的数据流量)， 
 尤其注意，输出除了TCVB的正文内容以外，别的地方出现TCVB的开始符和结束符(比如一些关于TCVB的附加说明，或者正好字符串前缀和TCVB符号一样)要做转义，
 以免接收的时候被错误的当成TCVB块（比如前面加入一些空格）
 （注意,TCVB会被用来和原始的CVB合并成新CVB的，所以输出格式要准确，用于匹配的字符串要精确）
