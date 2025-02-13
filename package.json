@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.46",
+  "version": "0.0.47",
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -47,7 +47,6 @@
         "command": "codeReDesign.analyzeCode",
         "title": "CodeReDesign: Analyze Code"
       },
-
       {
         "command": "codeReDesign.applyThisCvb",
         "title": "CodeReDesign: Apply this CVB to Workspace",
