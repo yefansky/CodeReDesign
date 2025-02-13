@@ -1,3 +1,11 @@
-doUploadCommand 返回的respond 离得 tcvb内容。本地确认merge可以成功后（说明tcvb格式正确），也存一份。后缀tcvb，文件名和merge之后的cvb文件一样，只是后缀不同。
+doUploadCommand 返回的respond 里的 tcvb内容。本地确认merge可以成功后（说明tcvb格式正确），也存一份。后缀tcvb，文件名和merge之后的cvb文件一样，只是后缀不同。
 analyze的结果也落盘，保存成.md，命名规则也一样。
 注意，新加的两种落盘都要能在sidebar里显示
+
+
+自我修正最大次数3次
+超过就跳出循环
+无论成功与否，把所有对话内容输出成一个 `时间戳_需求摘要.md` 的文件
+注意这个对话内容，可以直接拿lastMessageBody，把第一段输入（包含cvb代码的部分）替换成单纯的输入需求文本（因为cvb的代码太长了）
+输出时最好标注每一段是谁说的，是user还是assist，可以用markdown方式缩进清晰标注出来
+并在sidebar显示
