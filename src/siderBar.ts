@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { applyCvbToWorkspace} from './cvbManager';
 import { analyzeCode } from './deepseekApi';
-import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand} from './extension';
+import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand, saveAnalyzeCodeResult} from './extension';
 import { showInputMultiLineBox } from './UIComponents';
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
@@ -47,7 +47,7 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
     // 创建文件系统监听器
     const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(targetFolder, '**/*.cvb') // 监听子文件夹中的所有 .cvb 文件
+      new vscode.RelativePattern(targetFolder, '**/*.{cvb,md}') // 监听子文件夹中的所有 .cvb 文件
     );
 
     // 当文件变化时刷新视图
@@ -231,6 +231,10 @@ async function analyzeThisCvb(filePath: string) {
     vscode.window.showInformationMessage('Analysis completed. Check the output channel for details.');
   }
   clearCurrentOperationController();
+
+  if (analysisResult){
+      saveAnalyzeCodeResult(userRequest, analysisResult);
+  }
 }
 
 export function deactivate() {}

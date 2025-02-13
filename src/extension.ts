@@ -103,6 +103,18 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
     clearCurrentOperationController();
 }
 
+export async function saveAnalyzeCodeResult(request: string, respond: string){
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspacePath = (workspaceFolders && workspaceFolders.length > 0) ? workspaceFolders[0].uri.fsPath : "./";
+    const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
+    const timestamp = generateTimestamp();
+    const summary = await generateFilenameFromRequest(request);
+    const mdFileName = `${timestamp}_${summary}.md`;
+    const mdFilePath = path.join(tmpDir, mdFileName);
+    const mdContent = respond;
+    fs.writeFileSync(mdFilePath, mdContent, 'utf-8');
+}
+
 // 插件激活时调用
 export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "CodeReDesign" is now active!');
@@ -273,6 +285,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         vscode.window.showInformationMessage('解析完毕');
+
+        if (analysisResult){
+            saveAnalyzeCodeResult(userRequest, analysisResult);
+        }
     });
 
     context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, outputChannel);
