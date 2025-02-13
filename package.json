@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.47",
+  "version": "0.0.48",
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -93,7 +93,7 @@
         {
           "command": "codeReDesign.stopOperation",
           "group": "navigation",
-          "when": "panelFocus && activePanel == 'workbench.panel.output'" 
+          "when": "panelFocus && activePanel == 'workbench.panel.output'"
         }
       ]
     },
