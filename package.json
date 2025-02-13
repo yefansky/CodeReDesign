@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.49",
+  "version": "0.0.50",
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -68,11 +68,13 @@
       }
     ],
     "viewsContainers": {
-      "activitybar": [{
-        "id": "guide-bar",
-        "title": "Guide",
-        "icon": "images/icon.svg"
-      }]
+      "activitybar": [
+        {
+          "id": "guide-bar",
+          "title": "Guide",
+          "icon": "images/icon.svg"
+        }
+      ]
     },
     "views": {
       "explorer": [
@@ -81,11 +83,13 @@
           "name": "CVB Actions"
         }
       ],
-      "guide-bar": [{
-        "type": "webview",
-        "id": "guideView",
-        "name": "User Guide"
-      }]
+      "guide-bar": [
+        {
+          "type": "webview",
+          "id": "guideView",
+          "name": "User Guide"
+        }
+      ]
     },
     "menus": {
       "view/item/context": [
