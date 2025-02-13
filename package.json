@@ -40,10 +40,6 @@
         "title": "CodeReDesign: Apply CVB to Workspace"
       },
       {
-        "command": "codeReDesign.applyThisCvb",
-        "title": "CodeReDesign: Apply this CVB to Workspace"
-      },
-      {
         "command": "codeReDesign.stopOperation",
         "title": "CodeReDesign: Stop Operation"
       },
@@ -51,13 +47,21 @@
         "command": "codeReDesign.analyzeCode",
         "title": "CodeReDesign: Analyze Code"
       },
+
+      {
+        "command": "codeReDesign.applyThisCvb",
+        "title": "CodeReDesign: Apply this CVB to Workspace",
+        "when": "false"
+      },
       {
         "command": "codeReDesign.uploadThisCvb",
-        "title": "CodeReDesign: Upload this CVB and Call API"
+        "title": "CodeReDesign: Upload this CVB and Call API",
+        "when": "false"
       },
       {
         "command": "codeReDesign.analyzeThisCvb",
-        "title": "CodeReDesign: Analyze this CVB"
+        "title": "CodeReDesign: Analyze this CVB",
+        "when": "false"
       }
     ],
     "views": {

@@ -6,6 +6,7 @@ import { generateCvb, applyCvbToWorkspace, generateTimestamp, Cvb, TCVB, mergeCv
 import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode, callDeepSeekFixApi, GetLastMessageBody } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
+import { showInputMultiLineBox } from './UIComponents';
 
 let currentOperationController: AbortController | null = null;
 
@@ -161,7 +162,7 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
     
-        const userPrompt = await vscode.window.showInputBox({
+        const userPrompt = await showInputMultiLineBox({
             prompt: 'Enter your prompt for the refactoring',
             placeHolder: 'e.g., Refactor the code to improve readability',
         });
@@ -255,7 +256,7 @@ export function activate(context: vscode.ExtensionContext) {
         const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
 
         // 获取用户的分析需求
-        const userRequest = await vscode.window.showInputBox({
+        const userRequest = await showInputMultiLineBox({
             prompt: 'Enter your analysis request',
             placeHolder: 'e.g., Analyze the code for potential bugs',
         });

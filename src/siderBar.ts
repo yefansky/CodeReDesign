@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { applyCvbToWorkspace, generateTimestamp,  Cvb, TCVB, mergeCvb } from './cvbManager';
-import { queryCodeReDesign, analyzeCode, generateFilenameFromRequest } from './deepseekApi';
+import { applyCvbToWorkspace} from './cvbManager';
+import { analyzeCode } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand} from './extension';
+import { showInputMultiLineBox } from './UIComponents';
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
@@ -128,6 +129,7 @@ class CvbFile extends vscode.TreeItem {
       arguments: [uri]
     };
     this.iconPath = new vscode.ThemeIcon('files'); // 使用代码图标
+    this.resourceUri = uri;
     this.contextValue = 'cvbFile'; // 上下文值保持不变
   }
 }
@@ -144,6 +146,7 @@ class MDFile extends vscode.TreeItem {
       arguments: [uri]
     };
     this.iconPath = new vscode.ThemeIcon('comment-discussion'); // 使用文档图标
+    this.resourceUri = uri;
     this.contextValue = 'mdFile'; // 新的上下文值
   }
 }
@@ -192,7 +195,7 @@ async function uploadThisCvb(filePath: string) {
   }
   // 测试 end
 */
-  const userPrompt = await vscode.window.showInputBox({
+  const userPrompt = await showInputMultiLineBox({
     prompt: 'Enter your prompt for the refactoring',
     placeHolder: 'e.g., Refactor the code to improve readability',
   });
@@ -209,7 +212,7 @@ async function uploadThisCvb(filePath: string) {
  * @param filePath .cvb 文件的路径
  */
 async function analyzeThisCvb(filePath: string) {
-  const userRequest = await vscode.window.showInputBox({
+  const userRequest = await showInputMultiLineBox({
     prompt: 'Enter your analysis request',
     placeHolder: 'e.g., Analyze the code for potential bugs',
   });
