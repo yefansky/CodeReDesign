@@ -59,14 +59,16 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
   }
 
   // 注册右键菜单命令
-  vscode.commands.registerCommand('codeReDesign.openCvbFile', (uri: vscode.Uri) => {
+  vscode.commands.registerCommand('codeReDesign.showFile', (uri: vscode.Uri) => {
     vscode.window.showTextDocument(uri);
   });
 }
 
-class CvbViewProvider implements vscode.TreeDataProvider<CvbFile> {
-  private _onDidChangeTreeData: vscode.EventEmitter<CvbFile | undefined> = new vscode.EventEmitter<CvbFile | undefined>();
-  readonly onDidChangeTreeData: vscode.Event<CvbFile | undefined> = this._onDidChangeTreeData.event;
+
+class CvbViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+  // 修改返回类型为更通用的TreeItem
+  private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined> = new vscode.EventEmitter<vscode.TreeItem | undefined>();
+  readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined> = this._onDidChangeTreeData.event;
 
   // 刷新视图
   refresh(): void {
@@ -74,42 +76,42 @@ class CvbViewProvider implements vscode.TreeDataProvider<CvbFile> {
   }
 
   // 获取树节点
-  getTreeItem(element: CvbFile): vscode.TreeItem {
+  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
     return element;
   }
 
   // 获取子节点
-  async getChildren(element?: CvbFile): Promise<CvbFile[]> {
+  async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
     if (element) {
-      // 如果有子节点，可以在这里处理
       return [];
     } else {
-      // 从指定子文件夹中读取 .cvb 文件
       const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders) {
-        return [];
-      }
+      if (!workspaceFolders) { return [];}
 
-      const cvbFiles: CvbFile[] = [];
-      const targetFolder = path.join(workspaceFolders[0].uri.fsPath, '.CodeReDesignWorkSpace'); // 替换为你的子文件夹名称
+      const files: vscode.TreeItem[] = [];
+      const targetFolder = path.join(workspaceFolders[0].uri.fsPath, '.CodeReDesignWorkSpace');
 
-      // 读取文件夹中的文件
       if (fs.existsSync(targetFolder)) {
-        const files = fs.readdirSync(targetFolder);
-        files.forEach(file => {
-          if (file.endsWith('.cvb') || file.endsWith('.md')) {
+        fs.readdirSync(targetFolder).forEach(file => {
           const filePath = path.join(targetFolder, file);
-          cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
-      }
+          const uri = vscode.Uri.file(filePath);
+          
+          if (file.endsWith('.cvb')) {
+            files.push(new CvbFile(file, uri));
+          } else if (file.endsWith('.md')) {
+            files.push(new MDFile(file, uri));
+          }
         });
       }
 
-        // 新增排序逻辑
-        cvbFiles.sort((a, b) => 
-          a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
-      );
+      // 修改后的排序逻辑
+      files.sort((a, b) => {
+        const labelA = a.label ? a.label.toString() : '';
+        const labelB = b.label ? b.label.toString() : '';
+        return labelA.localeCompare(labelB, undefined, { sensitivity: 'base' });
+      });
 
-      return cvbFiles;
+      return files;
     }
   }
 }
@@ -120,23 +122,32 @@ class CvbFile extends vscode.TreeItem {
     public readonly uri: vscode.Uri
   ) {
     super(label, vscode.TreeItemCollapsibleState.None);
-
-    // 设置命令，单击时打开文件
     this.command = {
-      command: 'codeReDesign.openCvbFile',
+      command: 'codeReDesign.showFile',
       title: 'Open CVB File',
       arguments: [uri]
     };
-
-    // 设置图标（可选）
-    this.iconPath = vscode.ThemeIcon.File;
-
-    this.resourceUri = uri;
-
-    // 添加上下文菜单
-    this.contextValue = 'cvbFile';
+    this.iconPath = new vscode.ThemeIcon('files'); // 使用代码图标
+    this.contextValue = 'cvbFile'; // 上下文值保持不变
   }
 }
+
+class MDFile extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly uri: vscode.Uri
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.None);
+    this.command = {
+      command: 'codeReDesign.showFile', // 复用同一个打开命令
+      title: 'Open Markdown File',
+      arguments: [uri]
+    };
+    this.iconPath = new vscode.ThemeIcon('comment-discussion'); // 使用文档图标
+    this.contextValue = 'mdFile'; // 新的上下文值
+  }
+}
+
 
 /**
  * 处理 .cvb 文件的函数
