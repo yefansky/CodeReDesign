@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
 import { generateCvb, applyCvbToWorkspace, generateTimestamp, Cvb, TCVB, mergeCvb} from './cvbManager';
-import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode, callDeepSeekFixApi } from './deepseekApi';
+import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode, callDeepSeekFixApi, GetLastMessageBody } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
 
@@ -57,6 +57,7 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
 
     let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
     let processSuccess = true;
+    let attemptCount = 0;
     do {
         try {
             if (apiResponse) {
@@ -75,8 +76,28 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
             vscode.window.showInformationMessage(`API response have error ${err.message}, try fix ...`);
             apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
             processSuccess = false;
+            attemptCount++;
         }
-    } while (!processSuccess);
+    } while (!processSuccess && attemptCount < 3);
+
+    const lastMessageBody = GetLastMessageBody();
+
+    if (lastMessageBody && lastMessageBody.length > 2) {
+        const timestamp = generateTimestamp();
+        const summary = await generateFilenameFromRequest(userPrompt);
+        const mdFileName = `${timestamp}_${summary}.md`;
+        const mdFilePath = path.join(tmpDir, mdFileName);
+    
+        // 创建新数组，第一条消息替换为 { "role": "user", "content": userPrompt }
+        const modifiedMessages = [{ role: "user", content: userPrompt }, ...lastMessageBody.slice(2)];
+    
+        const mdContent = modifiedMessages.map(msg => {
+            return `**${msg.role}**:\n\n${msg.content}\n\n`;
+        }).join('\n');
+    
+        fs.writeFileSync(mdFilePath, mdContent, 'utf-8');
+        vscode.window.showInformationMessage(`Conversation log saved as: ${mdFilePath}`);
+    }    
 
     clearCurrentOperationController();
 }

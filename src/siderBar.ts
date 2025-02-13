@@ -97,10 +97,10 @@ class CvbViewProvider implements vscode.TreeDataProvider<CvbFile> {
       if (fs.existsSync(targetFolder)) {
         const files = fs.readdirSync(targetFolder);
         files.forEach(file => {
-          if (file.endsWith('.cvb')) {
-            const filePath = path.join(targetFolder, file);
-            cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
-          }
+          if (file.endsWith('.cvb') || file.endsWith('.md')) {
+          const filePath = path.join(targetFolder, file);
+          cvbFiles.push(new CvbFile(file, vscode.Uri.file(filePath)));
+      }
         });
       }
 

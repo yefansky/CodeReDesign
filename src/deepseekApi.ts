@@ -41,6 +41,10 @@ function getDeepSeekModelConfig(): { modelName: string, apiBaseURL: string, apiK
 
 let lastMessageBody : OpenAI.ChatCompletionMessageParam[];
 
+export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
+    return lastMessageBody;
+}
+
 /**
  * 调用 DeepSeek API
  * @param userContent 用户输入内容
@@ -307,9 +311,9 @@ export async function queryCodeReDesign(
         列出每个关键修改点所在的文件路径
     修改方案:
         文件路径1:
-            修改的关键代码,注意只输出关键修改,不要太长, 不要加载无用的上下文。不要输出没有改动部分的代码
+            描述修改点，避免用大块代码,注意只输出关键修改,不要太长, 不要加载无用的上下文。不要输出没有改动部分的代码
         文件路径2:
-            修改的关键代码，同上
+            描述修改点，同上
         …
     最后检查:
         对以上输出的方案大纲进行反思，重新阅读输入代码，结合以上方案大纲，逐条检查有没有和原文对不上的地方。检查方案是否完备、文件路径是否正确，设计思路是否无误，如有问题请提出修正意见
