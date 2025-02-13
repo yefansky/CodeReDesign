@@ -7,6 +7,7 @@ import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode, callDeepSe
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
 import { showInputMultiLineBox } from './UIComponents';
+import { activateGuide } from './guide';
 
 let currentOperationController: AbortController | null = null;
 
@@ -118,6 +119,8 @@ export async function saveAnalyzeCodeResult(request: string, respond: string){
 // 插件激活时调用
 export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "CodeReDesign" is now active!');
+    
+    activateGuide(context);
 
     // 创建输出通道
     const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream', 'markdown');

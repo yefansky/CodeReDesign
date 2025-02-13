@@ -61,15 +61,31 @@
         "command": "codeReDesign.analyzeThisCvb",
         "title": "CodeReDesign: Analyze this CVB",
         "when": "false"
+      },
+      {
+        "command": "codeReDesign.showGuide",
+        "title": "Show Guide"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [{
+        "id": "guide-bar",
+        "title": "Guide",
+        "icon": "images/icon.svg"
+      }]
+    },
     "views": {
       "explorer": [
         {
           "id": "codeReDesign.cvbView",
           "name": "CVB Actions"
         }
-      ]
+      ],
+      "guide-bar": [{
+        "type": "webview",
+        "id": "guideView",
+        "name": "User Guide"
+      }]
     },
     "menus": {
       "view/item/context": [
