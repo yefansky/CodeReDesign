@@ -90,9 +90,11 @@
           "group": "cvb@1"
         }
       ],
-      "commandPalette": [
+      "editor/context": [
         {
-          "command": "codeReDesign.stopOperation"
+          "command": "codeReDesign.stopOperation",
+          "group": "navigation",
+          "when": "panelFocus && activePanel == 'workbench.panel.output'" 
         }
       ]
     },
