@@ -188,7 +188,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
             <a href="#" id="applyCvb">CodeReDesign: Apply CVB to Workspace</a>
           </li>
           <li>
-            <p><strong>4. 使用"分析代码功能"，例如让它解释代码或描述一个 bug。</strong></p>
+            <p><strong>4. 使用"分析代码功能"，例如让它解释代码，或描述一个 bug，让他分析可能原因，并提出修改方案。</strong></p>
             <a href="#" id="analyzeCode">CodeReDesign: Analyze Code</a>
           </li>
           <li>
