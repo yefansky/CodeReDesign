@@ -5,19 +5,6 @@ export function activateGuide(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('guideView', guideViewProvider)
   );
-
-  guideViewProvider.webview?.onDidReceiveMessage((message) => {
-    switch (message.command) {
-      case 'saveApiKey':
-        // 保存 API 密钥
-        context.globalState.update('deepSeekApiKey', message.apiKey);
-        break;
-      case 'openCommand':
-        // 打开指令
-        vscode.commands.executeCommand(message.command);
-        break;
-    }
-  });
 }
 
 class GuideViewProvider implements vscode.WebviewViewProvider {
@@ -29,11 +16,74 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this.context.extensionUri],
     };
     webviewView.webview.html = this.getWebviewContent();
+
+    webviewView.webview?.onDidReceiveMessage((message) => {
+      switch (message.command) {
+        case 'saveApiKey':
+          // 保存 API 密钥
+          const config = vscode.workspace.getConfiguration('codeReDesign');
+          const newKeyValue = message.apiKey;
+
+          config.update('deepSeekApiKey', newKeyValue, vscode.ConfigurationTarget.Global)
+            .then(() => {
+              vscode.window.showInformationMessage('配置已更新');
+            }, (err) => {
+              vscode.window.showErrorMessage(`配置更新失败: ${err}`);
+          });
+          break;
+        case 'openCommand':
+          // 打开指令
+          vscode.commands.executeCommand(message.command);
+        default:
+          vscode.commands.executeCommand(message.command);
+          break;
+      }
+    });
   }
 
   private getWebviewContent(): string {
     // 获取 DeepSeek API 密钥
-    const apiKey = this.context.globalState.get('deepSeekApiKey') || '';
+    const config = vscode.workspace.getConfiguration('codeReDesign');
+    const apiKey = config.get('deepSeekApiKey') || '';
+
+    const currentModelConfig = this.context.globalState.get('modelConfig') || 'deepseek-chat';
+    const currentCustomConfig = {
+      custom1: {
+        baseURL: this.context.globalState.get('custom1BaseURL') || '',
+        modelName: this.context.globalState.get('custom1ModelName') || '',
+        modelNickname: this.context.globalState.get('custom1ModelNickname') || ''
+      },
+      custom2: {
+        baseURL: this.context.globalState.get('custom2BaseURL') || '',
+        modelName: this.context.globalState.get('custom2ModelName') || '',
+        modelNickname: this.context.globalState.get('custom2ModelNickname') || ''
+      },
+      custom3: {
+        baseURL: this.context.globalState.get('custom3BaseURL') || '',
+        modelName: this.context.globalState.get('custom3ModelName') || '',
+        modelNickname: this.context.globalState.get('custom3ModelNickname') || ''
+      },
+      custom4: {
+        baseURL: this.context.globalState.get('custom4BaseURL') || '',
+        modelName: this.context.globalState.get('custom4ModelName') || '',
+        modelNickname: this.context.globalState.get('custom4ModelNickname') || ''
+      },
+      custom5: {
+        baseURL: this.context.globalState.get('custom5BaseURL') || '',
+        modelName: this.context.globalState.get('custom5ModelName') || '',
+        modelNickname: this.context.globalState.get('custom5ModelNickname') || ''
+      },
+    }
+    // 获取 modelConfig 的枚举值和对应的昵称
+    const modelConfigEnum = [
+      { value: 'deepseek-chat', label: 'deepseek-chat' },
+      { value: 'deepseek-reasoner', label: 'deepseek-r1' },
+      { value: 'custom1', label: config.get('custom1ModelNickname')  || '自定义模型 1' },
+      { value: 'custom2', label: config.get('custom2ModelNickname')  || '自定义模型 2' },
+      { value: 'custom3', label: config.get('custom3ModelNickname')  || '自定义模型 3' },
+      { value: 'custom4', label: config.get('custom4ModelNickname')  || '自定义模型 4' },
+      { value: 'custom5', label: config.get('custom5ModelNickname')  || '自定义模型 5' }
+    ];
   
     return `
       <!DOCTYPE html>
@@ -86,10 +136,29 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       <body>
         <h1>欢迎使用 CodeReDesign 插件！</h1>
         <div class="section">
-          <label for="apiKey">DeepSeek API 密钥：</label>
+          使用之前请先设置DeepSeek API Key
+          <label for="apiKey">DeepSeek 官方 API Key：</label>
           <input type="text" id="apiKey" value="${apiKey}" placeholder="请输入您的 DeepSeek API 密钥" />
           <button id="saveApiKey">保存</button>
         </div>
+        <div class="section">
+        <label for="modelConfig">自定义模型配置：</label>
+        <select id="modelConfig">
+          ${modelConfigEnum.map(option => `
+            <option value="${option.value}" ${option.value === currentModelConfig ? 'selected' : ''}>
+              ${option.label}
+            </option>
+          `).join('')}
+        </select>
+        <div class="section" id="customConfigSection">
+          <label for="customBaseURL">自定义模型 Base URL：</label>
+          <input type="text" id="customBaseURL" value="${currentCustomConfig.custom1.baseURL}" placeholder="请输入自定义模型的 Base URL" />
+          <label for="customModelName">自定义模型名称：</label>
+          <input type="text" id="customModelName" value="${currentCustomConfig.custom1.modelName}" placeholder="请输入自定义模型的名称" />
+          <label for="customModelNickname">自定义模型昵称：</label>
+          <input type="text" id="customModelNickname" value="${currentCustomConfig.custom1.modelNickname}" placeholder="请输入自定义模型的昵称" />
+        </div>
+      </div>   
         <div class="section">
           <h2>常用指令：</h2>
           <ul>
@@ -107,19 +176,41 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
             const apiKey = document.getElementById('apiKey').value;
             vscode.postMessage({ command: 'saveApiKey', apiKey });
           });
+
+          // 监听模型配置变化
+          document.getElementById('modelConfig').addEventListener('change', (event) => {
+            const selectedModel = event.target.value;
+            const customConfigSection = document.getElementById('customConfigSection');
+            if (selectedModel.startsWith('custom')) {
+              customConfigSection.style.display = 'block';
+            } else {
+              customConfigSection.style.display = 'none';
+            }
+          });
+
+          // 初始化时根据当前模型配置显示或隐藏自定义模型配置
+          (function() {
+            const selectedModel = document.getElementById('modelConfig').value;
+            const customConfigSection = document.getElementById('customConfigSection');
+            if (selectedModel.startsWith('custom')) {
+              customConfigSection.style.display = 'block';
+            } else {
+              customConfigSection.style.display = 'none';
+            }
+          })();
   
           // 跳转到指令
           document.getElementById('generateCvb').addEventListener('click', () => {
-            vscode.postMessage({ command: 'openCommand', command: 'codeReDesign.generateCvb' });
+            vscode.postMessage({ command: 'codeReDesign.generateCvb' });
           });
           document.getElementById('uploadCvb').addEventListener('click', () => {
-            vscode.postMessage({ command: 'openCommand', command: 'codeReDesign.uploadCvb' });
+            vscode.postMessage({ command: 'codeReDesign.uploadCvb' });
           });
           document.getElementById('applyCvb').addEventListener('click', () => {
-            vscode.postMessage({ command: 'openCommand', command: 'codeReDesign.applyCvb' });
+            vscode.postMessage({ command: 'codeReDesign.applyCvb' });
           });
           document.getElementById('analyzeCode').addEventListener('click', () => {
-            vscode.postMessage({ command: 'openCommand', command: 'codeReDesign.analyzeCode' });
+            vscode.postMessage({ command: 'codeReDesign.analyzeCode' });
           });
         </script>
       </body>
