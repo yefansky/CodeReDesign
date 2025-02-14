@@ -116,11 +116,20 @@ export async function saveAnalyzeCodeResult(request: string, respond: string){
     fs.writeFileSync(mdFilePath, mdContent, 'utf-8');
 }
 
+function hideWorkspaceFolder() {
+    const configuration = vscode.workspace.getConfiguration();
+    configuration.update('files.exclude', {
+        '**/.CodeReDesignWorkSpace': true
+    }, vscode.ConfigurationTarget.Global);
+}
+
 // 插件激活时调用
 export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "CodeReDesign" is now active!');
     
     activateGuide(context);
+
+    hideWorkspaceFolder();
 
     // 创建输出通道
     const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream', 'markdown');

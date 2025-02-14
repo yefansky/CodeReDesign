@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 
 export function activateGuide(context: vscode.ExtensionContext) {
   const guideViewProvider = new GuideViewProvider(context);
@@ -83,6 +84,12 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
     const customModelName = selectedCustomConfig?.modelName || '';
     const customModelNickname = selectedCustomConfig?.modelNickname || '';
     const customAPIKey = selectedCustomConfig?.modelAPIKey || '';
+
+    // 获取图片路径
+    const imagePath = vscode.Uri.file(
+      path.join(this.context.extensionPath, 'images/guide/rightClick.png')
+    );
+    const imageUri = imagePath.with({ scheme: 'vscode-resource' }).toString(); // 转换为 vscode-resource 协议 URL
   
     return `
     <!DOCTYPE html>
@@ -196,6 +203,10 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
             <a href="#" id="stopOperation">CodeReDesign: Stop Operation</a>
           </li>
         </ul>
+      </div>
+
+      <div class="section">
+          <img src="${imageUri}" style="max-width: 100%; height: auto;">
       </div>
   
       <script>
