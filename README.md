@@ -13,6 +13,10 @@
 - **右键菜单支持**：在资源管理器中，右键点击 `.cvb` 文件时，会显示一个上下文菜单，包含 `applyThisCvb`、`uploadThisCvb` 和 `analyzeThisCvb` 三个选项。
 - **CVB 文件视图**：在 VSCode 的侧边栏中，新增了一个 `CVB Actions` 视图，用于显示当前工作区中的所有 `.cvb` 文件，并支持通过点击文件来打开或操作它们。
 
+除了直接通过指令操作，
+你也可以使用图形化的UI:
+![图形化界面演示](/images/guide/readme-guide.png)
+
 ## 使用方法
 
 #### 使用前需要先设置 DeepSeek API 的 Key
