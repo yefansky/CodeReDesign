@@ -29,42 +29,60 @@
     "commands": [
       {
         "command": "codeReDesign.generateCvb",
-        "title": "codeReDesign:Generate CVB File"
+        "title": "Generate CVB File",
+        "category": "CodeReDesign",
+        "icon": "${add}"
       },
       {
         "command": "codeReDesign.uploadCvb",
-        "title": "codeReDesign:Upload CVB and Call API"
+        "title": "Upload CVB and Call API",
+        "category": "CodeReDesign",
+        "icon": "${cloud-upload}"
       },
       {
         "command": "codeReDesign.applyCvb",
-        "title": "CodeReDesign: Apply CVB to Workspace"
+        "title": "Apply CVB to Workspace",
+        "category": "CodeReDesign",
+        "icon": "${save}"
       },
       {
         "command": "codeReDesign.stopOperation",
-        "title": "CodeReDesign: Stop Operation"
+        "title": "Stop Operation",
+        "category": "CodeReDesign",
+        "icon": "${stop}"
       },
       {
         "command": "codeReDesign.analyzeCode",
-        "title": "CodeReDesign: Analyze Code"
+        "title": "CodeReDesign: Analyze Code",
+        "category": "CodeReDesign",
+        "icon": "${bug}"
       },
       {
         "command": "codeReDesign.applyThisCvb",
-        "title": "CodeReDesign: Apply this CVB to Workspace",
-        "when": "false"
+        "title": "Apply this CVB to Workspace",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${save}"
       },
       {
         "command": "codeReDesign.uploadThisCvb",
-        "title": "CodeReDesign: Upload this CVB and Call API",
-        "when": "false"
+        "title": "Upload this CVB and Call API",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${cloud-upload}"
       },
       {
         "command": "codeReDesign.analyzeThisCvb",
-        "title": "CodeReDesign: Analyze this CVB",
-        "when": "false"
+        "title": "Analyze this CVB",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${bug}"
       },
       {
         "command": "codeReDesign.showGuide",
-        "title": "Show Guide"
+        "title": "Show Guide",
+        "category": "CodeReDesign",
+        "icon": "${question}"
       }
     ],
     "viewsContainers": {
