@@ -16,7 +16,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this.context.extensionUri],
     };
-    webviewView.webview.html = this.getWebviewContent();
+    webviewView.webview.html = this.getWebviewContent(webviewView);
 
     webviewView.webview?.onDidReceiveMessage((message) => {
       switch (message.command) {
@@ -26,7 +26,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
         case 'updateModelConfig':
           const config = vscode.workspace.getConfiguration('codeReDesign');
           config.update('modelConfig', message.selectedModel, vscode.ConfigurationTarget.Global).then(() => {
-            webviewView.webview.html = this.getWebviewContent(); // 更新内容
+            webviewView.webview.html = this.getWebviewContent(webviewView); // 更新内容
           });
           break;
         default:
@@ -45,7 +45,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
         vscode.window.showErrorMessage(`配置更新失败: ${err}`);
       });
   }
-  private getWebviewContent(): string {
+  private getWebviewContent(webviewView: vscode.WebviewView): string {
     const config = vscode.workspace.getConfiguration('codeReDesign');
     const apiKey = config.get('deepSeekApiKey') || '';
     const currentModelConfig = config.get('modelConfig') || 'deepseek-chat';
@@ -85,11 +85,11 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
     const customModelNickname = selectedCustomConfig?.modelNickname || '';
     const customAPIKey = selectedCustomConfig?.modelAPIKey || '';
 
-    // 获取图片路径
-    const imagePath = vscode.Uri.file(
-      path.join(this.context.extensionPath, 'images/guide/rightClick.png')
-    );
-    const imageUri = imagePath.with({ scheme: 'vscode-resource' }).toString(); // 转换为 vscode-resource 协议 URL
+    // Get path to resource on disk
+    const onDiskPath = vscode.Uri.joinPath(this.context.extensionUri, 'images', 'guide', 'rightClick.png');
+
+    // And get the special URI to use with the webview
+    const imageUri = webviewView.webview.asWebviewUri(onDiskPath);
   
     return `
     <!DOCTYPE html>
@@ -204,11 +204,10 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
           </li>
         </ul>
       </div>
-
       <div class="section">
+          <h2>你也可以从文件管理器视图里通过鼠标右键唤出菜单操作：</h2>
           <img src="${imageUri}" style="max-width: 100%; height: auto;">
       </div>
-  
       <script>
         const vscode = acquireVsCodeApi();
   
