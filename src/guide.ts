@@ -9,25 +9,25 @@ export function activateGuide(context: vscode.ExtensionContext) {
 }
 
 class GuideViewProvider implements vscode.WebviewViewProvider {
+  private webviewView?: vscode.WebviewView;
+
   constructor(private context: vscode.ExtensionContext) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
+    this.webviewView = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [this.context.extensionUri],
     };
     webviewView.webview.html = this.getWebviewContent(webviewView);
 
-    webviewView.webview?.onDidReceiveMessage((message) => {
+    webviewView.webview?.onDidReceiveMessage(async (message) => {
       switch (message.command) {
-        case 'saveApiKey':
-          this.saveApiKey(message.apiKey);
+        case 'saveAllConfig':
+          await this.handleSaveAllConfig(message.data, webviewView);
           break;
         case 'updateModelConfig':
-          const config = vscode.workspace.getConfiguration('codeReDesign');
-          config.update('modelConfig', message.selectedModel, vscode.ConfigurationTarget.Global).then(() => {
-            webviewView.webview.html = this.getWebviewContent(webviewView); // 更新内容
-          });
+          await this.updateModelConfig(message.selectedModel, webviewView);
           break;
         default:
           vscode.commands.executeCommand(message.command);
@@ -36,15 +36,38 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private saveApiKey(apiKey: string) {
+  private async handleSaveAllConfig(data: any, webviewView: vscode.WebviewView) {
     const config = vscode.workspace.getConfiguration('codeReDesign');
-    config.update('deepSeekApiKey', apiKey, vscode.ConfigurationTarget.Global)
-      .then(() => {
-        vscode.window.showInformationMessage('配置已更新');
-      }, (err) => {
-        vscode.window.showErrorMessage(`配置更新失败: ${err}`);
-      });
+    try {
+      // 保存DeepSeek API Key
+      await config.update('deepSeekApiKey', data.deepSeekApiKey, vscode.ConfigurationTarget.Global);
+      
+      // 保存模型配置
+      await config.update('modelConfig', data.selectedModel, vscode.ConfigurationTarget.Global);
+
+      // 如果选择的是自定义模型，保存自定义配置
+      const customModelMatch = data.selectedModel.match(/^custom(\d+)$/);
+      if (customModelMatch) {
+        const customNumber = customModelMatch[1];
+        await config.update(`custom${customNumber}BaseURL`, data.customBaseURL, vscode.ConfigurationTarget.Global);
+        await config.update(`custom${customNumber}ModelName`, data.customModelName, vscode.ConfigurationTarget.Global);
+        await config.update(`custom${customNumber}ModelNickname`, data.customModelNickname, vscode.ConfigurationTarget.Global);
+        await config.update(`custom${customNumber}APIKey`, data.customAPIKey, vscode.ConfigurationTarget.Global);
+      }
+
+      vscode.window.showInformationMessage('配置已保存');
+      webviewView.webview.html = this.getWebviewContent(webviewView);
+    } catch (err) {
+      vscode.window.showErrorMessage(`保存配置失败: ${err}`);
+    }
   }
+
+  private async updateModelConfig(selectedModel: string, webviewView: vscode.WebviewView) {
+    const config = vscode.workspace.getConfiguration('codeReDesign');
+    await config.update('modelConfig', selectedModel, vscode.ConfigurationTarget.Global);
+    webviewView.webview.html = this.getWebviewContent(webviewView);
+  }
+
   private getWebviewContent(webviewView: vscode.WebviewView): string {
     const config = vscode.workspace.getConfiguration('codeReDesign');
     const apiKey = config.get('deepSeekApiKey') || '';
@@ -64,7 +87,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
         baseURL: baseURL || '',
         modelName: modelName || '',
         modelNickname: modelNickname || `自定义模型 ${i}`,
-        modelAPIKey : modelAPIKey || ''
+        modelAPIKey: modelAPIKey || ''
       });
     }
   
@@ -84,10 +107,10 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
     const customModelName = selectedCustomConfig?.modelName || '';
     const customModelNickname = selectedCustomConfig?.modelNickname || '';
     const customAPIKey = selectedCustomConfig?.modelAPIKey || '';
-
+  
     // Get path to resource on disk
     const onDiskPath = vscode.Uri.joinPath(this.context.extensionUri, 'images', 'guide', 'rightClick.png');
-
+  
     // And get the special URI to use with the webview
     const imageUri = webviewView.webview.asWebviewUri(onDiskPath);
   
@@ -155,7 +178,6 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
           <summary>点击此处展开选择模型和设置APIKey</summary>
           <label for="apiKey">DeepSeek 官方 API Key：</label>
           <input type="text" id="apiKey" value="${apiKey}" placeholder="请输入您的 DeepSeek API 密钥" />
-          <button id="saveApiKey">保存</button>
           <summary>自定义模型配置</summary>
           <label for="modelConfig">选择模型</label>
           <select id="modelConfig">
@@ -175,6 +197,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
             <label for="customModelAPIKey">API Key：</label>
             <input type="text" id="customModelAPIKey" value="${customAPIKey}" placeholder="请输入自定义模型的 API Key" />
           </div>
+          <button id="saveAllConfig">保存所有配置</button>
         </details>
       </div>
   
@@ -211,9 +234,25 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       <script>
         const vscode = acquireVsCodeApi();
   
-        document.getElementById('saveApiKey').addEventListener('click', () => {
+        document.getElementById('saveAllConfig').addEventListener('click', () => {
           const apiKey = document.getElementById('apiKey').value;
-          vscode.postMessage({ command: 'saveApiKey', apiKey });
+          const selectedModel = document.getElementById('modelConfig').value;
+          const customBaseURL = document.getElementById('customBaseURL').value;
+          const customModelName = document.getElementById('customModelName').value;
+          const customModelNickname = document.getElementById('customModelNickname').value;
+          const customAPIKey = document.getElementById('customModelAPIKey').value;
+  
+          vscode.postMessage({
+            command: 'saveAllConfig',
+            data: {
+              deepSeekApiKey: apiKey,
+              selectedModel: selectedModel,
+              customBaseURL: customBaseURL,
+              customModelName: customModelName,
+              customModelNickname: customModelNickname,
+              customAPIKey: customAPIKey
+            }
+          });
         });
   
         document.getElementById('modelConfig').addEventListener('change', (event) => {
@@ -239,5 +278,5 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
     </body>
     </html>
     `;
-  }  
+  }
 }
