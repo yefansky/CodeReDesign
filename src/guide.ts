@@ -19,7 +19,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this.context.extensionUri],
     };
-    webviewView.webview.html = this.getWebviewContent(webviewView);
+    webviewView.webview.html = this.getWebviewContent(webviewView, {});
 
     webviewView.webview?.onDidReceiveMessage(async (message) => {
       switch (message.command) {
@@ -56,7 +56,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       }
 
       vscode.window.showInformationMessage('配置已保存');
-      webviewView.webview.html = this.getWebviewContent(webviewView);
+      webviewView.webview.html = this.getWebviewContent(webviewView, {"details": "open"});
     } catch (err) {
       vscode.window.showErrorMessage(`保存配置失败: ${err}`);
     }
@@ -65,10 +65,10 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
   private async updateModelConfig(selectedModel: string, webviewView: vscode.WebviewView) {
     const config = vscode.workspace.getConfiguration('codeReDesign');
     await config.update('modelConfig', selectedModel, vscode.ConfigurationTarget.Global);
-    webviewView.webview.html = this.getWebviewContent(webviewView);
+    webviewView.webview.html = this.getWebviewContent(webviewView, {"details": "open"});
   }
 
-  private getWebviewContent(webviewView: vscode.WebviewView): string {
+  private getWebviewContent(webviewView: vscode.WebviewView, state: any): string {
     const config = vscode.workspace.getConfiguration('codeReDesign');
     const apiKey = config.get('deepSeekApiKey') || '';
     const currentModelConfig = config.get('modelConfig') || 'deepseek-chat';
@@ -174,7 +174,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       <!--折叠的自定义模型设置部分-->
       <div class="section">
       <h2>开始使用前你需要先选择使用的模型和APIKey</h2>
-        <details close>
+        <details ${state["details"] || "close"}>
           <summary>点击此处展开选择模型和设置APIKey</summary>
           <label for="apiKey">DeepSeek 官方 API Key：</label>
           <input type="text" id="apiKey" value="${apiKey}" placeholder="请输入您的 DeepSeek API 密钥" />
