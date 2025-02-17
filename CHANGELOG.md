@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.60 (2025-02-17)
+
+
+### Features
+
+* 增加多种语言支持 ([1d2c14c](https://github.com/yefansky/CodeReDesign/commit/1d2c14c7e56e357d69140be3b7dc499c94245b2a))
+
 ### 0.0.59 (2025-02-16)
 
 ### 0.0.58 (2025-02-15)
