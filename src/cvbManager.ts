@@ -5,27 +5,7 @@ import * as iconv from 'iconv-lite'; // 编码转换库
 import * as vscode from 'vscode';
 import { generateFilenameFromRequest } from './deepseekApi';
 
-// 语言映射表
-const g_objLanguageMapping: { [key: string]: string } = {
-  'cpp': 'c++',
-  'hpp': 'c++',
-  'h': 'c++',
-  'lua': 'lua',
-  'ls': 'lua',
-  'lh': 'lua',
-  'py': 'python',
-  'ts': 'typescript',
-  'js': 'javascript',
-  'cs': 'c#',            // C#
-  'java': 'java',        // Java
-  'go': 'go',            // Go
-  'rb': 'ruby',          // Ruby
-  'swift': 'swift',      // Swift
-  'kt': 'kotlin',        // Kotlin
-  'php': 'php',          // PHP
-  'rust': 'rust',        // Rust
-  'dart': 'dart'         // Dart
-};
+import { g_objLanguageMapping } from './languageMapping';
 
 // ================== CVB 核心类 ==================
 export class Cvb
