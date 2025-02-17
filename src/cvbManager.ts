@@ -15,7 +15,16 @@ const g_objLanguageMapping: { [key: string]: string } = {
   'lh': 'lua',
   'py': 'python',
   'ts': 'typescript',
-  'js': 'javascript'
+  'js': 'javascript',
+  'cs': 'c#',            // C#
+  'java': 'java',        // Java
+  'go': 'go',            // Go
+  'rb': 'ruby',          // Ruby
+  'swift': 'swift',      // Swift
+  'kt': 'kotlin',        // Kotlin
+  'php': 'php',          // PHP
+  'rust': 'rust',        // Rust
+  'dart': 'dart'         // Dart
 };
 
 // ================== CVB 核心类 ==================
