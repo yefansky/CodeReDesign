@@ -113,17 +113,14 @@
       "view/item/context": [
         {
           "command": "codeReDesign.applyThisCvb",
-          "when": "resourceExtname  == .cvb",
           "group": "cvb@1"
         },
         {
           "command": "codeReDesign.uploadThisCvb",
-          "when": "resourceExtname  == .cvb",
           "group": "cvb@1"
         },
         {
           "command": "codeReDesign.analyzeThisCvb",
-          "when": "resourceExtname  == .cvb",
           "group": "cvb@1"
         }
       ],

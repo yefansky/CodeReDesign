@@ -59,10 +59,14 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
     context.subscriptions.push(watcher);
   }
 
-  // 注册右键菜单命令
-  vscode.commands.registerCommand('codeReDesign.showFile', (uri: vscode.Uri) => {
-    vscode.window.showTextDocument(uri);
-  });
+   // 注册命令
+   context.subscriptions.push(
+     vscode.commands.registerCommand('codeReDesign.showFile', (uri: vscode.Uri) => {
+         // 如果插件已安装，使用其命令打开文件
+         vscode.commands.executeCommand('markdown.showPreview', uri);
+         //vscode.commands.executeCommand('vscode.open', uri);
+     })
+   );
 }
 
 
