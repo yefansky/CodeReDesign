@@ -143,6 +143,9 @@ export class ChatPanel {
                         color: white !important;
                         background-color: transparent !important;
                     }
+                    .katex-display > .katex {
+                        padding: 1em 0;
+                    }
                     #input-container {
                         position: fixed;
                         bottom: 0;
@@ -208,6 +211,8 @@ export class ChatPanel {
                             // 解析Markdown
                             targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
                                 breaks: true,
+                                mangle: false,
+                                headerIds: false,
                                 highlight: (code, lang) => {
                                     const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
                                     return hljs.highlight(code, { language: validLang }).value;
@@ -218,10 +223,24 @@ export class ChatPanel {
                             renderMathInElement(targetDiv, {
                                 delimiters: [
                                     { left: '$$', right: '$$', display: true },
-                                    { left: '$', right: '$', display: false }
+                                    { left: '$', right: '$', display: false },
+                                    { left: '\\[', right: '\\]', display: true },
+                                    { left: '\\(', right: '\\)', display: false }
                                 ],
                                 throwOnError: false
                             });
+                            setTimeout(() => {
+                                renderMathInElement(targetDiv, {
+                                    delimiters: [
+                                        { left: '$$', right: '$$', display: true },
+                                        { left: '$', right: '$', display: false },
+                                        { left: '\\[', right: '\\]', display: true },
+                                        { left: '\\(', right: '\\)', display: false }
+                                    ],
+                                    throwOnError: false
+                                });
+                                hljs.highlightAll();
+                            }, 0);
 
                             // 重新高亮代码块
                             hljs.highlightAll();
