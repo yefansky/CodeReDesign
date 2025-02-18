@@ -1,4 +1,4 @@
-import * as vscode from 'vscode';
+ï»¿import * as vscode from 'vscode';
 import { callDeepSeekApi } from './deepseekApi';
 
 class WebviewOutputChannel implements vscode.OutputChannel {
@@ -15,7 +15,7 @@ class WebviewOutputChannel implements vscode.OutputChannel {
     }
 
     append(value: string): void {
-        // ½«Êı¾İÍ¨¹ı Webview ·¢ËÍ³öÈ¥
+        // å°†æ•°æ®é€šè¿‡ Webview å‘é€å‡ºå»
         this._webview.postMessage({ role: 'model', content: value });
     }
 
@@ -24,7 +24,7 @@ class WebviewOutputChannel implements vscode.OutputChannel {
     }
 
     clear(): void {
-        // Çå³ıÊä³ö£¬Í¨³£¿ÉÒÔÍ¨¹ıÇå¿Õ Webview À´ÊµÏÖ
+        // æ¸…é™¤è¾“å‡ºï¼Œé€šå¸¸å¯ä»¥é€šè¿‡æ¸…ç©º Webview æ¥å®ç°
         this._webview.postMessage({ role: 'model', content: '' });
     }
 
@@ -32,15 +32,15 @@ class WebviewOutputChannel implements vscode.OutputChannel {
     show(column?: vscode.ViewColumn, preserveFocus?: boolean): void;
     show(arg1?: boolean | vscode.ViewColumn, arg2?: boolean): void {
         if (typeof arg1 === 'boolean') {
-            // µÚÒ»ÖÖÖØÔØ£ºshow(preserveFocus?: boolean)
-            this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
+            // ç¬¬ä¸€ç§é‡è½½ï¼šshow(preserveFocus?: boolean)
+            //this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
         } else {
-            // µÚ¶şÖÖÖØÔØ£ºshow(column?: ViewColumn, preserveFocus?: boolean)
+            // ç¬¬äºŒç§é‡è½½ï¼šshow(column?: ViewColumn, preserveFocus?: boolean)
             if (arg1 !== undefined) {
-                // ¸ù¾İ column ½øĞĞ´¦Àí£¨¿ÉÒÔ×Ô¶¨ÒåÂß¼­£©
-                console.log(`Showing in column: ${arg1}`);
+                // æ ¹æ® column è¿›è¡Œå¤„ç†ï¼ˆå¯ä»¥è‡ªå®šä¹‰é€»è¾‘ï¼‰
+                //console.log(`Showing in column: ${arg1}`);
             }
-            this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
+            //this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
         }
     }
     hide(): void {
@@ -52,7 +52,7 @@ class WebviewOutputChannel implements vscode.OutputChannel {
     }
 
     replace(value: string): void {
-        // Ìæ»»Êä³öÄÚÈİ
+        // æ›¿æ¢è¾“å‡ºå†…å®¹
         this._webview.postMessage({ role: 'model', content: value });
     }
 }
@@ -104,24 +104,24 @@ export class ChatPanel {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Chat with Model</title>
                 <style>
-                .user { color: blue; }
-                .model { color: green; }
-                #chat {
-                    height: calc(100vh - 150px);
-                    overflow-y: auto;
-                }
-                #input-container {
-                    position: fixed;
-                    bottom: 0;
-                    width: 100%;
-                    background-color: white;
-                    padding: 10px;
-                }
-                #chat div {
-                    white-space: pre-wrap; /* ¹Ø¼ü´úÂë£º±£Áô»»ĞĞ·û */
-                    margin-bottom: 8px;    /* ¶ÎÂä¼ä¾à£¨¿ÉÑ¡£© */
-                }
-            </style>
+                    .user { color: blue; }
+                    .model { color: green; }
+                    #chat {
+                        height: calc(100vh - 150px);
+                        overflow-y: auto;
+                    }
+                    #input-container {
+                        position: fixed;
+                        bottom: 0;
+                        width: 100%;
+                        background-color: white;
+                        padding: 10px;
+                    }
+                    #chat div {
+                        white-space: pre-wrap; /* å…³é”®ä»£ç ï¼šä¿ç•™æ¢è¡Œç¬¦ */
+                        margin-bottom: 8px;    /* æ®µè½é—´è·ï¼ˆå¯é€‰ï¼‰ */
+                    }
+                </style>
             </head>
             <body>
                 <div id="chat"></div>
@@ -166,7 +166,7 @@ export class ChatPanel {
                         const chat = document.getElementById('chat');
                         const lastChild = chat.lastElementChild;
 
-                        // ºÏ²¢µ½Í¬Ò»½ÇÉ«ÔªËØ
+                        // åˆå¹¶åˆ°åŒä¸€è§’è‰²å…ƒç´ 
                         if (lastChild && lastChild.className === role) {
                             lastChild.textContent += content;
                         } else {
@@ -176,7 +176,7 @@ export class ChatPanel {
                             chat.appendChild(div);
                         }
 
-                        // ×Ô¶¯¹ö¶¯µ½µ×²¿
+                        // è‡ªåŠ¨æ»šåŠ¨åˆ°åº•éƒ¨
                         chat.scrollTop = chat.scrollHeight;
                     });
                 </script>
