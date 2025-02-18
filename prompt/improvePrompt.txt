@@ -1,0 +1,362 @@
+
+/**
+ * 调用 DeepSeek API
+ * @param userContent 用户输入内容
+ * @param systemContent 系统提示内容
+ * @param outputChannel 输出通道，用于实时显示流式内容
+ * @param streamMode 是否启用流式模式
+ * @param endstring 结束字符串，用于检查输出是否包含特定字符串
+ * @param abortSignal 用于中断请求的信号
+ * @returns API 返回的完整内容
+ */
+async function callDeepSeekApi(
+    userContent: string,
+    systemContent: string = 'You are a helpful assistant.',
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    endstring?: string,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig();
+    const userStopException = 'operation stop by user';
+
+    if (!apiKey) {
+        vscode.window.showErrorMessage('DeepSeek API Key is not configured. Please set it in the settings.');
+        return null;
+    }
+
+    if (!modelName || !apiBaseURL) {
+        vscode.window.showErrorMessage('DeepSeek Model Name or API Base URL is not configured.');
+        return null;
+    }
+
+    try {
+        const openai = new OpenAI({
+            apiKey: apiKey,
+            baseURL: apiBaseURL,
+        });
+
+        if (outputChannel) {
+            outputChannel.clear();
+            outputChannel.show();
+        }
+
+        const messages_body: OpenAI.ChatCompletionMessageParam[] = [
+            { role: 'system', content: systemContent },
+            { role: 'user', content: userContent },
+        ];
+        let fullResponse = '';
+        let maxAttempts = 5;
+        let attempts = 0;
+
+        vscode.window.showInformationMessage('开始上传DeepSeek API');
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            const response = await openai.chat.completions.create({
+                model: modelName,
+                messages: messages_body,
+                stream: streamMode,
+                max_tokens: 8192,
+                temperature: 0
+            });
+
+            vscode.window.showInformationMessage('DeepSeek API 正在处理...');
+
+            let chunkResponse = '';
+            let finishReason: string | null = null;
+
+            if (streamMode) {
+                for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+                    if (abortSignal?.aborted) {
+                        throw new Error(userStopException);
+                    }
+                    const content = chunk.choices[0]?.delta?.content || '';
+                    chunkResponse += content;
+                    if (outputChannel) {
+                        outputChannel.append(content);
+                    }
+                    finishReason = chunk.choices[0]?.finish_reason || null;
+                }
+            } else {
+                const completion = response as OpenAI.Chat.Completions.ChatCompletion;
+                chunkResponse = completion.choices[0].message.content || "";
+                finishReason = completion.choices[0].finish_reason || null;
+                if (outputChannel) {
+                    outputChannel.append(chunkResponse);
+                }
+            }
+
+            // 累积完整响应
+            fullResponse += chunkResponse;
+
+            // 检查终止条件
+            const shouldContinue = 
+                finishReason === 'length' || 
+                (endstring && !fullResponse.includes(endstring));
+
+            if (!shouldContinue) {break;};
+
+            if (abortSignal?.aborted) {
+                throw new Error(userStopException);
+            }
+
+            vscode.window.showWarningMessage('超过最大Token数，正在重试...');
+
+            // 准备下一次请求
+            messages_body.push(
+                { role: 'assistant', content: fullResponse },
+                { role: 'user', content: '你的输出被截断了，请继续输出剩余部分, 不需要```做起始，直接继续输出纯内容:' }
+            );
+        }
+
+        // 最终检查
+        if (endstring && !fullResponse.includes(endstring)) {
+            vscode.window.showWarningMessage('响应未包含结束标记');
+        }
+
+        messages_body.push({ role: 'assistant', content: fullResponse });
+        lastMessageBody = messages_body;
+        return fullResponse;
+
+    } catch (error) {
+        if (error instanceof Error && error.message === userStopException) {
+            vscode.window.showInformationMessage('operation stop by user');
+            return null;
+        }
+        vscode.window.showErrorMessage('API调用失败: ' + (error as Error).message);
+        return null;
+    }
+}
+
+export async function callDeepSeekFixApi(
+    errorInfo: string,
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig();
+    const userStopException = 'operation stop by user';
+
+    if (!apiKey) {
+        vscode.window.showErrorMessage('DeepSeek API Key is not configured. Please set it in the settings.');
+        return null;
+    }
+
+    if (!modelName || !apiBaseURL) {
+        vscode.window.showErrorMessage('DeepSeek Model Name or API Base URL is not configured.');
+        return null;
+    }
+
+    const openai = new OpenAI({
+        apiKey: apiKey,
+        baseURL: apiBaseURL,
+    });
+
+    if (outputChannel) {
+        outputChannel.clear();
+        outputChannel.show();
+    }
+
+    let messages_body = lastMessageBody;
+
+    messages_body.push(
+        { role: 'user', content:`你以上提供的数据格式存在错误: ${errorInfo}。
+请你仔细检查数据，分析并找出所有错误原因，并核实错误类型。请按照下面的格式输出，要求如下：
+
+【第一步：错误原因分析】
+请逐项列出所有错误原因，每项必须包括：
+  1. 错误类型及原因描述（详细说明为何出错）
+  2. 对应的文件路径（精确到文件）
+  3. 错误的写法（直接引用错误代码，指明具体位置）
+  4. 正确的写法（建议的修正代码，必须准确对应错误部分）
+  
+【第二步：最小改动修正】
+在保证原有正确部分完整保留的前提下，仅对错误部分做最小改动。要求：
+  - 详细说明每处改动的理由
+  - 列出每个文件修改的具体位置和修改内容，确保不遗漏任何正确部分
+
+【第三步：完整输出】
+请输出最终修正后的完整数据，按照上一次要求的格式，严格输出。并注意：
+  - 包含修正后的代码
+  - 不要遗漏原有正确部分（完整输出，绝对不省略任何内容）
+  
+【第四步：总结说明】
+在输出完完整数据后，请总结以上步骤，归纳错误原因和修改方案，并确认所有文件路径及代码位置均正确无误。
+
+请严格按照以上步骤输出，确保先详细列出错误原因，再输出完整修正后的数据，不要只输出错误部分。`}
+    );
+
+    let fullResponse = '';
+    let chunkResponse = '';
+    let finishReason: string | null = null;
+
+    vscode.window.showInformationMessage('开始上传DeepSeek API, 进行修复');
+
+    const response = await openai.chat.completions.create({
+        model: modelName,
+        messages: messages_body,
+        stream: streamMode,
+        max_tokens: 8192,
+        temperature: 0
+    });
+
+    if (streamMode) {
+        for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+            if (abortSignal?.aborted) {
+                throw new Error(userStopException);
+            }
+            const content = chunk.choices[0]?.delta?.content || '';
+            chunkResponse += content;
+            if (outputChannel) {
+                outputChannel.append(content);
+            }
+            finishReason = chunk.choices[0]?.finish_reason || null;
+        }
+    } else {
+        const completion = response as OpenAI.Chat.Completions.ChatCompletion;
+        chunkResponse = completion.choices[0].message.content || "";
+        finishReason = completion.choices[0].finish_reason || null;
+        if (outputChannel) {
+            outputChannel.append(chunkResponse);
+        }
+    }
+
+    fullResponse = chunkResponse;
+
+    messages_body.push({ role: 'assistant', content: fullResponse });
+    lastMessageBody = messages_body;
+
+    return fullResponse;
+}
+
+/**
+ * 应用代码重构功能
+ * @param cvbContent CVB 文件内容
+ * @param userRequest 用户输入的重构需求
+ * @param outputChannel 输出通道，用于实时显示流式内容
+ * @param abortSignal 用于中断请求的信号
+ * @returns API 返回的完整 CVB 内容
+ */
+export async function queryCodeReDesign(
+    cvbContent: string,
+    userRequest: string,
+    outputChannel: vscode.OutputChannel,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const requestContent = `
+【格式说明】
+- CVB 格式说明：${Cvb.getFormatDescription()}
+- TCVB 格式说明：${TCVB.getFormatDescription()}
+
+【任务说明】
+请读取以下 CVB 格式代码，并根据需求修改代码。注意：
+1. 如果需求涉及“移动代码”，请务必修改原始代码，将代码重新封装到新位置，而非简单复制；
+2. 修改后的代码必须完整、可执行，不能有任何省略；
+3. 输出内容必须严格遵守 TCVB 格式（仅正文部分含 TCVB 标记，其他地方如有 TCVB 开始或结束符需转义），以确保后续合并正确；
+4. 注意不要将某文件的修改内容误认为是其他文件，请一条一条列出具体修改项及对应文件路径。
+
+【输出要求】
+1. 先输出你对需求及相关代码的理解，请按层级缩进列出笔记，便于整理思路；
+2. 再输出详细的方案大纲，格式如下：
+    需求理解:
+        …
+    查询资料:
+        列出每个关键修改点所在的文件路径
+    修改方案:
+        文件路径1:
+            描述修改点，避免用大块代码,注意只输出关键修改,不要太长, 不要加载无用的上下文。不要输出没有改动部分的代码
+        文件路径2:
+            描述修改点，同上
+        …
+    最后检查:
+        对以上输出的方案大纲进行反思，重新阅读输入代码，结合以上方案大纲，逐条检查有没有和原文对不上的地方。检查方案是否完备、文件路径是否正确，设计思路是否无误，如有问题请提出修正意见
+3. 请确保输出中既包含错误部分的修正说明，又完整保留原有正确部分，不得遗漏任何内容；
+4. 用最小改动实现需求目的。
+
+【输入部分】
+- 输入代码：${cvbContent}
+- 需求描述：${userRequest}
+
+【最终输出】
+请先输出思路与方案大纲，最后汇总输出符合 TCVB 格式的精确代码。
+`;
+
+    return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_TCVB', abortSignal); // 添加结束字符串
+}
+
+
+class Cvb{
+  public static getFormatDescription() : string
+  {
+    return `
+CVB 格式介绍:
+- 文件以 "## BEGIN_CVB" 开头，以 "## END_CVB" 结尾。
+- 元数据部分以 "## META" 开头，以 "## END_META" 结尾，包含用户需求和时间戳。
+- 每个文件以 "## FILE:文件路径" 开头，紧接着是 Markdown 格式的代码块，包含文件内容。
+- 多个文件按顺序拼接在一起。
+`;
+  }
+}
+
+class TCVB{
+
+  public static getFormatDescription() : string
+  {
+    return `
+TCVB 格式规范：
+
+## BEGIN_TCVB
+[文件块1]
+[文件块2]
+...
+## END_TCVB
+
+文件块格式：
+## FILE:<文件绝对路径>
+[操作1]
+[操作2]
+...
+
+操作类型：
+
+1. 全局替换操作(GLOBAL-REPLACE):
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+[markdown代码块:被全局替换的内容, 可以在需要被替换的文本前后包含一些上下文帮助精确替换，一般是上下各3行。不要太长，不要带太多不必要的上下文，因为输出越长就越可能出错导致匹配不上。总长度不要超过10行，尽量不要大块的替换代码，而是切成很多小块替换。]
+## NEW_CONTENT
+[markdown代码块:新内容]
+
+2. 创建操作(CREATE):
+## OPERATION:CREATE
+[markdown代码块:直接跟正文内容，表示新文件的全部内容]
+
+注意：
+1. 所有OPERATION操作以行为单位
+2. 一个'## FILE'下可以有多个'## OPERATION'
+3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆(如果需要可以超过3行)
+4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉。
+5. 注意TCVB和CVB的区别。CVB是完整的内容，而TCVB是用来生成差量同步的，通过多个OPERATION去操作已有CVB合成新CVB
+6. 插入和删除操作都可以转化为替换操作
+7. 用来匹配的锚点必须和原文的格式完全一致，不能有缺失，不能丢弃注释。
+8. 注意不要丢失OPERATION而直接输出代码块
+9. 不要私自加入不必要的空行
+10.如果是在一个已有文件里插入大块代码，不应该用CREATE，而是用替换的方式插入
+`;
+  }
+}
+}
+
+读懂以上代码，帮我优化提示词
+需要让模型更准确的跟随
+实际使用queryCodeReDesign时发现，模型生成的代码会有以下几个问题
+1.搞错了函数所在的文件
+2.被替换的代码太长，其实只需要替换其中一小段，结果模型忘乎所以的几乎把一大半代码都输出当做替换串了
+3.输出的被替换串不准确，比如有些可有可无的;结尾，和原文不一致导致匹配失败
+4.一些原文里的缩进空格等会错误，导致匹配不准确
+5.有时候提前输出的方案里包含了部分代码，正式输出的时候会错觉的把这些代码当成原文的被替换串
+
+
+callDeepSeekFixApi 有以下问题：
+我提供给他一些错误描述，让他反思，结果他只是很敷衍的重复一些废话，比如：就是输入串不匹配。根本不去反思哪里不匹配，为什么会不匹配
+然后重新输出的字符串还是错的
