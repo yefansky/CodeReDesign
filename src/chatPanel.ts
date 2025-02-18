@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { callDeepSeekApi } from './deepseekApi';
+import { getCurrentOperationController, resetCurrentOperationController } from './extension';
 
 class WebviewOutputChannel implements vscode.OutputChannel {
     private _webview: vscode.Webview;
@@ -177,7 +178,7 @@ export class ChatPanel {
                 <div id="input-container">
                     <textarea id="input" placeholder="Type your message here... (Ctrl+Enter to send)"></textarea>
                     <button id="send">Send</button>
-                    <button id="reset">Reset</button>
+                    <button id="new-session" style="position: absolute; top: 10px; right: 10px;">New Session</button>
                 </div>
                 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
@@ -246,8 +247,9 @@ export class ChatPanel {
                         input.value = '';
                     });
 
-                    document.getElementById('reset').addEventListener('click', () => {
-                        vscode.postMessage({ command: 'reset' });
+                    document.getElementById('new-session').addEventListener('click', () => {
+                        vscode.postMessage({ command: 'newSession' });
+                        chat.innerHTML = '';
                     });
 
                     input.addEventListener('keydown', (e) => {
@@ -275,7 +277,9 @@ export class ChatPanel {
                         message.text,
                         'You are a helpful assistant. Always format answers with Markdown.',
                         webviewOutputChannel,
-                        true
+                        true,
+                        undefined,
+                        getCurrentOperationController().signal
                     );
                     
                     this._conversation.push({ role: 'model', content: response || '' });
@@ -287,9 +291,9 @@ export class ChatPanel {
                 }
                 break;
                 
-            case 'reset':
+            case 'newSession':
                 this._conversation = [];
-                this._panel.webview.postMessage({ command: 'clearHistory' });
+                resetCurrentOperationController();
                 break;
         }
     }
