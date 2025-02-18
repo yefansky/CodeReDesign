@@ -104,8 +104,13 @@ export class ChatPanel {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Chat with Model</title>
                 <style>
-                    .user { color: blue; }
-                    .model { color: green; }
+                    .user {
+                        color: black; /* 黑色字体 */
+                        background-color: #a3a3a3; /* 浅灰色背景 */
+                    }
+                    .model {
+                        color: white; /* 白色字体 */
+                    }
                     #chat {
                         height: calc(100vh - 150px);
                         overflow-y: auto;
@@ -118,7 +123,7 @@ export class ChatPanel {
                         padding: 10px;
                     }
                     #chat div {
-                        white-space: pre-wrap; /* 关键代码：保留换行符 */
+                        white-space: pre-wrap; /* 保留换行符 */
                         margin-bottom: 8px;    /* 段落间距（可选） */
                     }
                 </style>
