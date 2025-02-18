@@ -102,87 +102,152 @@ export class ChatPanel {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src vscode-resource: https:; script-src vscode-resource: 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src vscode-resource: 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src https://cdn.jsdelivr.net;">
                 <title>Chat with Model</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
                 <style>
-                    .user {
-                        color: black; /* 黑色字体 */
-                        background-color: #a3a3a3; /* 浅灰色背景 */
-                    }
-                    .model {
-                        color: white; /* 白色字体 */
-                    }
                     #chat {
                         height: calc(100vh - 150px);
                         overflow-y: auto;
+                        padding: 8px;
+                    }
+                    .user {
+                        background-color: #a3a3a3;
+                        color: black;
+                        padding: 12px;
+                        margin: 8px 0;
+                        border-radius: 4px;
+                        white-space: pre-wrap;
+                    }
+                    .model {
+                        background-color: #333;
+                        color: white;
+                        padding: 12px;
+                        margin: 8px 0;
+                        border-radius: 4px;
+                    }
+                    .model pre code {
+                        background-color: #444 !important;
+                        padding: 1em;
+                        border-radius: 4px;
+                        display: block;
+                        overflow-x: auto;
+                    }
+                    .model code {
+                        background-color: #444;
+                        padding: 2px 4px;
+                        border-radius: 3px;
+                    }
+                    .katex {
+                        color: white !important;
+                        background-color: transparent !important;
                     }
                     #input-container {
                         position: fixed;
                         bottom: 0;
                         width: 100%;
-                        background-color: white;
+                        background-color: var(--vscode-editor-background);
                         padding: 10px;
+                        box-sizing: border-box;
                     }
-                    #chat div {
-                        white-space: pre-wrap; /* 保留换行符 */
-                        margin-bottom: 8px;    /* 段落间距（可选） */
+                    #input {
+                        width: 100%;
+                        height: 100px;
+                        padding: 8px;
+                        margin-bottom: 8px;
+                        color: var(--vscode-input-foreground);
+                        background-color: var(--vscode-input-background);
+                        border: 1px solid var(--vscode-input-border);
+                    }
+                    button {
+                        padding: 8px 16px;
+                        background-color: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                        border: none;
+                        cursor: pointer;
                     }
                 </style>
             </head>
             <body>
                 <div id="chat"></div>
                 <div id="input-container">
-                    <textarea id="input" placeholder="Type your message here..." style="width: 100%; height: 100px;"></textarea>
+                    <textarea id="input" placeholder="Type your message here... (Ctrl+Enter to send)"></textarea>
                     <button id="send">Send</button>
                     <button id="reset">Reset</button>
                 </div>
+                <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
                 <script>
                     const vscode = acquireVsCodeApi();
                     const chat = document.getElementById('chat');
                     const input = document.getElementById('input');
-                    const send = document.getElementById('send');
-                    const reset = document.getElementById('reset');
+                    
+                    // 初始化代码高亮
+                    hljs.configure({ ignoreUnescapedHTML: true });
 
-                    input.addEventListener('keydown', (event) => {
-                        if (event.key === 'Enter' && event.ctrlKey) {
-                            vscode.postMessage({
-                                command: 'sendMessage',
-                                text: input.value
-                            });
-                            input.value = '';
+                    // 消息处理
+                    window.addEventListener('message', (event) => {
+                        const { role, content } = event.data;
+                        const lastChild = chat.lastElementChild;
+
+                        let targetDiv;
+                        if (lastChild && lastChild.classList.contains(role)) {
+                            targetDiv = lastChild;
+                            targetDiv.dataset.markdownContent += content;
+                        } else {
+                            targetDiv = document.createElement('div');
+                            targetDiv.className = role;
+                            targetDiv.dataset.markdownContent = content;
+                            chat.appendChild(targetDiv);
                         }
+
+                        if (role === 'model') {
+                            // 解析Markdown
+                            targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
+                                breaks: true,
+                                highlight: (code, lang) => {
+                                    const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
+                                    return hljs.highlight(code, { language: validLang }).value;
+                                }
+                            });
+
+                            // 渲染数学公式
+                            renderMathInElement(targetDiv, {
+                                delimiters: [
+                                    { left: '$$', right: '$$', display: true },
+                                    { left: '$', right: '$', display: false }
+                                ],
+                                throwOnError: false
+                            });
+
+                            // 重新高亮代码块
+                            hljs.highlightAll();
+                        } else {
+                            // 用户消息保持纯文本
+                            targetDiv.textContent = targetDiv.dataset.markdownContent;
+                        }
+
+                        chat.scrollTop = chat.scrollHeight;
                     });
 
-                    send.addEventListener('click', () => {
-                        vscode.postMessage({
-                            command: 'sendMessage',
-                            text: input.value
-                        });
+                    // 发送消息逻辑
+                    document.getElementById('send').addEventListener('click', () => {
+                        vscode.postMessage({ command: 'sendMessage', text: input.value });
                         input.value = '';
                     });
 
-                    reset.addEventListener('click', () => {
-                        vscode.postMessage({
-                            command: 'reset'
-                        });
+                    document.getElementById('reset').addEventListener('click', () => {
+                        vscode.postMessage({ command: 'reset' });
                     });
 
-                    window.addEventListener('message', (event) => {
-                        const { role, content } = event.data;
-                        const chat = document.getElementById('chat');
-                        const lastChild = chat.lastElementChild;
-
-                        // 合并到同一角色元素
-                        if (lastChild && lastChild.className === role) {
-                            lastChild.textContent += content;
-                        } else {
-                            const div = document.createElement('div');
-                            div.className = role;
-                            div.textContent = content;
-                            chat.appendChild(div);
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                            vscode.postMessage({ command: 'sendMessage', text: input.value });
+                            input.value = '';
                         }
-
-                        // 自动滚动到底部
-                        chat.scrollTop = chat.scrollHeight;
                     });
                 </script>
             </body>
@@ -197,13 +262,27 @@ export class ChatPanel {
             case 'sendMessage':
                 this._conversation.push({ role: 'user', content: message.text });
                 this._panel.webview.postMessage({ role: 'user', content: message.text });
-                const response = await callDeepSeekApi(message.text, 'You are a helpful assistant.', webviewOutputChannel, true);
-                this._conversation.push({ role: 'model', content: response || '' });
-                this._panel.webview.postMessage({ role: 'model', content: response || '' });
+                
+                try {
+                    const response = await callDeepSeekApi(
+                        message.text,
+                        'You are a helpful assistant. Always format answers with Markdown.',
+                        webviewOutputChannel,
+                        true
+                    );
+                    
+                    this._conversation.push({ role: 'model', content: response || '' });
+                } catch (error) {
+                    this._panel.webview.postMessage({ 
+                        role: 'model', 
+                        content: `**Error**: ${error instanceof Error ? error.message : 'Unknown error'}`
+                    });
+                }
                 break;
+                
             case 'reset':
                 this._conversation = [];
-                this._panel.webview.html = this._getHtmlForWebview();
+                this._panel.webview.postMessage({ command: 'clearHistory' });
                 break;
         }
     }
