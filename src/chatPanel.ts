@@ -1,4 +1,4 @@
-﻿import * as vscode from 'vscode';
+import * as vscode from 'vscode';
 import { callDeepSeekApi } from './deepseekApi';
 
 class WebviewOutputChannel implements vscode.OutputChannel {
@@ -108,7 +108,7 @@ export class ChatPanel {
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
                 <style>
                     #chat {
-                        height: calc(100vh - 150px);
+                        height: calc(100vh - 170px);
                         overflow-y: auto;
                         padding: 8px;
                     }
