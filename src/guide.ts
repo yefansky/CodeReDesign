@@ -225,6 +225,10 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
             <p><strong>5. 中断正在进行的任务</strong></p>
             <a href="#" id="stopOperation">CodeReDesign: Stop Operation</a>
           </li>
+          <li>
+            <p><strong>6. 唤起聊天窗</strong></p>
+            <a href="#" id="startChat">CodeReDesign: Start Chat</a>
+          </li>
         </ul>
       </div>
       <div class="section">

@@ -59,7 +59,7 @@
       },
       {
         "command": "codeReDesign.startChat",
-        "title": "startChat",
+        "title": "Start Chat",
         "category": "CodeReDesign",
         "icon": "${chat}"
       },
