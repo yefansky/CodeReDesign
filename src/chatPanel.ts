@@ -178,6 +178,7 @@ export class ChatPanel {
                 <div id="input-container">
                     <textarea id="input" placeholder="Type your message here... (Ctrl+Enter to send)"></textarea>
                     <button id="send">Send</button>
+                    <button id="stop" style="display: none;">Stop</button>
                     <button id="new-session" style="position: absolute; top: 10px; right: 10px;">New Session</button>
                 </div>
                 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -186,59 +187,90 @@ export class ChatPanel {
                 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
                 <script>
                     const vscode = acquireVsCodeApi();
+
                     const chat = document.getElementById('chat');
                     const input = document.getElementById('input');
+                    const sendButton = document.getElementById('send');
+                    const stopButton = document.getElementById('stop');
                     
                     // 初始化代码高亮
                     hljs.configure({ ignoreUnescapedHTML: true });
 
                     // 消息处理
                     window.addEventListener('message', (event) => {
-                        const { role, content } = event.data;
-                        const lastChild = chat.lastElementChild;
+                        const data = event.data;
 
-                        let targetDiv;
-                        if (lastChild && lastChild.classList.contains(role)) {
-                            targetDiv = lastChild;
-                            targetDiv.dataset.markdownContent += content;
-                        } else {
-                            targetDiv = document.createElement('div');
-                            targetDiv.className = role;
-                            targetDiv.dataset.markdownContent = content;
-                            chat.appendChild(targetDiv);
+                        // 处理 role 和 content 的消息
+                        if (data.role && data.content) {
+                            const { role, content } = data;
+                            const lastChild = chat.lastElementChild;
+
+                            let targetDiv;
+                            if (lastChild && lastChild.classList.contains(role)) {
+                                targetDiv = lastChild;
+                                targetDiv.dataset.markdownContent += content;
+                            } else {
+                                targetDiv = document.createElement('div');
+                                targetDiv.className = role;
+                                targetDiv.dataset.markdownContent = content;
+                                chat.appendChild(targetDiv);
+                            }
+
+                            if (role === 'model') {
+                                // 解析 Markdown
+                                targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
+                                    breaks: true,
+                                    mangle: false,
+                                    headerIds: false,
+                                    highlight: (code, lang) => {
+                                        const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
+                                        return hljs.highlight(code, { language: validLang }).value;
+                                    }
+                                });
+
+                                // 渲染数学公式
+                                renderMathInElement(targetDiv, {
+                                    delimiters: [
+                                        { left: '$$', right: '$$', display: true },
+                                        { left: '$', right: '$', display: false },
+                                        { left: '\\[', right: '\\]', display: true },
+                                        { left: '\\(', right: '\\)', display: false }
+                                    ],
+                                    throwOnError: false
+                                });
+
+                                // 重新高亮代码块
+                                hljs.highlightAll();
+                            } else {
+                                // 用户消息保持纯文本
+                                targetDiv.textContent = targetDiv.dataset.markdownContent;
+                            }
+
+                            chat.scrollTop = chat.scrollHeight;
                         }
+                        
+                        // 处理 command 类型的消息
+                        if (data.command) {
+                            const { command } = data;
 
-                        if (role === 'model') {
-                            // 解析Markdown
-                            targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
-                                breaks: true,
-                                mangle: false,
-                                headerIds: false,
-                                highlight: (code, lang) => {
-                                    const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
-                                    return hljs.highlight(code, { language: validLang }).value;
-                                }
-                            });
-
-                            // 渲染数学公式
-                            renderMathInElement(targetDiv, {
-                                delimiters: [
-                                    { left: '$$', right: '$$', display: true },
-                                    { left: '$', right: '$', display: false },
-                                    { left: '\\[', right: '\\]', display: true },
-                                    { left: '\\(', right: '\\)', display: false }
-                                ],
-                                throwOnError: false
-                            });
-
-                            // 重新高亮代码块
-                            hljs.highlightAll();
-                        } else {
-                            // 用户消息保持纯文本
-                            targetDiv.textContent = targetDiv.dataset.markdownContent;
+                            switch (command) {
+                                case 'disableSendButton':
+                                    sendButton.disabled = true;
+                                    break;
+                                case 'enableSendButton':
+                                    sendButton.disabled = false;
+                                    break;
+                                case 'showStopButton':
+                                    stopButton.style.display = 'inline-block';
+                                    break;
+                                case 'hideStopButton':
+                                    stopButton.style.display = 'none';
+                                    break;
+                                default:
+                                    // 处理其他 command 消息
+                                    break;
+                            }
                         }
-
-                        chat.scrollTop = chat.scrollHeight;
                     });
 
                     // 发送消息逻辑
@@ -250,6 +282,12 @@ export class ChatPanel {
                     document.getElementById('new-session').addEventListener('click', () => {
                         vscode.postMessage({ command: 'newSession' });
                         chat.innerHTML = '';
+                        sendButton.disabled = false;
+                        stopButton.style.display = 'none';
+                    });
+
+                    stopButton.addEventListener('click', () => {
+                        vscode.postMessage({ command: 'stop' });
                     });
 
                     input.addEventListener('keydown', (e) => {
@@ -266,13 +304,17 @@ export class ChatPanel {
 
     private async _handleMessage(message: any) {
         const webviewOutputChannel = new WebviewOutputChannel(this._panel.webview, 'DeepSeek API Output');
-
+    
         switch (message.command) {
             case 'sendMessage':
                 this._conversation.push({ role: 'user', content: message.text });
                 this._panel.webview.postMessage({ role: 'user', content: message.text });
                 
                 try {
+                    // 发送消息到 Webview，禁用发送按钮并显示停止按钮
+                    this._panel.webview.postMessage({ command: 'disableSendButton' });
+                    this._panel.webview.postMessage({ command: 'showStopButton' });
+    
                     const response = await callDeepSeekApi(
                         message.text,
                         'You are a helpful assistant. Always format answers with Markdown.',
@@ -281,9 +323,17 @@ export class ChatPanel {
                         undefined,
                         getCurrentOperationController().signal
                     );
-                    
+    
+                    // 发送消息到 Webview，启用发送按钮并隐藏停止按钮
+                    this._panel.webview.postMessage({ command: 'enableSendButton' });
+                    this._panel.webview.postMessage({ command: 'hideStopButton' });
+    
                     this._conversation.push({ role: 'model', content: response || '' });
                 } catch (error) {
+                    // 发送消息到 Webview，启用发送按钮并隐藏停止按钮
+                    this._panel.webview.postMessage({ command: 'enableSendButton' });
+                    this._panel.webview.postMessage({ command: 'hideStopButton' });
+    
                     this._panel.webview.postMessage({ 
                         role: 'model', 
                         content: `**Error**: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -294,6 +344,10 @@ export class ChatPanel {
             case 'newSession':
                 this._conversation = [];
                 resetCurrentOperationController();
+                break;
+            case 'stop':
+                resetCurrentOperationController();
+                this._panel.webview.postMessage({ role: 'model', content: '\n\n**Operation stopped by user**' });
                 break;
         }
     }
