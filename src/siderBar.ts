@@ -109,11 +109,13 @@ class CvbViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         });
       }
 
-      // 修改后的排序逻辑
-      files.sort((a, b) => {
-        const labelA = a.label ? a.label.toString() : '';
-        const labelB = b.label ? b.label.toString() : '';
-        return labelA.localeCompare(labelB, undefined, { sensitivity: 'base' });
+        // 按创建时间逆序排序
+        files.sort((a, b) => {
+          const filePathA = a.resourceUri?.fsPath || "";
+          const filePathB = b.resourceUri?.fsPath || "";
+          const statsA = fs.statSync(filePathA);
+          const statsB = fs.statSync(filePathB);
+          return statsB.birthtime.getTime() - statsA.birthtime.getTime(); // 逆序排序
       });
 
       return files;

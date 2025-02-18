@@ -177,6 +177,13 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage('No CVB files found in the tmp directory.');
             return;
         }
+
+        // 按照创建时间逆序排序
+        cvbFiles.sort((a, b) => {
+            const statsA = fs.statSync(path.join(tmpDir, a));
+            const statsB = fs.statSync(path.join(tmpDir, b));
+            return statsB.birthtime.getTime() - statsA.birthtime.getTime(); // 逆序排序
+        });
     
         const selectedCvbFile = await vscode.window.showQuickPick(cvbFiles, {
             placeHolder: 'Select a CVB file to upload',
@@ -265,6 +272,13 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage('No CVB files found in the tmp directory.');
             return;
         }
+
+        // 按照创建时间逆序排序
+        cvbFiles.sort((a, b) => {
+            const statsA = fs.statSync(path.join(tmpDir, a));
+            const statsB = fs.statSync(path.join(tmpDir, b));
+            return statsB.birthtime.getTime() - statsA.birthtime.getTime(); // 逆序排序
+        });
 
         // 让用户选择要分析的 CVB 文件
         const selectedCvbFile = await vscode.window.showQuickPick(cvbFiles, {

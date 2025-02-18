@@ -53,27 +53,27 @@
       },
       {
         "command": "codeReDesign.analyzeCode",
-        "title": "CodeReDesign: Analyze Code",
+        "title": "Analyze Code",
         "category": "CodeReDesign",
         "icon": "${bug}"
       },
       {
         "command": "codeReDesign.applyThisCvb",
-        "title": "Apply this CVB to Workspace",
+        "title": "sidebar Apply this CVB to Workspace",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${save}"
       },
       {
         "command": "codeReDesign.uploadThisCvb",
-        "title": "Upload this CVB and Call API",
+        "title": "sidebar Upload this CVB and Call API",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${cloud-upload}"
       },
       {
         "command": "codeReDesign.analyzeThisCvb",
-        "title": "Analyze this CVB",
+        "title": "sidebar Analyze this CVB",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${bug}"
