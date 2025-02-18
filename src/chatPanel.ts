@@ -53,22 +53,32 @@ export class ChatPanel {
             </head>
             <body>
                 <div id="chat"></div>
-                <input type="text" id="input" placeholder="Type your message here..." />
+                <textarea id="input" placeholder="Type your message here..." style="width: 100%; height: 100px;"></textarea>
+                <button id="send">Send</button>
                 <button id="reset">Reset</button>
                 <script>
                     const vscode = acquireVsCodeApi();
                     const chat = document.getElementById('chat');
                     const input = document.getElementById('input');
+                    const send = document.getElementById('send');
                     const reset = document.getElementById('reset');
 
                     input.addEventListener('keydown', (event) => {
-                        if (event.key === 'Enter') {
+                        if (event.key === 'Enter' && event.ctrlKey) {
                             vscode.postMessage({
                                 command: 'sendMessage',
                                 text: input.value
                             });
                             input.value = '';
                         }
+                    });
+
+                    send.addEventListener('click', () => {
+                        vscode.postMessage({
+                            command: 'sendMessage',
+                            text: input.value
+                        });
+                        input.value = '';
                     });
 
                     reset.addEventListener('click', () => {
