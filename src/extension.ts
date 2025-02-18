@@ -40,6 +40,9 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
         vscode.window.showErrorMessage('No workspace folder found');
         return;
     }
+
+    resetCurrentOperationController();
+    const CurrentOperationController = getCurrentOperationController();
     
     const workspacePath = workspaceFolders[0].uri.fsPath;
     const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
@@ -56,9 +59,7 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
 
     const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
 
-    resetCurrentOperationController();
-
-    let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, getCurrentOperationController().signal);
+    let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, CurrentOperationController.signal);
     let processSuccess = true;
     let attemptCount = 0;
     do {
@@ -77,11 +78,11 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
             }
         } catch (err : any){
             vscode.window.showInformationMessage(`API response have error ${err.message}, try fix ...`);
-            apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, getCurrentOperationController().signal);
+            apiResponse = await callDeepSeekFixApi(err.message, outputChannel, true, CurrentOperationController.signal);
             processSuccess = false;
             attemptCount++;
         }
-    } while (!processSuccess && attemptCount < 3);
+    } while (!processSuccess && attemptCount < 3 && !CurrentOperationController.signal.aborted);
 
     const lastMessageBody = GetLastMessageBody();
 
