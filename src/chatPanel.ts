@@ -47,15 +47,28 @@ export class ChatPanel {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Chat with Model</title>
                 <style>
-                    .user { color: blue; }
-                    .model { color: green; }
-                </style>
+                .user { color: blue; }
+                .model { color: green; }
+                #chat {
+                    height: calc(100vh - 150px);
+                    overflow-y: auto;
+                }
+                #input-container {
+                    position: fixed;
+                    bottom: 0;
+                    width: 100%;
+                    background-color: white;
+                    padding: 10px;
+                }
+            </style>
             </head>
             <body>
                 <div id="chat"></div>
-                <textarea id="input" placeholder="Type your message here..." style="width: 100%; height: 100px;"></textarea>
-                <button id="send">Send</button>
-                <button id="reset">Reset</button>
+                <div id="input-container">
+                    <textarea id="input" placeholder="Type your message here..." style="width: 100%; height: 100px;"></textarea>
+                    <button id="send">Send</button>
+                    <button id="reset">Reset</button>
+                </div>
                 <script>
                     const vscode = acquireVsCodeApi();
                     const chat = document.getElementById('chat');
