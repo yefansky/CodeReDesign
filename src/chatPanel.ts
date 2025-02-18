@@ -1,6 +1,63 @@
 import * as vscode from 'vscode';
 import { callDeepSeekApi } from './deepseekApi';
 
+class WebviewOutputChannel implements vscode.OutputChannel {
+    private _webview: vscode.Webview;
+    private _name: string;
+
+    constructor(webview: vscode.Webview, name: string) {
+        this._webview = webview;
+        this._name = name;
+    }
+
+    get name(): string {
+        return this._name;
+    }
+
+    append(value: string): void {
+        // 将数据通过 Webview 发送出去
+        this._webview.postMessage({ role: 'model', content: value });
+    }
+
+    appendLine(value: string): void {
+        this.append(value + '\n');
+    }
+
+    clear(): void {
+        // 清除输出，通常可以通过清空 Webview 来实现
+        this._webview.postMessage({ role: 'model', content: '' });
+    }
+
+    show(preserveFocus?: boolean): void;
+    show(column?: vscode.ViewColumn, preserveFocus?: boolean): void;
+    show(arg1?: boolean | vscode.ViewColumn, arg2?: boolean): void {
+        if (typeof arg1 === 'boolean') {
+            // 第一种重载：show(preserveFocus?: boolean)
+            this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
+        } else {
+            // 第二种重载：show(column?: ViewColumn, preserveFocus?: boolean)
+            if (arg1 !== undefined) {
+                // 根据 column 进行处理（可以自定义逻辑）
+                console.log(`Showing in column: ${arg1}`);
+            }
+            this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
+        }
+    }
+    hide(): void {
+
+    }
+
+    dispose(): void{
+        
+    }
+
+    replace(value: string): void {
+        // 替换输出内容
+        this._webview.postMessage({ role: 'model', content: value });
+    }
+}
+
+
 export class ChatPanel {
     private static readonly viewType = 'chatPanel';
     private static currentPanel: ChatPanel | undefined;
@@ -60,6 +117,10 @@ export class ChatPanel {
                     background-color: white;
                     padding: 10px;
                 }
+                #chat div {
+                    white-space: pre-wrap; /* 关键代码：保留换行符 */
+                    margin-bottom: 8px;    /* 段落间距（可选） */
+                }
             </style>
             </head>
             <body>
@@ -102,10 +163,21 @@ export class ChatPanel {
 
                     window.addEventListener('message', (event) => {
                         const { role, content } = event.data;
-                        const div = document.createElement('div');
-                        div.className = role;
-                        div.textContent = content;
-                        chat.appendChild(div);
+                        const chat = document.getElementById('chat');
+                        const lastChild = chat.lastElementChild;
+
+                        // 合并到同一角色元素
+                        if (lastChild && lastChild.className === role) {
+                            lastChild.textContent += content;
+                        } else {
+                            const div = document.createElement('div');
+                            div.className = role;
+                            div.textContent = content;
+                            chat.appendChild(div);
+                        }
+
+                        // 自动滚动到底部
+                        chat.scrollTop = chat.scrollHeight;
                     });
                 </script>
             </body>
@@ -114,11 +186,13 @@ export class ChatPanel {
     }
 
     private async _handleMessage(message: any) {
+        const webviewOutputChannel = new WebviewOutputChannel(this._panel.webview, 'DeepSeek API Output');
+
         switch (message.command) {
             case 'sendMessage':
                 this._conversation.push({ role: 'user', content: message.text });
                 this._panel.webview.postMessage({ role: 'user', content: message.text });
-                const response = await callDeepSeekApi(message.text, 'You are a helpful assistant.');
+                const response = await callDeepSeekApi(message.text, 'You are a helpful assistant.', webviewOutputChannel, true);
                 this._conversation.push({ role: 'model', content: response || '' });
                 this._panel.webview.postMessage({ role: 'model', content: response || '' });
                 break;
