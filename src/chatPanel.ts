@@ -229,18 +229,6 @@ export class ChatPanel {
                                 ],
                                 throwOnError: false
                             });
-                            setTimeout(() => {
-                                renderMathInElement(targetDiv, {
-                                    delimiters: [
-                                        { left: '$$', right: '$$', display: true },
-                                        { left: '$', right: '$', display: false },
-                                        { left: '\\[', right: '\\]', display: true },
-                                        { left: '\\(', right: '\\)', display: false }
-                                    ],
-                                    throwOnError: false
-                                });
-                                hljs.highlightAll();
-                            }, 0);
 
                             // 重新高亮代码块
                             hljs.highlightAll();
