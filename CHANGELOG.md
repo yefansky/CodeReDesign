@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.68 (2025-02-18)
+
+
+### Bug Fixes
+
+* 引导页添加聊天功能介绍 ([0356271](https://github.com/yefansky/CodeReDesign/commit/0356271041fcca38ca39830912e6fca25bca9e8c))
+
 ### 0.0.67 (2025-02-18)
 
 ### 0.0.66 (2025-02-18)
