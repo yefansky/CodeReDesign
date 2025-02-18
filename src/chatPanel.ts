@@ -128,14 +128,14 @@ export class ChatPanel {
                         border-radius: 4px;
                     }
                     .model pre code {
-                        background-color: #444 !important;
+                        background-color: #040404 !important;
                         padding: 1em;
                         border-radius: 4px;
                         display: block;
                         overflow-x: auto;
                     }
                     .model code {
-                        background-color: #444;
+                        background-color: #040404;
                         padding: 2px 4px;
                         border-radius: 3px;
                     }
