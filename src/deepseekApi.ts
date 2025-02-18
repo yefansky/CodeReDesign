@@ -55,7 +55,7 @@ export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
  * @param abortSignal 用于中断请求的信号
  * @returns API 返回的完整内容
  */
-async function callDeepSeekApi(
+export async function callDeepSeekApi(
     userContent: string,
     systemContent: string = 'You are a helpful assistant.',
     outputChannel?: vscode.OutputChannel,

@@ -20,5 +20,6 @@ export const g_objLanguageMapping: { [key: string]: string } = {
   'php': 'php',          // PHP
   'rust': 'rust',        // Rust
   'dart': 'dart',        // Dart
-  'md': 'markdown'       // markdown
+  'md': 'markdown',       // markdown
+  'json':'json'
 };

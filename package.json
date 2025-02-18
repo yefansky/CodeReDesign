@@ -58,6 +58,12 @@
         "icon": "${bug}"
       },
       {
+        "command": "codeReDesign.startChat",
+        "title": "startChat",
+        "category": "CodeReDesign",
+        "icon": "${chat}"
+      },
+      {
         "command": "codeReDesign.applyThisCvb",
         "title": "sidebar Apply this CVB to Workspace",
         "when": "false",

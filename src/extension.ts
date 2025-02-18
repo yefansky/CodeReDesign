@@ -8,6 +8,7 @@ import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
 import { showInputMultiLineBox } from './UIComponents';
 import { activateGuide } from './guide';
+import {ChatPanel} from './chatPanel';
 
 let currentOperationController: AbortController | null = null;
 
@@ -133,6 +134,11 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 创建输出通道
     const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream', 'markdown');
+
+    // 注册命令:开始对话
+    let startChatCommand = vscode.commands.registerCommand('codeReDesign.startChat', () => {
+        ChatPanel.createOrShow();
+    });
 
     // 注册命令:选择文件并生成 CVB
     let generateCvbCommand = vscode.commands.registerCommand('codeReDesign.generateCvb', async () => {
@@ -317,7 +323,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, outputChannel);
+    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, outputChannel, startChatCommand);
 
     setupCvbAsMarkdown(context);
 
