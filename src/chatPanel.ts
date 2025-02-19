@@ -140,6 +140,26 @@ export class ChatPanel {
                         padding: 2px 4px;
                         border-radius: 3px;
                     }
+                    .copy-btn {
+                        position: absolute;
+                        right: 8px;
+                        top: 8px;
+                        padding: 4px 8px;
+                        background: #616161;
+                        border: none;
+                        color: white;
+                        cursor: pointer;
+                        border-radius: 4px;
+                        font-size: 0.8em;
+                        transition: opacity 0.3s;
+                    }
+                    .copy-btn:hover {
+                        background: #757575;
+                    }
+                    .model pre {
+                        position: relative;
+                        padding-top: 30px !important;
+                    }
                     .katex {
                         color: white !important;
                         background-color: transparent !important;
@@ -192,6 +212,32 @@ export class ChatPanel {
                     const input = document.getElementById('input');
                     const sendButton = document.getElementById('send');
                     const stopButton = document.getElementById('stop');
+
+                    function addCopyButtons() {
+                        document.querySelectorAll('pre').forEach(pre => {
+                            if (pre.querySelector('.copy-btn')) return;
+
+                            const button = document.createElement('button');
+                            button.className = 'copy-btn';
+                            button.textContent = 'Copy';
+                            
+                            button.addEventListener('click', (event) => {
+                                // 通过事件目标找到最近的 pre 元素
+                                const preElement = event.target.closest('pre');
+                                // 获取 pre 元素下的第一个 code 元素内容
+                                const code = preElement.querySelector('code').textContent;
+                                
+                                navigator.clipboard.writeText(code).then(() => {
+                                    event.target.textContent = 'Copied!';
+                                    setTimeout(() => {
+                                        event.target.textContent = 'Copy';
+                                    }, 2000);
+                                });
+                            });
+
+                            pre.appendChild(button);
+                        });
+                    }
                     
                     // 初始化代码高亮
                     hljs.configure({ ignoreUnescapedHTML: true });
@@ -239,6 +285,7 @@ export class ChatPanel {
                                     throwOnError: false
                                 });
 
+                                addCopyButtons();
                                 // 重新高亮代码块
                                 hljs.highlightAll();
                             } else {
