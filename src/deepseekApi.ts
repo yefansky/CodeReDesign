@@ -95,6 +95,7 @@ export async function callDeepSeekApi(
         let maxAttempts = 5;
         let attempts = 0;
 
+
         vscode.window.showInformationMessage('开始上传DeepSeek API');
 
         while (attempts < maxAttempts) {
@@ -106,6 +107,7 @@ export async function callDeepSeekApi(
                 max_tokens: 8192,
                 temperature: 0
             });
+            let thinking = false;
 
             vscode.window.showInformationMessage('DeepSeek API 正在处理...');
 
@@ -118,10 +120,28 @@ export async function callDeepSeekApi(
                         throw new Error(userStopException);
                     }
                     const content = chunk.choices[0]?.delta?.content || '';
+                    const delta = chunk.choices[0]?.delta;
+                    const think = ('reasoning_content' in delta! && delta.reasoning_content) as string || "";
+
+                    if (!thinking && chunkResponse.length === 0 && think.length > 0){
+                        if (outputChannel) {
+                            outputChannel.append("<think>");
+                        }
+                        thinking = true;
+                    }
+
                     chunkResponse += content;
                     if (outputChannel) {
-                        outputChannel.append(content);
+                        outputChannel.append(content + think);
                     }
+
+                    if (thinking && content.length > 0){
+                        thinking = false;
+                        if (outputChannel) {
+                            outputChannel.append("</think>");
+                        }
+                    }
+
                     finishReason = chunk.choices[0]?.finish_reason || null;
                 }
             } else {
