@@ -118,8 +118,8 @@ export class ChatPanel {
                         position: relative;
                         background-color: #a3a3a3;
                         color: black;
-                        padding: 12px 12px 12px 40px;
-                        margin: 8px 0;
+                        padding: 8px 12px 8px 40px;
+                        margin: 4px 0;
                         border-radius: 4px;
                         white-space: pre-wrap;
                     }
@@ -142,7 +142,7 @@ export class ChatPanel {
                         background-color: #333;
                         color: white;
                         padding: 12px;
-                        margin: 8px 0;
+                        margin: 4px 0;
                         border-radius: 4px;
                     }
                     .model pre code {
@@ -236,13 +236,11 @@ export class ChatPanel {
                                 const userDiv = event.target.closest('.user');
                                 const contentDiv = userDiv.querySelector('.user-content');
                                 userDiv.innerHTML = \`
-                                    <textarea class="edit-textarea">\${contentDiv.textContent}</textarea>
-                                    <div class="edit-buttons">
-                                        <button class="edit-send">发送</button>
-                                        <button class="edit-cancel">取消</button>
-                                    </div>
-                                \`;
-                                
+                                    <textarea class="edit-textarea" style="width:100%; min-height:100px; resize:vertical; margin-bottom:8px; padding:8px; box-sizing:border-box;">\${contentDiv.textContent}</textarea>
+                                    <div class="edit-buttons" style="display:flex; gap:8px; justify-content:flex-end;">
+                                    <button class="edit-send" style="padding:6px 12px;">发送</button>
+                                    <button class="edit-cancel" style="padding:6px 12px;">取消</button>
+                                </div>\`;                             
                                 userDiv.querySelector('.edit-send').onclick = () => {
                                     const newText = userDiv.querySelector('textarea').value;
                                     vscode.postMessage({
@@ -251,19 +249,13 @@ export class ChatPanel {
                                         text: newText
                                     });
                                     // 立即更新当前消息显示
-                                    userDiv.innerHTML = \`
-                                        <button class="edit-btn">✎</button>
-                                        <div class="user-content">\${newText}</div>
-                                    \`;
+                                    userDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${newText}</div>\`;
                                     addEditButtons();
                                     userDiv.querySelectorAll('.model').forEach(m => m.remove());
                                 };
                                 
                                 userDiv.querySelector('.edit-cancel').onclick = () => {
-                                    userDiv.innerHTML = \`
-                                        <button class="edit-btn">✎</button>
-                                        <div class="user-content">\${contentDiv.textContent}</div>
-                                    \`;
+                                    userDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${contentDiv.textContent}</div>\`;
                                     addEditButtons();
                                 };
                             };
@@ -347,10 +339,7 @@ export class ChatPanel {
                                 hljs.highlightAll();
                             } else {
                                 // 用户消息保持纯文本并添加编辑功能
-                                targetDiv.innerHTML = \`
-                                            <button class="edit-btn">✎</button>
-                                            <div class="user-content">\${targetDiv.dataset.markdownContent}</div>
-                                        \`;
+                                targetDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${targetDiv.dataset.markdownContent}</div>\`;
                                 targetDiv.dataset.index = data.index;
                             }
                             addEditButtons();
