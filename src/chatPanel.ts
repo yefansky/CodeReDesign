@@ -452,10 +452,10 @@ export class ChatPanel {
                     this._panel.webview.postMessage({ command: 'showStopButton' });
 
                     // 转换 _conversation 为 DeepSeek API 所需的消息格式
-                    const conversationMessages: string[] = [];
+                    const conversationMessages: {role : string, content : string}[] = [];
                     for (let i = 0; i < this._conversation.length; i++) {
                         const message = this._conversation[i];
-                        conversationMessages.push(message.content); // 仅取出内容
+                        conversationMessages.push({role: message.role, 'content' : message.content}); // 仅取出内容
                     }
     
                     const response = await callDeepSeekApi(

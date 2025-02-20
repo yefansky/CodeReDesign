@@ -56,7 +56,7 @@ export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
  * @returns API 返回的完整内容
  */
 export async function callDeepSeekApi(
-    userContent: string | string[],  // 修改为支持 string 或 string[]
+    userContent: string | {role:string, content: string}[],  // 修改为支持 string 或 string[]
     systemContent: string = 'You are a helpful assistant.',
     outputChannel?: vscode.OutputChannel,
     streamMode: boolean = true,
@@ -90,10 +90,11 @@ export async function callDeepSeekApi(
         // 构造消息体
         let messages_body: OpenAI.ChatCompletionMessageParam[] = [];
         if (Array.isArray(userContent)) {
+            messages_body.push({ role: 'system', content: systemContent });
             // 如果 userContent 是数组，按交替方式生成消息
             for (let i = 0; i < userContent.length; i++) {
-                const role = i % 2 === 0 ? 'user' : 'assistant';
-                messages_body.push({ role, content: userContent[i] });
+                const role = (userContent[i].role === 'user') ? 'user' : 'assistant';
+                messages_body.push({ role, content: userContent[i].content });
             }
         } else {
             // 如果是单个字符串，默认是 'user' 角色
