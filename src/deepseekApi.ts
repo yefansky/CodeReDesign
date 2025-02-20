@@ -47,7 +47,7 @@ export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
 
 /**
  * 调用 DeepSeek API
- * @param userContent 用户输入内容
+ * @param userContent 用户输入内容，可以是字符串或字符串数组
  * @param systemContent 系统提示内容
  * @param outputChannel 输出通道，用于实时显示流式内容
  * @param streamMode 是否启用流式模式
@@ -56,7 +56,7 @@ export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
  * @returns API 返回的完整内容
  */
 export async function callDeepSeekApi(
-    userContent: string,
+    userContent: string | string[],  // 修改为支持 string 或 string[]
     systemContent: string = 'You are a helpful assistant.',
     outputChannel?: vscode.OutputChannel,
     streamMode: boolean = true,
@@ -87,14 +87,25 @@ export async function callDeepSeekApi(
             outputChannel.show();
         }
 
-        const messages_body: OpenAI.ChatCompletionMessageParam[] = [
-            { role: 'system', content: systemContent },
-            { role: 'user', content: userContent },
-        ];
+        // 构造消息体
+        let messages_body: OpenAI.ChatCompletionMessageParam[] = [];
+        if (Array.isArray(userContent)) {
+            // 如果 userContent 是数组，按交替方式生成消息
+            for (let i = 0; i < userContent.length; i++) {
+                const role = i % 2 === 0 ? 'user' : 'assistant';
+                messages_body.push({ role, content: userContent[i] });
+            }
+        } else {
+            // 如果是单个字符串，默认是 'user' 角色
+            messages_body = [
+                { role: 'system', content: systemContent },
+                { role: 'user', content: userContent },
+            ];
+        }
+
         let fullResponse = '';
         let maxAttempts = 5;
         let attempts = 0;
-
 
         vscode.window.showInformationMessage('开始上传DeepSeek API');
 

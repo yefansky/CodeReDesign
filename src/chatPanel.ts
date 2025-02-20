@@ -450,9 +450,16 @@ export class ChatPanel {
                     // 发送消息到 Webview，禁用发送按钮并显示停止按钮
                     this._panel.webview.postMessage({ command: 'disableSendButton' });
                     this._panel.webview.postMessage({ command: 'showStopButton' });
+
+                    // 转换 _conversation 为 DeepSeek API 所需的消息格式
+                    const conversationMessages: string[] = [];
+                    for (let i = 0; i < this._conversation.length; i++) {
+                        const message = this._conversation[i];
+                        conversationMessages.push(message.content); // 仅取出内容
+                    }
     
                     const response = await callDeepSeekApi(
-                        message.text,
+                        conversationMessages,
                         'You are a helpful assistant. Always format answers with Markdown.',
                         webviewOutputChannel,
                         true,
