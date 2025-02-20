@@ -65,6 +65,7 @@ export class ChatPanel {
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
     private _conversation: { role: string, content: string }[] = [];
+    private _userMessageIndex: number = 0;
 
     private constructor(panel: vscode.WebviewPanel) {
         this._panel = panel;
@@ -114,12 +115,28 @@ export class ChatPanel {
                         padding: 8px;
                     }
                     .user {
+                        position: relative;
                         background-color: #a3a3a3;
                         color: black;
-                        padding: 12px;
+                        padding: 12px 12px 12px 40px;
                         margin: 8px 0;
                         border-radius: 4px;
                         white-space: pre-wrap;
+                    }
+                    .edit-btn {
+                        position: absolute;
+                        left: 8px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        display: none;
+                        background: none;
+                        border: none;
+                        color: #fff;
+                        cursor: pointer;
+                        padding: 4px;
+                    }
+                    .user:hover .edit-btn {
+                        display: block;
                     }
                     .model {
                         background-color: #333;
@@ -213,6 +230,46 @@ export class ChatPanel {
                     const sendButton = document.getElementById('send');
                     const stopButton = document.getElementById('stop');
 
+                    function addEditButtons() {
+                        document.querySelectorAll('.edit-btn').forEach(btn => {
+                            btn.onclick = function(event) {
+                                const userDiv = event.target.closest('.user');
+                                const contentDiv = userDiv.querySelector('.user-content');
+                                userDiv.innerHTML = \`
+                                    <textarea class="edit-textarea">\${contentDiv.textContent}</textarea>
+                                    <div class="edit-buttons">
+                                        <button class="edit-send">发送</button>
+                                        <button class="edit-cancel">取消</button>
+                                    </div>
+                                \`;
+                                
+                                userDiv.querySelector('.edit-send').onclick = () => {
+                                    const newText = userDiv.querySelector('textarea').value;
+                                    vscode.postMessage({
+                                        command: 'editMessage',
+                                        index: parseInt(userDiv.dataset.index),
+                                        text: newText
+                                    });
+                                    // 立即更新当前消息显示
+                                    userDiv.innerHTML = \`
+                                        <button class="edit-btn">✎</button>
+                                        <div class="user-content">\${newText}</div>
+                                    \`;
+                                    addEditButtons();
+                                    userDiv.querySelectorAll('.model').forEach(m => m.remove());
+                                };
+                                
+                                userDiv.querySelector('.edit-cancel').onclick = () => {
+                                    userDiv.innerHTML = \`
+                                        <button class="edit-btn">✎</button>
+                                        <div class="user-content">\${contentDiv.textContent}</div>
+                                    \`;
+                                    addEditButtons();
+                                };
+                            };
+                        });
+                    }
+                    
                     function addCopyButtons() {
                         document.querySelectorAll('pre').forEach(pre => {
                             if (pre.querySelector('.copy-btn')) return;
@@ -289,9 +346,14 @@ export class ChatPanel {
                                 // 重新高亮代码块
                                 hljs.highlightAll();
                             } else {
-                                // 用户消息保持纯文本
-                                targetDiv.textContent = targetDiv.dataset.markdownContent;
+                                // 用户消息保持纯文本并添加编辑功能
+                                targetDiv.innerHTML = \`
+                                            <button class="edit-btn">✎</button>
+                                            <div class="user-content">\${targetDiv.dataset.markdownContent}</div>
+                                        \`;
+                                targetDiv.dataset.index = data.index;
                             }
+                            addEditButtons();
 
                             chat.scrollTop = chat.scrollHeight;
                         }
@@ -313,6 +375,19 @@ export class ChatPanel {
                                 case 'hideStopButton':
                                     stopButton.style.display = 'none';
                                     break;
+                                case 'clearAfterIndex':
+                                    const clearIndex = data.index;
+                                    document.querySelectorAll('.user').forEach(userDiv => {
+                                        const userIndex = parseInt(userDiv.dataset.index);
+                                        if (userIndex >= clearIndex) {
+                                            const modelDiv = userDiv.nextElementSibling;
+                                            if (modelDiv && modelDiv.classList.contains('model')) {
+                                                modelDiv.remove();
+                                            }
+                                            userDiv.remove();
+                                        }
+                                    });
+                                    break;
                                 default:
                                     // 处理其他 command 消息
                                     break;
@@ -322,7 +397,10 @@ export class ChatPanel {
 
                     // 发送消息逻辑
                     document.getElementById('send').addEventListener('click', () => {
-                        vscode.postMessage({ command: 'sendMessage', text: input.value });
+                        vscode.postMessage({
+                                command: 'sendMessage',
+                                text: input.value
+                            });
                         input.value = '';
                     });
 
@@ -339,7 +417,10 @@ export class ChatPanel {
 
                     input.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                            vscode.postMessage({ command: 'sendMessage', text: input.value });
+                            vscode.postMessage({
+                                command: 'sendMessage',
+                                text: input.value
+                            });
                             input.value = '';
                         }
                     });
@@ -353,9 +434,17 @@ export class ChatPanel {
         const webviewOutputChannel = new WebviewOutputChannel(this._panel.webview, 'DeepSeek API Output');
     
         switch (message.command) {
+            case 'editMessage':
+                if (message.index < this._conversation.length) {
+                    this._conversation.splice(message.index + 1);
+                    this._panel.webview.postMessage({ command: 'clearAfterIndex', index: message.index });
+                    this._userMessageIndex = message.index;   
+                }
+                // break; 复用下面的send
             case 'sendMessage':
                 this._conversation.push({ role: 'user', content: message.text });
-                this._panel.webview.postMessage({ role: 'user', content: message.text });
+                this._panel.webview.postMessage({ role: 'user', content: message.text, index: this._userMessageIndex });
+                this._userMessageIndex++;
                 
                 try {
                     // 发送消息到 Webview，禁用发送按钮并显示停止按钮
@@ -390,7 +479,9 @@ export class ChatPanel {
                 
             case 'newSession':
                 this._conversation = [];
+                this._userMessageIndex = 0;
                 resetCurrentOperationController();
+                this._panel.webview.postMessage({ command: 'clearAfterIndex', index: -1 });
                 break;
             case 'stop':
                 resetCurrentOperationController();
