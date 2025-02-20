@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.78 (2025-02-19)
+
+
+### Features
+
+* 聊天界面增加代码复制按钮 ([b893463](https://github.com/yefansky/CodeReDesign/commit/b89346303bf97340819d8f7a39c9087bde1b76c2))
+
 ### 0.0.77 (2025-02-18)
 
 ### 0.0.76 (2025-02-18)
