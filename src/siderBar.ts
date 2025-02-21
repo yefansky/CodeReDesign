@@ -123,6 +123,7 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
       provider.writeFile(previewUri, Buffer.from(decoratedText));
 
       // 打开或刷新预览
+      await vscode.commands.executeCommand('markdown.preview.refresh');
       await vscode.commands.executeCommand('markdown.showPreview', previewUri);
     })
   );

@@ -132,7 +132,7 @@ export async function saveAnalyzeCodeResult(request: string, respond: string){
     const summary = await generateFilenameFromRequest(request);
     const mdFileName = `${timestamp}_${summary}.md`;
     const mdFilePath = path.join(tmpDir, mdFileName);
-    const mdContent = `## 提问:\n\n${request}\n\n## 结果:\n\n${respond}`;
+    const mdContent = `@user:\n\n${request}\n\n@AI:\n\n${respond}`;
     fs.writeFileSync(mdFilePath, mdContent, 'utf-8');
 }
 
