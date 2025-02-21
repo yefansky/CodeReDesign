@@ -696,7 +696,7 @@ function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>): Cvb {
 // ================== 工具函数 ==================
 
 function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return str.replace(/[.*+?^${}()|[\]\\&]/g, (match) => "\\" + match);
 }
 
 function normalizeLineWhitespace(anchor: string): string {

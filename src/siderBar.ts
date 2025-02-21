@@ -130,9 +130,22 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
 // 处理聊天内容的独立函数
 function processChatContent(text: string): string {
-  // 修饰内容
-  let processedText = text.replace(/^@user:\n/gm, '🙋‍♂️ User:\n');
-  processedText = processedText.replace(/^@AI:\n/gm, '🧠 AI:\n');
+  // 为用户和 AI 消息添加类标记
+  let processedText = text.replace(/^@user:\n/gm, '# 🙋‍♂️ User:\n> ');
+  processedText = processedText.replace(/^@AI:\n/gm, '# 🧠 AI:\n> ');
+
+  // 处理其他标记
+  processedText = processedText.replace(/^## CVB_BEGIN$/gm, '<!-- CVB_BEGIN -->');
+  processedText = processedText.replace(/^## CVB_END$/gm, '<!-- CVB_END -->');
+  // 将 META 到 META_END 区段转为 Markdown 代码块
+  processedText = processedText.replace(
+    /(^## META$\n)([\s\S]*?)(^## END_META$\n)/gm,
+    '```\nMETA:\n\n$2\n```'
+  );
+  processedText = processedText.replace(/^## FILE:(.*)$/gm, '*FILE: $1*');
+
+  // 添加换行分隔
+  processedText = processedText.replace(/(\n> .+?)(?=\n#|\n$)/gs, '$1\n\n');
 
   // 包裹对话块
   const blocks = processedText.split(/(🙋‍♂️ User:|🧠 AI:)/);
