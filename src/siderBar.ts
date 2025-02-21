@@ -6,6 +6,51 @@ import { analyzeCode } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand, saveAnalyzeCodeResult} from './extension';
 import { showInputMultiLineBox } from './UIComponents';
 
+class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
+  private content: Uint8Array = new Uint8Array();
+  private readonly _emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
+
+  onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._emitter.event;
+
+  watch(): vscode.Disposable {
+    return new vscode.Disposable(() => {});
+  }
+
+  stat(): vscode.FileStat {
+    return {
+      type: vscode.FileType.File,
+      ctime: Date.now(),
+      mtime: Date.now(),
+      size: this.content.length
+    };
+  }
+
+  readDirectory(): never {
+    throw vscode.FileSystemError.FileIsADirectory();
+  }
+
+  createDirectory(): never {
+    throw vscode.FileSystemError.FileIsADirectory();
+  }
+
+  readFile(): Uint8Array {
+    return this.content;
+  }
+
+  writeFile(uri: vscode.Uri, content: Uint8Array): void {
+    this.content = content;
+    this._emitter.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+  }
+
+  delete(): never {
+    throw vscode.FileSystemError.NoPermissions();
+  }
+
+  rename(): never {
+    throw vscode.FileSystemError.NoPermissions();
+  }
+}
+
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
   // 注册右键菜单命令
@@ -59,16 +104,54 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
     context.subscriptions.push(watcher);
   }
 
-   // 注册命令
-   context.subscriptions.push(
-     vscode.commands.registerCommand('codeReDesign.showFile', (uri: vscode.Uri) => {
-         // 如果插件已安装，使用其命令打开文件
-         vscode.commands.executeCommand('markdown.showPreview', uri);
-         //vscode.commands.executeCommand('vscode.open', uri);
-     })
-   );
+  const scheme = 'chatpreview';
+  const provider = new ChatPreviewFileSystemProvider();
+  context.subscriptions.push(vscode.workspace.registerFileSystemProvider(scheme, provider, { isCaseSensitive: true }));
+
+  const previewUri = vscode.Uri.parse(`${scheme}:/chat-preview.md`);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codeReDesign.showFile', async (uri: vscode.Uri) => {
+      // 读取文件内容
+      const content = await vscode.workspace.fs.readFile(uri);
+      const rawText = Buffer.from(content).toString('utf-8');
+      
+      // 处理文本内容
+      const decoratedText = processChatContent(rawText);
+
+      // 更新虚拟文件内容
+      provider.writeFile(previewUri, Buffer.from(decoratedText));
+
+      // 打开或刷新预览
+      await vscode.commands.executeCommand('markdown.showPreview', previewUri);
+    })
+  );
 }
 
+// 处理聊天内容的独立函数
+function processChatContent(text: string): string {
+  // 修饰内容
+  let processedText = text.replace(/^@user:\n/gm, '🙋‍♂️ User:\n');
+  processedText = processedText.replace(/^@AI:\n/gm, '🧠 AI:\n');
+
+  // 包裹对话块
+  const blocks = processedText.split(/(🙋‍♂️ User:|🧠 AI:)/);
+  let decoratedText = '';
+  
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].startsWith('🙋‍♂️ User:')) {
+      // 用户：深蓝色背景，白色文字
+      decoratedText += `<div style="background-color: #1E3A8A; color: #FFFFFF; padding: 10px; border-radius: 5px; margin-bottom: 10px;">\n${blocks[i]}\n`;
+    } else if (blocks[i].startsWith('🧠 AI:')) {
+      // AI：浅灰色背景，深灰色文字
+      decoratedText += `<div style="background-color: #F3F4F6; color: #1F2937; padding: 10px; border-radius: 5px; margin-bottom: 10px;">\n${blocks[i]}\n`;
+    } else if (blocks[i].trim()) {  // 只处理非空内容
+      decoratedText += `${blocks[i]}\n</div>\n`;
+    }
+  }
+
+  return decoratedText;
+}
 
 class CvbViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   // 修改返回类型为更通用的TreeItem
