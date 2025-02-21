@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.76",
+  "version": "0.0.87",
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -399,6 +399,6 @@
   "dependencies": {
     "iconv-lite": "^0.6.3",
     "jschardet": "^3.1.4",
-    "openai": "^4.81.0"
+    "openai": "^4.85.2"
   }
 }

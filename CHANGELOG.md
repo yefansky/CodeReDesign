@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.87 (2025-02-21)
+
+### 0.0.86 (2025-02-21)
+
+### 0.0.85 (2025-02-21)
+
+
+### Features
+
+* 新增，聊天存盘功能 ([4eaa01a](https://github.com/yefansky/CodeReDesign/commit/4eaa01ad0b2eba4ffdd05805b17bb1010074936e))
+
+### 0.0.84 (2025-02-21)
+
+### 0.0.83 (2025-02-21)
+
+### 0.0.82 (2025-02-21)
+
+### 0.0.81 (2025-02-21)
+
+### 0.0.80 (2025-02-20)
+
+### 0.0.79 (2025-02-20)
+
+### 0.0.78 (2025-02-19)
+
+
+### Features
+
+* 聊天界面增加代码复制按钮 ([b893463](https://github.com/yefansky/CodeReDesign/commit/b89346303bf97340819d8f7a39c9087bde1b76c2))
+
+### 0.0.77 (2025-02-18)
+
 ### 0.0.76 (2025-02-18)
 
 ### 0.0.75 (2025-02-18)

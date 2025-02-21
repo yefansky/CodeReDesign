@@ -1,23 +1,25 @@
 import * as vscode from 'vscode';
 import { callDeepSeekApi } from './deepseekApi';
 import { getCurrentOperationController, resetCurrentOperationController } from './extension';
+import path from 'path';
+import * as fs from "fs";
 
+// Webview 输出通道实现
 class WebviewOutputChannel implements vscode.OutputChannel {
-    private _webview: vscode.Webview;
-    private _name: string;
+    private readonly webview: vscode.Webview;
+    private readonly channelName: string;
 
     constructor(webview: vscode.Webview, name: string) {
-        this._webview = webview;
-        this._name = name;
+        this.webview = webview;
+        this.channelName = name;
     }
 
     get name(): string {
-        return this._name;
+        return this.channelName;
     }
 
     append(value: string): void {
-        // 将数据通过 Webview 发送出去
-        this._webview.postMessage({ role: 'model', content: value });
+        this.webview.postMessage({ role: 'model', content: value });
     }
 
     appendLine(value: string): void {
@@ -25,61 +27,48 @@ class WebviewOutputChannel implements vscode.OutputChannel {
     }
 
     clear(): void {
-        // 清除输出，通常可以通过清空 Webview 来实现
-        this._webview.postMessage({ role: 'model', content: '' });
+        this.webview.postMessage({ role: 'model', content: '' });
     }
 
-    show(preserveFocus?: boolean): void;
-    show(column?: vscode.ViewColumn, preserveFocus?: boolean): void;
-    show(arg1?: boolean | vscode.ViewColumn, arg2?: boolean): void {
-        if (typeof arg1 === 'boolean') {
-            // 第一种重载：show(preserveFocus?: boolean)
-            //this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
-        } else {
-            // 第二种重载：show(column?: ViewColumn, preserveFocus?: boolean)
-            if (arg1 !== undefined) {
-                // 根据 column 进行处理（可以自定义逻辑）
-                //console.log(`Showing in column: ${arg1}`);
-            }
-            //this._webview.postMessage({ role: 'model', content: 'Webview is now shown' });
-        }
+    show(columnOrPreserve?: vscode.ViewColumn | boolean, preserveFocus?: boolean): void {
+        // 根据参数类型处理显示逻辑（这里简化为无操作，实际可扩展）
     }
+
     hide(): void {
-
+        // 可选实现
     }
 
-    dispose(): void{
-        
+    dispose(): void {
+        // 可选清理逻辑
     }
 
     replace(value: string): void {
-        // 替换输出内容
-        this._webview.postMessage({ role: 'model', content: value });
+        this.webview.postMessage({ role: 'model', content: value });
     }
 }
 
-
+// 聊天面板类
 export class ChatPanel {
     private static readonly viewType = 'chatPanel';
     private static currentPanel: ChatPanel | undefined;
-    private readonly _panel: vscode.WebviewPanel;
-    private _disposables: vscode.Disposable[] = [];
-    private _conversation: { role: string, content: string }[] = [];
+    private readonly panel: vscode.WebviewPanel;
+    private disposables: vscode.Disposable[] = [];
+    private conversation: { role: string; content: string }[] = [];
+    private userMessageIndex: number = 0;
+    private chatFilePath: string | null = null;
+    private lastSaveTime: number = Date.now();
 
     private constructor(panel: vscode.WebviewPanel) {
-        this._panel = panel;
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        this._panel.webview.html = this._getHtmlForWebview();
-        this._panel.webview.onDidReceiveMessage(this._handleMessage, this, this._disposables);
+        this.panel = panel;
+        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+        this.panel.webview.html = this.getHtmlForWebview();
+        this.panel.webview.onDidReceiveMessage((message) => this.handleMessage(message), this, this.disposables);
     }
 
-    public static createOrShow() {
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
-
+    public static createOrShow(): void {
+        const column = vscode.window.activeTextEditor?.viewColumn;
         if (ChatPanel.currentPanel) {
-            ChatPanel.currentPanel._panel.reveal(column);
+            ChatPanel.currentPanel.panel.reveal(column);
             return;
         }
 
@@ -87,16 +76,12 @@ export class ChatPanel {
             ChatPanel.viewType,
             'Chat with Model',
             column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-            }
+            { enableScripts: true, retainContextWhenHidden: true }
         );
-
         ChatPanel.currentPanel = new ChatPanel(panel);
     }
 
-    private _getHtmlForWebview() {
+    private getHtmlForWebview(): string {
         return `
             <!DOCTYPE html>
             <html lang="en">
@@ -114,18 +99,34 @@ export class ChatPanel {
                         padding: 8px;
                     }
                     .user {
+                        position: relative;
                         background-color: #a3a3a3;
                         color: black;
-                        padding: 12px;
-                        margin: 8px 0;
+                        padding: 8px 12px 8px 40px;
+                        margin: 4px 0;
                         border-radius: 4px;
                         white-space: pre-wrap;
+                    }
+                    .edit-btn {
+                        position: absolute;
+                        left: 8px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        display: none;
+                        background: none;
+                        border: none;
+                        color: #fff;
+                        cursor: pointer;
+                        padding: 4px;
+                    }
+                    .user:hover .edit-btn {
+                        display: block;
                     }
                     .model {
                         background-color: #333;
                         color: white;
                         padding: 12px;
-                        margin: 8px 0;
+                        margin: 4px 0;
                         border-radius: 4px;
                     }
                     .model pre code {
@@ -139,6 +140,26 @@ export class ChatPanel {
                         background-color: #040404;
                         padding: 2px 4px;
                         border-radius: 3px;
+                    }
+                    .copy-btn {
+                        position: absolute;
+                        right: 8px;
+                        top: 8px;
+                        padding: 4px 8px;
+                        background: #616161;
+                        border: none;
+                        color: white;
+                        cursor: pointer;
+                        border-radius: 4px;
+                        font-size: 0.8em;
+                        transition: opacity 0.3s;
+                    }
+                    .copy-btn:hover {
+                        background: #757575;
+                    }
+                    .model pre {
+                        position: relative;
+                        padding-top: 30px !important;
                     }
                     .katex {
                         color: white !important;
@@ -187,113 +208,188 @@ export class ChatPanel {
                 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
                 <script>
                     const vscode = acquireVsCodeApi();
-
                     const chat = document.getElementById('chat');
                     const input = document.getElementById('input');
                     const sendButton = document.getElementById('send');
                     const stopButton = document.getElementById('stop');
-                    
-                    // 初始化代码高亮
+                    const newSessionButton = document.getElementById('new-session');
+
+                    // 配置代码高亮
                     hljs.configure({ ignoreUnescapedHTML: true });
 
-                    // 消息处理
+                    // 添加编辑按钮功能
+                    function setupEditButtons() {
+                        document.querySelectorAll('.edit-btn').forEach(btn => {
+                            btn.onclick = (event) => {
+                                const userDiv = event.target.closest('.user');
+                                const contentDiv = userDiv.querySelector('.user-content');
+                                userDiv.innerHTML = \`
+                                    <textarea class="edit-textarea" style="width:100%; min-height:100px; resize:vertical; margin-bottom:8px; padding:8px; box-sizing:border-box;">\${contentDiv.textContent}</textarea>
+                                    <div class="edit-buttons" style="display:flex; gap:8px; justify-content:flex-end;">
+                                        <button class="edit-send" style="padding:6px 12px;">发送</button>
+                                        <button class="edit-cancel" style="padding:6px 12px;">取消</button>
+                                    </div>\`;
+
+                                const editSend = userDiv.querySelector('.edit-send');
+                                const editCancel = userDiv.querySelector('.edit-cancel');
+
+                                editSend.onclick = () => {
+                                    const newText = userDiv.querySelector('textarea').value;
+                                    vscode.postMessage({ command: 'editMessage', index: parseInt(userDiv.dataset.index), text: newText });
+                                    userDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${newText}</div>\`;
+                                    setupEditButtons();
+                                };
+
+                                editCancel.onclick = () => {
+                                    userDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${contentDiv.textContent}</div>\`;
+                                    setupEditButtons();
+                                };
+                            };
+                        });
+                    }
+
+                    // 为代码块添加复制按钮
+                    function ensureCopyButtons() {
+                        document.querySelectorAll('.model pre').forEach(pre => {
+                            if (!pre.querySelector('.copy-btn')) {
+                                const button = document.createElement('button');
+                                button.className = 'copy-btn';
+                                button.textContent = 'Copy';
+                                pre.appendChild(button);
+                            }
+                        });
+                    }
+
+                    // 处理复制按钮点击（事件委托）
+                    function setupCopyButtonDelegation() {
+                        chat.addEventListener('click', (event) => {
+                            const copyBtn = event.target.closest('.copy-btn');
+                            if (!copyBtn) return;
+
+                            const preElement = copyBtn.closest('pre');
+                            if (!preElement) return;
+
+                            const code = preElement.querySelector('code').textContent;
+                            navigator.clipboard.writeText(code)
+                                .then(() => {
+                                    copyBtn.textContent = 'Copied!';
+                                    setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+                                })
+                                .catch(err => console.error('Copy failed:', err));
+                        });
+                    }
+
+                    // 渲染消息内容
+                    function renderMessage(role, content, index) {
+                        const lastChild = chat.lastElementChild;
+                        let targetDiv;
+
+                        if (lastChild && lastChild.classList.contains(role)) {
+                            targetDiv = lastChild;
+                            targetDiv.dataset.markdownContent += content;
+                        } else {
+                            targetDiv = document.createElement('div');
+                            targetDiv.className = role;
+                            targetDiv.dataset.markdownContent = content;
+                            chat.appendChild(targetDiv);
+                        }
+
+                        if (role === 'model') {
+                            targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
+                                breaks: true,
+                                mangle: false,
+                                headerIds: false,
+                                highlight: (code, lang) => hljs.highlight(hljs.getLanguage(lang) ? lang : 'plaintext', code).value
+                            });
+                            renderMathInElement(targetDiv, {
+                                delimiters: [
+                                    { left: '$$', right: '$$', display: true },
+                                    { left: '$', right: '$', display: false },
+                                    { left: '\\[', right: '\\]', display: true },
+                                    { left: '\\(', right: '\\)', display: false }
+                                ],
+                                throwOnError: false
+                            });
+                            ensureCopyButtons();
+                            hljs.highlightAll();
+                        } else {
+                            targetDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${targetDiv.dataset.markdownContent}</div>\`;
+                            targetDiv.dataset.index = index;
+                            setupEditButtons();
+                        }
+                        chat.scrollTop = chat.scrollHeight;
+                    }
+
+                    // 处理 Webview 消息
                     window.addEventListener('message', (event) => {
                         const data = event.data;
 
-                        // 处理 role 和 content 的消息
                         if (data.role && data.content) {
-                            const { role, content } = data;
-                            const lastChild = chat.lastElementChild;
+                            renderMessage(data.role, data.content, data.index);
+                            return;
+                        }
 
-                            let targetDiv;
-                            if (lastChild && lastChild.classList.contains(role)) {
-                                targetDiv = lastChild;
-                                targetDiv.dataset.markdownContent += content;
-                            } else {
-                                targetDiv = document.createElement('div');
-                                targetDiv.className = role;
-                                targetDiv.dataset.markdownContent = content;
-                                chat.appendChild(targetDiv);
-                            }
+                        if (!data.command) return;
 
-                            if (role === 'model') {
-                                // 解析 Markdown
-                                targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
-                                    breaks: true,
-                                    mangle: false,
-                                    headerIds: false,
-                                    highlight: (code, lang) => {
-                                        const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
-                                        return hljs.highlight(code, { language: validLang }).value;
+                        switch (data.command) {
+                            case 'disableSendButton':
+                                sendButton.disabled = true;
+                                break;
+                            case 'enableSendButton':
+                                sendButton.disabled = false;
+                                break;
+                            case 'showStopButton':
+                                stopButton.style.display = 'inline-block';
+                                break;
+                            case 'hideStopButton':
+                                stopButton.style.display = 'none';
+                                break;
+                            case 'clearAfterIndex':
+                                const clearIndex = data.index;
+                                document.querySelectorAll('.user').forEach(userDiv => {
+                                    if (parseInt(userDiv.dataset.index) >= clearIndex) {
+                                        const modelDiv = userDiv.nextElementSibling;
+                                        if (modelDiv?.classList.contains('model')) modelDiv.remove();
+                                        userDiv.remove();
                                     }
                                 });
-
-                                // 渲染数学公式
-                                renderMathInElement(targetDiv, {
-                                    delimiters: [
-                                        { left: '$$', right: '$$', display: true },
-                                        { left: '$', right: '$', display: false },
-                                        { left: '\\[', right: '\\]', display: true },
-                                        { left: '\\(', right: '\\)', display: false }
-                                    ],
-                                    throwOnError: false
-                                });
-
-                                // 重新高亮代码块
-                                hljs.highlightAll();
-                            } else {
-                                // 用户消息保持纯文本
-                                targetDiv.textContent = targetDiv.dataset.markdownContent;
-                            }
-
-                            chat.scrollTop = chat.scrollHeight;
-                        }
-                        
-                        // 处理 command 类型的消息
-                        if (data.command) {
-                            const { command } = data;
-
-                            switch (command) {
-                                case 'disableSendButton':
-                                    sendButton.disabled = true;
-                                    break;
-                                case 'enableSendButton':
-                                    sendButton.disabled = false;
-                                    break;
-                                case 'showStopButton':
-                                    stopButton.style.display = 'inline-block';
-                                    break;
-                                case 'hideStopButton':
-                                    stopButton.style.display = 'none';
-                                    break;
-                                default:
-                                    // 处理其他 command 消息
-                                    break;
-                            }
+                                break;
                         }
                     });
 
-                    // 发送消息逻辑
-                    document.getElementById('send').addEventListener('click', () => {
-                        vscode.postMessage({ command: 'sendMessage', text: input.value });
-                        input.value = '';
+                    // 初始化事件监听
+                    setupCopyButtonDelegation();
+
+                    // 发送消息
+                    sendButton.addEventListener('click', () => {
+                        const text = input.value.trim();
+                        if (text) {
+                            vscode.postMessage({ command: 'sendMessage', text });
+                            input.value = '';
+                        }
                     });
 
-                    document.getElementById('new-session').addEventListener('click', () => {
+                    // 新会话
+                    newSessionButton.addEventListener('click', () => {
                         vscode.postMessage({ command: 'newSession' });
                         chat.innerHTML = '';
                         sendButton.disabled = false;
                         stopButton.style.display = 'none';
                     });
 
+                    // 停止操作
                     stopButton.addEventListener('click', () => {
                         vscode.postMessage({ command: 'stop' });
                     });
 
+                    // Ctrl+Enter 发送
                     input.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                            vscode.postMessage({ command: 'sendMessage', text: input.value });
-                            input.value = '';
+                            const text = input.value.trim();
+                            if (text) {
+                                vscode.postMessage({ command: 'sendMessage', text });
+                                input.value = '';
+                            }
                         }
                     });
                 </script>
@@ -302,64 +398,98 @@ export class ChatPanel {
         `;
     }
 
-    private async _handleMessage(message: any) {
-        const webviewOutputChannel = new WebviewOutputChannel(this._panel.webview, 'DeepSeek API Output');
-    
-        switch (message.command) {
-            case 'sendMessage':
-                this._conversation.push({ role: 'user', content: message.text });
-                this._panel.webview.postMessage({ role: 'user', content: message.text });
-                
-                try {
-                    // 发送消息到 Webview，禁用发送按钮并显示停止按钮
-                    this._panel.webview.postMessage({ command: 'disableSendButton' });
-                    this._panel.webview.postMessage({ command: 'showStopButton' });
-    
-                    const response = await callDeepSeekApi(
-                        message.text,
-                        'You are a helpful assistant. Always format answers with Markdown.',
-                        webviewOutputChannel,
-                        true,
-                        undefined,
-                        getCurrentOperationController().signal
-                    );
-    
-                    // 发送消息到 Webview，启用发送按钮并隐藏停止按钮
-                    this._panel.webview.postMessage({ command: 'enableSendButton' });
-                    this._panel.webview.postMessage({ command: 'hideStopButton' });
-    
-                    this._conversation.push({ role: 'model', content: response || '' });
-                } catch (error) {
-                    // 发送消息到 Webview，启用发送按钮并隐藏停止按钮
-                    this._panel.webview.postMessage({ command: 'enableSendButton' });
-                    this._panel.webview.postMessage({ command: 'hideStopButton' });
-    
-                    this._panel.webview.postMessage({ 
-                        role: 'model', 
-                        content: `**Error**: ${error instanceof Error ? error.message : 'Unknown error'}`
-                    });
-                }
-                break;
-                
-            case 'newSession':
-                this._conversation = [];
-                resetCurrentOperationController();
-                break;
-            case 'stop':
-                resetCurrentOperationController();
-                this._panel.webview.postMessage({ role: 'model', content: '\n\n**Operation stopped by user**' });
-                break;
+    private async handleMessage(message: any): Promise<void> {
+        const webviewOutputChannel = new WebviewOutputChannel(this.panel.webview, 'DeepSeek API Output');
+
+        if (message.command === 'sendMessage' || message.command === 'editMessage') {
+            await this.handleSendOrEdit(message, webviewOutputChannel);
+            this.saveChatToFile();
+            return;
+        }
+
+        if (message.command === 'newSession') {
+            this.chatFilePath = null;
+        }
+
+        if (message.command === 'newSession') {
+            this.conversation = [];
+            this.userMessageIndex = 0;
+            resetCurrentOperationController();
+            this.panel.webview.postMessage({ command: 'clearAfterIndex', index: -1 });
+            return;
+        }
+
+        if (message.command === 'stop') {
+            resetCurrentOperationController();
+            this.panel.webview.postMessage({ role: 'model', content: '\n\n**Operation stopped by user**' });
         }
     }
 
-    public dispose() {
-        ChatPanel.currentPanel = undefined;
-        this._panel.dispose();
-        while (this._disposables.length) {
-            const disposable = this._disposables.pop();
-            if (disposable) {
-                disposable.dispose();
+    private async handleSendOrEdit(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<void> {
+        if (message.command === 'editMessage' && message.index < this.conversation.length) {
+            this.conversation.splice(message.index + 1);
+            this.panel.webview.postMessage({ command: 'clearAfterIndex', index: message.index });
+            this.userMessageIndex = message.index;
+        }
+
+        if (!this.chatFilePath) {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders) {
+                const workspacePath = workspaceFolders[0].uri.fsPath;
+                const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `${timestamp}_chat.chat`;
+                this.chatFilePath = path.join(tmpDir, filename);
             }
         }
+
+        this.conversation.push({ role: 'user', content: message.text });
+        this.panel.webview.postMessage({ role: 'user', content: message.text, index: this.userMessageIndex++ });
+
+        this.panel.webview.postMessage({ command: 'disableSendButton' });
+        this.panel.webview.postMessage({ command: 'showStopButton' });
+
+        try {
+            const response = await callDeepSeekApi(
+                this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
+                'You are a helpful assistant. Always format answers with Markdown.',
+                webviewOutputChannel,
+                true,
+                undefined,
+                getCurrentOperationController().signal
+            );
+
+            this.conversation.push({ role: 'model', content: response || '' });
+        } catch (error) {
+            this.panel.webview.postMessage({
+                role: 'model',
+                content: `**Error**: ${error instanceof Error ? error.message : 'Unknown error'}`
+            });
+        }
+
+        this.panel.webview.postMessage({ command: 'enableSendButton' });
+        this.panel.webview.postMessage({ command: 'hideStopButton' });
+    }
+
+    public dispose(): void {
+        ChatPanel.currentPanel = undefined;
+        this.panel.dispose();
+        while (this.disposables.length) {
+            this.disposables.pop()?.dispose();
+        }
+    }
+
+    private saveChatToFile(): void {
+        if (!this.chatFilePath) return;
+
+        const now = Date.now();
+        if (now - this.lastSaveTime < 10000) return;
+
+        const mdContent = this.conversation.map(msg => {
+            return `@${msg.role === 'user' ? 'user' : 'AI'}:\n\n${msg.content}\n\n`;
+        }).join('\n');
+
+        fs.writeFileSync(this.chatFilePath, mdContent, 'utf-8');
+        this.lastSaveTime = now;
     }
 }
