@@ -93,8 +93,20 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
         // 创建新数组，第一条消息替换为 { "role": "user", "content": userPrompt }
         const modifiedMessages = [{ role: "user", content: userPrompt }, ...lastMessageBody.slice(2)];
     
+        /*
         let mdContent = modifiedMessages.map(msg => {
             return `**${msg.role}**:\n\n${msg.content}\n\n`;
+        }).join('\n');
+        */
+        
+        // 定义修饰函数，加上表情符号
+        const decorateWithEmojis = (role : string) => {
+            return role === "user" ? "🙋‍♂️ **人类**" : "🧠 **AI**";
+        };
+
+        // 生成Markdown内容，使用修饰函数
+        let mdContent = modifiedMessages.map(msg => {
+            return `${decorateWithEmojis(msg.role)}:\n\n${msg.content}\n\n`;
         }).join('\n');
 
         // 处理 TCVB 格式，只匹配行首的标记
