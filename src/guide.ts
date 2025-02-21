@@ -75,12 +75,16 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
   
     // 获取所有以 'custom' 开头的模型配置
     const customConfigs = [];
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; ; i++) {
       const baseURL = config.get(`custom${i}BaseURL`);
       const modelName = config.get(`custom${i}ModelName`);
       const modelNickname = config.get(`custom${i}ModelNickname`);
       const modelAPIKey = config.get(`custom${i}APIKey`);
       
+      if (baseURL === undefined){
+        break;
+      }
+
       customConfigs.push({
         value: `custom${i}`,
         label: modelNickname || `自定义模型 ${i}`,
