@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { callDeepSeekApi } from './deepseekApi';
 import { getCurrentOperationController, resetCurrentOperationController } from './extension';
+import path from 'path';
+import * as fs from "fs";
 
 // Webview 输出通道实现
 class WebviewOutputChannel implements vscode.OutputChannel {
@@ -53,6 +55,8 @@ export class ChatPanel {
     private disposables: vscode.Disposable[] = [];
     private conversation: { role: string; content: string }[] = [];
     private userMessageIndex: number = 0;
+    private chatFilePath: string | null = null;
+    private lastSaveTime: number = Date.now();
 
     private constructor(panel: vscode.WebviewPanel) {
         this.panel = panel;
@@ -399,7 +403,12 @@ export class ChatPanel {
 
         if (message.command === 'sendMessage' || message.command === 'editMessage') {
             await this.handleSendOrEdit(message, webviewOutputChannel);
+            this.saveChatToFile();
             return;
+        }
+
+        if (message.command === 'newSession') {
+            this.chatFilePath = null;
         }
 
         if (message.command === 'newSession') {
@@ -421,6 +430,17 @@ export class ChatPanel {
             this.conversation.splice(message.index + 1);
             this.panel.webview.postMessage({ command: 'clearAfterIndex', index: message.index });
             this.userMessageIndex = message.index;
+        }
+
+        if (!this.chatFilePath) {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders) {
+                const workspacePath = workspaceFolders[0].uri.fsPath;
+                const tmpDir = path.join(workspacePath, '.CodeReDesignWorkSpace');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `${timestamp}_chat.chat`;
+                this.chatFilePath = path.join(tmpDir, filename);
+            }
         }
 
         this.conversation.push({ role: 'user', content: message.text });
@@ -457,5 +477,19 @@ export class ChatPanel {
         while (this.disposables.length) {
             this.disposables.pop()?.dispose();
         }
+    }
+
+    private saveChatToFile(): void {
+        if (!this.chatFilePath) return;
+
+        const now = Date.now();
+        if (now - this.lastSaveTime < 10000) return;
+
+        const mdContent = this.conversation.map(msg => {
+            return `@${msg.role === 'user' ? 'user' : 'AI'}:\n\n${msg.content}\n\n`;
+        }).join('\n');
+
+        fs.writeFileSync(this.chatFilePath, mdContent, 'utf-8');
+        this.lastSaveTime = now;
     }
 }

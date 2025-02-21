@@ -47,7 +47,7 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
     // 创建文件系统监听器
     const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(targetFolder, '**/*.{cvb,md}') // 监听子文件夹中的所有 .cvb 文件
+      new vscode.RelativePattern(targetFolder, '**/*.{cvb,md,chat}') // 监听子文件夹中的所有 .cvb 文件
     );
 
     // 当文件变化时刷新视图
@@ -106,6 +106,9 @@ class CvbViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
           } else if (file.endsWith('.md')) {
             files.push(new MDFile(file, uri));
           }
+          else if (file.endsWith('.chat')) {
+            files.push(new ChatFile(file, uri));
+          }
         });
       }
 
@@ -157,6 +160,22 @@ class MDFile extends vscode.TreeItem {
   }
 }
 
+class ChatFile extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly uri: vscode.Uri
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.None);
+    this.command = {
+      command: 'codeReDesign.showFile', // 复用同一个打开命令
+      title: 'Open Chat File',
+      arguments: [uri]
+    };
+    this.iconPath = new vscode.ThemeIcon('comment-discussion'); // 使用文档图标
+    this.resourceUri = uri;
+    this.contextValue = 'chatFile'; // 新的上下文值
+  }
+}
 
 /**
  * 处理 .cvb 文件的函数
