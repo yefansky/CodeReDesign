@@ -5,7 +5,7 @@ import * as iconv from 'iconv-lite'; // 编码转换库
 import * as vscode from 'vscode';
 import { generateFilenameFromRequest } from './deepseekApi';
 
-import { g_objLanguageMapping } from './languageMapping';
+import { getLanguageFromPath } from './languageMapping';
 
 // ================== CVB 核心类 ==================
 export class Cvb
@@ -56,8 +56,8 @@ export class Cvb
     // 将文件内容转换成字符串
     let filesStr = '';
     for (const filePath in this.m_recFiles) {
-      // 这里假设文件内容不需要包裹代码块标记，如果需要，可自行添加
-      filesStr += `## FILE:${filePath}\n${this.m_recFiles[filePath]}\n`;
+      const strLang = getLanguageFromPath(filePath);
+      filesStr += `## FILE:${filePath}\n\`\`\`${strLang}\n${this.m_recFiles[filePath]}\n\`\`\`\n`;
     }
   
     // 重新组装整个 CVB 内容
@@ -655,8 +655,7 @@ function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>) : Cvb
 
   for (const [strFilePath, strContent] of mapFiles)
   {
-    const strExt: string = path.extname(strFilePath).slice(1).toLowerCase();
-    const strLang: string = g_objLanguageMapping[strExt] || 'text';
+    const strLang: string = getLanguageFromPath(strFilePath);
     strNewContent += `## FILE:${strFilePath}\n\`\`\`${strLang}\n${strContent}\n\`\`\`\n\n`;
   }
 
@@ -798,8 +797,7 @@ export async function generateCvb(arrFilePaths: string[], strUserRequest: string
     try
     {
       const strFileContent = readFileWithEncoding(strFilePath);
-      const strExt = path.extname(strFilePath).slice(1).toLowerCase();
-      const strLang = g_objLanguageMapping[strExt] || 'text';
+      const strLang = getLanguageFromPath(strFilePath);
       strCvbContent += `## FILE:${strFilePath}\n`;
       strCvbContent += '```' + strLang + '\n';
       strCvbContent += strFileContent + '\n';

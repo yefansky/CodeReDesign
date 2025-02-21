@@ -23,3 +23,13 @@ export const g_objLanguageMapping: { [key: string]: string } = {
   'md': 'markdown',       // markdown
   'json':'json'
 };
+
+/**
+ * 根据文件路径猜测编程语言
+ * @param filePath 文件路径
+ * @returns 语言名称字符串，未匹配时返回 'text'
+ */
+export function getLanguageFromPath(filePath: string): string {
+  const strExt = filePath.split('.').pop()?.toLowerCase() || '';
+  return g_objLanguageMapping[strExt] || 'text';
+}
