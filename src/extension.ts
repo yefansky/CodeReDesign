@@ -101,7 +101,7 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
         
         // 定义修饰函数，加上表情符号
         const decorateWithEmojis = (role : string) => {
-            return role === "user" ? "🙋‍♂️ **User**" : "🧠 **AI**";
+            return role === "user" ? "@user" : "@AI";
         };
 
         // 生成Markdown内容，使用修饰函数
