@@ -49,11 +49,11 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
 
     const filenameSummary = await generateFilenameFromRequest(userPrompt);
     const timestamp = generateTimestamp();
-    let baseFileName = `${timestamp}_${filenameSummary}.cvb`;
-    let fileName = baseFileName;
+    let baseFileName = `${timestamp}_${filenameSummary}`;
+    let fileName = `${baseFileName}.cvb`;
     let i = 1;
     while (fs.existsSync(path.join(tmpDir, fileName))) {
-        fileName = `${timestamp}_${filenameSummary}_${i}.cvb`;
+        fileName = `${baseFileName}_${i}.cvb`;
         i++;
     }
 
@@ -84,20 +84,26 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
         }
     } while (!processSuccess && attemptCount < 3 && !CurrentOperationController.signal.aborted);
 
-    const lastMessageBody = GetLastMessageBody();
+    let lastMessageBody = GetLastMessageBody();
 
     if (lastMessageBody && lastMessageBody.length > 2) {
-        const timestamp = generateTimestamp();
-        const summary = await generateFilenameFromRequest(userPrompt);
-        const mdFileName = `${timestamp}_${summary}.md`;
+        const mdFileName = `${baseFileName}.md`;
         const mdFilePath = path.join(tmpDir, mdFileName);
     
         // 创建新数组，第一条消息替换为 { "role": "user", "content": userPrompt }
         const modifiedMessages = [{ role: "user", content: userPrompt }, ...lastMessageBody.slice(2)];
     
-        const mdContent = modifiedMessages.map(msg => {
+        let mdContent = modifiedMessages.map(msg => {
             return `**${msg.role}**:\n\n${msg.content}\n\n`;
         }).join('\n');
+
+        // 处理 TCVB 格式，只匹配行首的标记
+        if (mdContent.includes('## BEGIN_TCVB')) {
+            // 匹配行首的 ```任意语言标记\n## BEGIN_TCVB
+            mdContent = mdContent.replace(/^```[^\n]*\n## BEGIN_TCVB/gm, '## BEGIN_TCVB');
+            // 匹配行首的 ## END_TCVB\n```
+            mdContent = mdContent.replace(/^## END_TCVB\n```$/gm, '## END_TCVB');
+        }
     
         fs.writeFileSync(mdFilePath, mdContent, 'utf-8');
         vscode.window.showInformationMessage(`Conversation log saved as: ${mdFilePath}`);
