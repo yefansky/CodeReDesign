@@ -107,3 +107,733 @@ agent怎么实现，是否会遇到上下文超长，一般要怎么解决？
 
 最好能给我代码以及配合提示词，怎么写这个agent
 提示词最好都是中文的
+
+----------------------
+
+如何使用deepseekapi来开发agent
+如果用来重构大规模的代码，上下文超过模型限制
+如何设计agent来处理这种情况
+结合一些代码来向我说明
+另外，目前deepseek-v3的tools功能支持不稳定，很多第三方部署也不支持tools功能
+遇到这种情况，已经开发了tools的agent有办法不用tools来移植兼容么？
+收集资料之后，给我详细讲讲，谢谢
+着重演示如何开发agent，以及介绍现在流行的设计思路，谢谢！
+
+grok设计了一个简单架构
+推荐方案：分层式 Agent 设计
+我建议采用 分层式 Agent 设计，结合 Plan-and-Execute 模式和 外部记忆增强，具体分为以下几个模块：
+
+Code Scanner Agent：扫描所有文件，生成代码摘要（summary）和依赖关系。
+Planner Agent：基于摘要和任务，生成重构或开发计划。
+Executor Agent：按计划逐文件或逐片段执行具体任务。
+Memory Manager：管理外部记忆，存储摘要和中间结果。
+优点
+分层解耦：每个 Agent 专注单一职责，降低复杂度。
+外部记忆：避免 token 限制，通过摘要压缩上下文。
+模块化：易扩展和调试。
+详细设计与实现
+1. Code Scanner Agent
+功能：读取所有文件，生成简洁的摘要（例如函数列表、类定义、依赖关系），并检测文件间的调用关系。
+处理超长文件：将文件分片，逐片分析，最后汇总。
+代码示例
+
+python
+Wrap
+Copy
+import os
+import re
+
+def scan_file(file_path, max_chunk_size=4000):
+    with open(file_path, "r") as f:
+        content = f.read()
+    
+    # 分片处理
+    chunks = [content[i:i+max_chunk_size] for i in range(0, len(content), max_chunk_size)]
+    summaries = []
+    for chunk in chunks:
+        prompt = f"分析以下代码片段，生成简洁摘要（列出函数、类、变量等）：\n```python\n{chunk}\n```"
+        summary = call_deepseek(prompt)
+        summaries.append(summary)
+    
+    # 合并摘要
+    full_prompt = f"合并以下摘要，生成 {file_path} 的完整摘要：\n{summaries}"
+    file_summary = call_deepseek(full_prompt)
+    return file_summary
+
+def scan_project(project_dir):
+    summaries = {}
+    for root, _, files in os.walk(project_dir):
+        for file in files:
+            if file.endswith(".py"):
+                file_path = os.path.join(root, file)
+                summaries[file_path] = scan_file(file_path)
+    return summaries
+
+# 测试
+project_summaries = scan_project("./my_project")
+print(project_summaries)
+2. Planner Agent
+功能：根据任务（重构或新功能）和代码摘要，生成具体执行计划。
+输入：用户任务 + 项目摘要。
+输出：步骤列表，例如“修改文件 A 的函数 X”、“在文件 B 新增函数 Y”。
+代码示例
+
+python
+Wrap
+Copy
+def generate_plan(task, project_summaries):
+    summaries_text = "\n".join([f"{path}: {summary}" for path, summary in project_summaries.items()])
+    prompt = f"""
+    你是一个代码重构专家。以下是项目中各文件的摘要：
+    {summaries_text}
+    用户任务：{task}
+    请生成一个详细的执行计划，列出具体步骤（例如修改哪个文件、做什么操作）。
+    """
+    plan = call_deepseek(prompt)
+    return plan.split("\n")  # 每行一个步骤
+
+# 测试
+task = "为项目添加日志功能，要求每个函数调用时记录日志"
+plan = generate_plan(task, project_summaries)
+print(plan)
+3. Executor Agent
+功能：按计划逐个执行任务，处理单文件时分片操作。
+处理超长文件：将文件分片，逐片修改，最后合并。
+代码示例
+
+python
+Wrap
+Copy
+def chunk_file(content, max_length=4000):
+    lines = content.split("\n")
+    chunks = []
+    current_chunk = ""
+    for line in lines:
+        if len(current_chunk) + len(line) < max_length:
+            current_chunk += line + "\n"
+        else:
+            chunks.append(current_chunk)
+            current_chunk = line + "\n"
+    if current_chunk:
+        chunks.append(current_chunk)
+    return chunks
+
+def execute_step(step, file_path):
+    with open(file_path, "r") as f:
+        content = f.read()
+    
+    chunks = chunk_file(content)
+    refactored_chunks = []
+    for i, chunk in enumerate(chunks):
+        prompt = f"根据以下步骤修改代码片段（第 {i+1} 部分）：{step}\n原始代码：\n```python\n{chunk}\n```"
+        refactored_chunk = call_deepseek(prompt)
+        refactored_chunks.append(refactored_chunk)
+    
+    # 合并结果并写入文件
+    new_content = "\n".join(refactored_chunks)
+    with open(file_path, "w") as f:
+        f.write(new_content)
+    return new_content
+
+def execute_plan(plan, project_dir):
+    for step in plan:
+        # 假设步骤格式为 "修改文件 X: 操作 Y"
+        if "修改文件" in step:
+            file_path = step.split(":")[0].replace("修改文件", "").strip()
+            full_path = os.path.join(project_dir, file_path)
+            execute_step(step, full_path)
+            print(f"已处理: {step}")
+
+# 测试
+execute_plan(plan, "./my_project")
+4. Memory Manager
+功能：存储摘要、中间结果，避免重复计算。
+实现：简单用字典或文件存储，高级可用向量数据库（如 FAISS）。
+代码示例
+
+python
+Wrap
+Copy
+class MemoryManager:
+    def __init__(self):
+        self.memory = {}
+
+    def save(self, key, value):
+        self.memory[key] = value
+
+    def load(self, key):
+        return self.memory.get(key)
+
+memory = MemoryManager()
+memory.save("project_summaries", project_summaries)
+使用流程
+扫描代码：运行 scan_project 生成项目摘要，存入 Memory。
+生成计划：用 generate_plan 基于任务和摘要生成步骤。
+执行任务：用 execute_plan 按步骤修改代码。
+完整调用示例
+
+python
+Wrap
+Copy
+# 用户任务
+task = "为项目添加日志功能，要求每个函数调用时记录日志"
+
+# 1. 扫描项目
+project_summaries = scan_project("./my_project")
+memory.save("project_summaries", project_summaries)
+
+# 2. 生成计划
+plan = generate_plan(task, project_summaries)
+print("执行计划：", plan)
+
+# 3. 执行计划
+execute_plan(plan, "./my_project")
+处理多文件依赖的关键点
+摘要包含依赖：在 scan_file 中让模型识别文件间的调用关系（例如 import 语句、函数调用）。
+Planner 考虑依赖：Prompt 中要求模型在计划中处理依赖顺序（例如先改被调用的文件）。
+分片时保留上下文：在分片边界添加少量冗余代码（如前几行），确保模型理解上下文。
+与流行设计的结合
+Plan-and-Execute：本方案核心，Planner 和 Executor 分工明确。
+RAG（检索增强生成）：Memory Manager 可升级为向量数据库，检索相关文件摘要。
+Multi-Agent System：Scanner、Planner、Executor 可视为独立 Agent，异步协作。
+优化建议
+验证机制：每次执行后运行单元测试，确保代码正确性。
+增量更新：只处理变更的文件，减少开销。
+并行处理：多文件无依赖时并行执行，提高效率。
+如果需要更具体的设计（例如某个文件示例的重构），请提供更多细节，我可以进一步完善代码！
+
+
+
+
+
+
+你的设计有几个问题
+1.首先，scan_project 生成的总结总长度可能就会超过token上限
+然后generate_plan 里接收的事整个project_summaries拼接，就可能超过上限
+而且scan_file生成的摘要到底要多细节，太粗了可能会漏掉细节
+
+2.generate_plan只能生成很粗的方案，因为他只能看到summarie， 看不到原代码的细节
+所以实际执行还是取决于Executor Agent
+但是Executor Agent 是逐个文件逐个步骤处理的
+分成了多次处理，但是这些操作之间没有沟通，只能粗略的依赖于generate_plan的计划
+但是处理细节代码的时候才会发现很多plan的不合理的地反，需要动态调整的地方
+或者某个步骤就是要处理多个文件的，比如某个变量所有引用的地方要改写法
+这种互相没有沟通的修改就容易互相冲突，两次修改两个地方的风格不统一，或者新用到的变量名都不一样，调用函数的函数名和参数都不一样
+
+3.MemoryManager我的理解，不光用来存summarie， 不然也太废了
+Executor Agent 多次执行其实可以认为是多个子任务
+他们之间需要沟通的地方就应该通过MemoryManager
+这样一个子任务才能知道另外一个子任务在另一个文件里新写了一个函数和变量，才能用上，不然靠猜么？
+还有scan_file 做总结的时候其实很机械，很多变量和函数的实际作用，其实是要看他在别的文件里是怎么使用的，通过调用的关系才能分析出变量和函数的实际含义和作用
+这种也需要MemoryManager从中协调
+从这里也可以看出scan_project 写的太简单了，想的太单纯了。代码不可能这么解耦，一个文件里的功能都在单文件里是不可能的
+你好好想想
+
+一种可能的方案是这样的：
+
+scan_file 扫描的时候，让他提出一些疑问，疑问存在MemoryManager里，就是question_list
+然后只要question_list非空，就重新调用scan_project_slove_question，去重新扫描一遍，看看能否解惑这个问题，这期间可能会push新的问题
+这些问题要判重，防止死循环
+直到问题列表空了，说明没疑问了
+此时结合question_list当做prompt前缀，scan_project 做plan
+然后让他反思，看看plan有没有细节需要核实，有没有多个文件之间的配合问题，这些放入question_list
+然后重新再做plan，直到没疑问为止，此时这个plan应该完善了，列出需要多文件配合的沟通点存入memory
+把一些实操中可能的疑问都存到memory里
+
+然后才开始Executor Agen， 由于plan定的足够细，实操时遇到问题的几率很低
+如果遇到疑问，就去memory里去查询是不是先想到了
+如果没想到，就把这个待解决问题放入question_list ，跳过继续执行
+全部跑完，如果发现有question_list非空，就打回重新做plan，着重修复这些问题
+然后重新执行Executor Agen
+
+我说的可能有点乱，你想想，怎么把他理顺。或者你有没有启发想出更好的方法，欢迎补充
+
+2 / 2
+
+
+
+你提出的问题非常有深度，指出了我之前设计中的几个关键缺陷，尤其是上下文 token 限制、跨文件依赖、动态调整不足以及 MemoryManager 的作用不够充分等问题。你的改进方案（通过 question_list 迭代解决问题并完善 plan）非常有启发性，我会基于你的反馈和建议重新设计一个更健壮的 Agent 系统，解决这些问题，同时理顺逻辑并提供清晰的实现思路。
+
+问题总结与改进方向
+你指出的问题
+Scan 和 Plan 的 token 超限问题
+scan_project 生成的 project_summaries 拼接后可能超限，导致 generate_plan 无法处理。
+scan_file 的摘要粒度难以平衡，太粗糙漏细节，太细致又超限。
+Plan 的粗糙与 Executor 的局限
+generate_plan 只依赖摘要，缺乏细节，导致计划不准确。
+Executor Agent 逐文件、逐步骤执行，缺乏跨文件沟通，容易产生冲突（如变量名不一致、函数签名不统一）。
+动态调整能力不足，发现问题时无法及时修正 plan。
+MemoryManager 的作用不足
+只存摘要太简单，未能用于子任务间沟通。
+scan_file 无法分析跨文件依赖，理解变量/函数的实际作用受限。
+你的改进方案的核心
+迭代疑问解决：通过 question_list 记录疑问，迭代扫描和计划，直到问题清空。
+细化 Plan：结合疑问反思，确保 plan 足够详细，包含多文件协作点。
+MemoryManager 增强：存储疑问、协作点和中间结果，支持动态调整。
+我的改进目标
+解决 token 限制：通过分层摘要和动态检索。
+增强跨文件理解：引入依赖分析和协作机制。
+动态调整计划：支持实时反馈和迭代优化。
+强化 MemoryManager：作为任务间沟通和知识积累的核心。
+重新设计的 Agent 系统
+系统架构
+Code Analyzer Agent（替代 scan_project）
+扫描代码，生成分层摘要和依赖图，提出疑问存入 MemoryManager。
+Planner Agent
+基于摘要和疑问迭代生成计划，直到无疑问。
+输出详细计划，包括跨文件协作点。
+Executor Agent
+执行计划，实时反馈问题到 MemoryManager，动态调整。
+MemoryManager
+存储摘要、依赖图、疑问列表（question_list）、协作点和中间结果。
+处理流程
+初始化分析：扫描代码，生成摘要和疑问。
+迭代疑问解决：反复扫描和分析，直到疑问清空。
+计划生成与优化：生成详细计划，反思并完善。
+执行与反馈：执行计划，记录新问题，必要时回退重做。
+详细实现
+1. MemoryManager 定义
+python
+Wrap
+Copy
+class MemoryManager:
+    def __init__(self):
+        self.summaries = {}  # 文件摘要 {file_path: summary}
+        self.dependencies = {}  # 依赖图 {file_path: [dep_files]}
+        self.question_list = []  # 疑问列表
+        self.collaborations = {}  # 协作点 {task_id: {file_path: action}}
+        self.results = {}  # 中间结果 {file_path: modified_content}
+
+    def add_question(self, question, source_file):
+        if question not in [q["text"] for q in self.question_list]:
+            self.question_list.append({"text": question, "source": source_file})
+
+    def save_summary(self, file_path, summary):
+        self.summaries[file_path] = summary
+
+    def save_dependency(self, file_path, dep_files):
+        self.dependencies[file_path] = dep_files
+
+    def save_collaboration(self, task_id, file_path, action):
+        if task_id not in self.collaborations:
+            self.collaborations[task_id] = {}
+        self.collaborations[task_id][file_path] = action
+
+memory = MemoryManager()
+2. Code Analyzer Agent
+功能：分片扫描文件，生成摘要，分析依赖，提出疑问。
+处理超长文件：分片后逐片分析，最后汇总。
+python
+Wrap
+Copy
+def analyze_file(file_path, memory, max_chunk_size=4000):
+    with open(file_path, "r") as f:
+        content = f.read()
+    
+    chunks = [content[i:i+max_chunk_size] for i in range(0, len(content), max_chunk_size)]
+    chunk_summaries = []
+    for chunk in chunks:
+        prompt = f"""
+        分析以下代码片段，生成摘要（函数、类、变量列表），并提出疑问（例如未定义的变量、调用外部函数）：
+        ```python
+        {chunk}
+返回格式：
+
+Summary: <摘要内容>
+Questions: <疑问列表，用逗号分隔> """ response = call_deepseek(prompt) summary, questions = response.split("Questions:")[0].replace("Summary:", "").strip(),
+response.split("Questions:")[1].strip().split(", ") chunk_summaries.append(summary) for q in questions: if q: memory.add_question(q, file_path)
+合并摘要并分析依赖
+full_prompt = f"合并以下摘要，生成 {file_path} 的完整摘要，并列出依赖的其他文件：\n{chunk_summaries}"
+full_response = call_deepseek(full_prompt)
+summary = full_response.split("Dependencies:")[0].strip()
+deps = full_response.split("Dependencies:")[1].strip().split(", ") if "Dependencies:" in full_response else []
+memory.save_summary(file_path, summary)
+memory.save_dependency(file_path, deps)
+
+def analyze_project(project_dir, memory):
+for root, _, files in os.walk(project_dir):
+for file in files:
+if file.endswith(".py"):
+analyze_file(os.path.join(root, file), memory)
+
+迭代解决疑问
+def resolve_questions(project_dir, memory):
+while memory.question_list:
+prev_questions = len(memory.question_list)
+analyze_project(project_dir, memory)  # 重新扫描，尝试解答
+
+检查是否无进展（死循环）
+if len(memory.question_list) == prev_questions:
+print("无法解决所有疑问，剩余：", memory.question_list)
+break
+
+text
+Wrap
+Copy
+
+#### 3. Planner Agent
+- **功能**：迭代生成计划，反思并优化，直到无疑问。
+
+```python
+def generate_plan(task, memory):
+    summaries_text = "\n".join([f"{path}: {summary}" for path, summary in memory.summaries.items()])
+    deps_text = "\n".join([f"{path}: {deps}" for path, deps in memory.dependencies.items()])
+    questions_text = "\n".join([f"{q['text']} (from {q['source']})" for q in memory.question_list])
+    
+    prompt = f"""
+    你是一个代码专家。以下是项目摘要、依赖关系和当前疑问：
+    Summaries:
+    {summaries_text}
+    Dependencies:
+    {deps_text}
+    Questions:
+    {questions_text}
+    任务：{task}
+    请生成详细执行计划（每步指定文件和操作），并反思计划是否有遗漏或需要多文件协作的地方。
+    返回格式：
+    - Plan: <步骤列表，用换行分隔>
+    - Reflections: <反思内容，可能提出新疑问>
+    """
+    response = call_deepseek(prompt)
+    plan = response.split("Reflections:")[0].replace("Plan:", "").strip().split("\n")
+    reflections = response.split("Reflections:")[1].strip() if "Reflections:" in response else ""
+    
+    # 处理反思中的新疑问
+    if reflections:
+        for line in reflections.split("\n"):
+            if line.startswith("疑问：") or line.startswith("Question:"):
+                memory.add_question(line, "Planner")
+    
+    return plan
+
+def optimize_plan(task, memory):
+    while memory.question_list:
+        plan = generate_plan(task, memory)
+        if not memory.question_list:  # 无新疑问，计划完成
+            break
+    return plan
+4. Executor Agent
+功能：执行计划，记录新问题，必要时回退。
+python
+Wrap
+Copy
+def execute_step(step, memory):
+    file_path = step.split(":")[0].strip()
+    action = ":".join(step.split(":")[1:]).strip()
+    
+    with open(file_path, "r") as f:
+        content = f.read()
+    
+    prompt = f"""
+    根据以下步骤修改代码：
+    步骤：{action}
+    原始代码：
+    ```python
+    {content}
+如果有疑问或冲突，请在返回中注明。
+返回格式：
+
+Modified: <修改后的代码>
+Issues: <问题列表，用逗号分隔> """ response = call_deepseek(prompt) modified = response.split("Issues:")[0].replace("Modified:", "").strip() issues = response.split("Issues:")[1].strip().split(", ") if "Issues:" in response else []
+for issue in issues:
+if issue:
+memory.add_question(issue, file_path)
+
+memory.results[file_path] = modified
+with open(file_path, "w") as f:
+f.write(modified)
+
+def execute_plan(plan, memory):
+for step in plan:
+execute_step(step, memory)
+if memory.question_list:
+print("执行中发现问题：", memory.question_list)
+return False  # 需要回退重做
+return True
+
+text
+Wrap
+Copy
+
+#### 5. 主流程
+```python
+def refactor_project(project_dir, task):
+    memory = MemoryManager()
+    
+    # 初始分析
+    analyze_project(project_dir, memory)
+    resolve_questions(project_dir, memory)
+    
+    # 生成并优化计划
+    plan = optimize_plan(task, memory)
+    print("最终计划：", plan)
+    
+    # 执行并反馈
+    while not execute_plan(plan, memory):
+        plan = optimize_plan(task, memory)  # 重新优化计划
+
+# 测试
+refactor_project("./my_project", "为项目添加日志功能")
+改进亮点
+Token 限制：通过分片和摘要分层管理上下文，Planner 只看摘要和疑问。
+跨文件依赖：analyze_file 提取依赖图，MemoryManager 记录协作点。
+动态调整：疑问驱动迭代，Executor 反馈问题，重新优化。
+MemoryManager 增强：存储疑问、依赖、中间结果，协调子任务。
+进一步优化
+优先级排序：为 question_list 添加优先级，先解决关键疑问。
+并行执行：无依赖的步骤并行处理。
+验证机制：每次执行后运行测试，确保一致性。
+
+解决一个question没有这么简单，有些question可能会牵连出一大串子问题，子问题又会有子问题
+要标记出他们的树形关系
+一个问题的所有儿子都解决才算解决
+这个最好用bfs，一次一次的遍历
+直到队列清空。每次都要检查所有节点是不是儿子问题都解决了
+
+
+你说得非常对，解决一个 question 确实可能引发一系列子问题，形成树形依赖关系。简单地用列表（如 question_list）来管理这些问题确实不够严谨，会丢失问题的层次性和解决顺序。为了更精确地处理这种复杂情况，我们需要：
+
+树形结构：将 question_list 升级为问题树，每个问题节点可以有子问题。
+BFS（广度优先搜索）：按层级遍历问题树，确保子问题解决后才标记父问题为已解决。
+状态跟踪：每个问题节点需要状态（未解决、解决中、已解决），只有当所有子问题解决时，父问题才算完成。
+基于你的建议，我会重新设计 MemoryManager 和疑问解决逻辑，引入树形结构和 BFS 遍历，确保问题解决的完整性和顺序性。以下是详细实现：
+
+改进设计
+1. MemoryManager 重构
+用树形结构管理问题，每个问题节点包含：
+text：问题描述。
+source：问题来源（如文件路径或 "Planner"）。
+children：子问题列表。
+status：状态（"unsolved"、"solving"、"solved"）。
+id：唯一标识符，便于追踪。
+用 BFS 遍历问题树，逐步解决。
+python
+Wrap
+Copy
+from collections import deque
+
+class QuestionNode:
+    def __init__(self, text, source, qid):
+        self.text = text
+        self.source = source
+        self.qid = qid
+        self.children = []  # 子问题
+        self.status = "unsolved"  # 未解决、解决中、已解决
+
+    def add_child(self, child_node):
+        self.children.append(child_node)
+
+    def is_resolved(self):
+        return self.status == "solved" and all(child.is_resolved() for child in self.children)
+
+class MemoryManager:
+    def __init__(self):
+        self.summaries = {}  # 文件摘要
+        self.dependencies = {}  # 依赖图
+        self.question_tree = []  # 根问题列表
+        self.collaborations = {}  # 协作点
+        self.results = {}  # 中间结果
+        self.question_counter = 0  # 用于生成唯一 qid
+
+    def add_question(self, text, source, parent_qid=None):
+        self.question_counter += 1
+        new_node = QuestionNode(text, source, f"Q{self.question_counter}")
+        if parent_qid:
+            parent = self.find_question(parent_qid)
+            if parent:
+                parent.add_child(new_node)
+        else:
+            self.question_tree.append(new_node)
+        return new_node.qid
+
+    def find_question(self, qid):
+        queue = deque(self.question_tree)
+        while queue:
+            node = queue.popleft()
+            if node.qid == qid:
+                return node
+            queue.extend(node.children)
+        return None
+
+    def has_unresolved_questions(self):
+        return any(not node.is_resolved() for node in self.question_tree)
+
+    # BFS 遍历问题树，返回未解决的问题
+    def get_unresolved_questions(self):
+        unresolved = []
+        queue = deque(self.question_tree)
+        while queue:
+            node = queue.popleft()
+            if not node.is_resolved():
+                unresolved.append(node)
+            queue.extend(node.children)
+        return unresolved
+
+    def save_summary(self, file_path, summary):
+        self.summaries[file_path] = summary
+
+    def save_dependency(self, file_path, dep_files):
+        self.dependencies[file_path] = dep_files
+
+memory = MemoryManager()
+2. Code Analyzer Agent
+在分析代码时，遇到疑问时记录父子关系。
+python
+Wrap
+Copy
+def analyze_file(file_path, memory, max_chunk_size=4000):
+    with open(file_path, "r") as f:
+        content = f.read()
+    
+    chunks = [content[i:i+max_chunk_size] for i in range(0, len(content), max_chunk_size)]
+    chunk_summaries = []
+    for chunk in chunks:
+        prompt = f"""
+        分析以下代码片段，生成摘要并提出疑问（可能引发子问题）：
+        ```python
+        {chunk}
+返回格式：
+
+Summary: <摘要内容>
+Questions: <疑问1> [子问题1, 子问题2], <疑问2> [子问题3] """ response = call_deepseek(prompt) summary = response.split("Questions:")[0].replace("Summary:", "").strip() questions_part = response.split("Questions:")[1].strip() if "Questions:" in response else ""
+chunk_summaries.append(summary)
+if questions_part:
+for q in questions_part.split(", "):
+if "[" in q:
+parent_q, children = q.split("[", 1)
+parent_q = parent_q.strip()
+children = children.rstrip("]").split(", ")
+parent_qid = memory.add_question(parent_q, file_path)
+for child_q in children:
+if child_q.strip():
+memory.add_question(child_q.strip(), file_path, parent_qid)
+else:
+memory.add_question(q.strip(), file_path)
+
+full_prompt = f"合并以下摘要，生成 {file_path} 的完整摘要，并列出依赖：\n{chunk_summaries}"
+full_response = call_deepseek(full_prompt)
+summary = full_response.split("Dependencies:")[0].strip()
+deps = full_response.split("Dependencies:")[1].strip().split(", ") if "Dependencies:" in full_response else []
+memory.save_summary(file_path, summary)
+memory.save_dependency(file_path, deps)
+
+def analyze_project(project_dir, memory):
+for root, _, files in os.walk(project_dir):
+for file in files:
+if file.endswith(".py"):
+analyze_file(os.path.join(root, file), memory)
+
+text
+Wrap
+Copy
+
+#### 3. 疑问解决（BFS）
+- 用 BFS 遍历问题树，逐层解决。
+
+```python
+def resolve_questions(project_dir, memory):
+    while memory.has_unresolved_questions():
+        unresolved = memory.get_unresolved_questions()
+        prev_unresolved_count = len(unresolved)
+        
+        for node in unresolved:
+            if node.status == "unsolved":
+                node.status = "solving"
+                prompt = f"""
+                尝试解决以下问题（来源：{node.source}）：
+                问题：{node.text}
+                项目摘要：{memory.summaries.get(node.source, '无摘要')}
+                已知依赖：{memory.dependencies.get(node.source, [])}
+                返回格式：
+                - Resolution: <解决方案或无解>
+                - New Questions: <新疑问> [子问题1, 子问题2]
+                """
+                response = call_deepseek(prompt)
+                resolution = response.split("New Questions:")[0].replace("Resolution:", "").strip()
+                new_questions = response.split("New Questions:")[1].strip() if "New Questions:" in response else ""
+                
+                if resolution != "无解":
+                    node.status = "solved" if not node.children else "solving"  # 有子问题则等待
+                if new_questions:
+                    for q in new_questions.split(", "):
+                        if "[" in q:
+                            parent_q, children = q.split("[", 1)
+                            parent_qid = memory.add_question(parent_q.strip(), node.source, node.qid)
+                            for child_q in children.rstrip("]").split(", "):
+                                if child_q.strip():
+                                    memory.add_question(child_q.strip(), node.source, parent_qid)
+                        else:
+                            memory.add_question(q.strip(), node.source, node.qid)
+        
+        # 检查是否无进展
+        if len(memory.get_unresolved_questions()) == prev_unresolved_count:
+            print("无法解决所有疑问，剩余：", [n.text for n in memory.get_unresolved_questions()])
+            break
+4. Planner Agent
+在疑问清空后生成计划。
+python
+Wrap
+Copy
+def generate_plan(task, memory):
+    summaries_text = "\n".join([f"{path}: {summary}" for path, summary in memory.summaries.items()])
+    deps_text = "\n".join([f"{path}: {deps}" for path, deps in memory.dependencies.items()])
+    
+    prompt = f"""
+    根据以下信息生成详细执行计划：
+    Summaries:
+    {summaries_text}
+    Dependencies:
+    {deps_text}
+    任务：{task}
+    返回格式：
+    - Plan: <步骤列表，用换行分隔>
+    - Reflections: <反思，可能提出新疑问>
+    """
+    response = call_deepseek(prompt)
+    plan = response.split("Reflections:")[0].replace("Plan:", "").strip().split("\n")
+    reflections = response.split("Reflections:")[1].strip() if "Reflections:" in response else ""
+    
+    if reflections:
+        for line in reflections.split("\n"):
+            if line.startswith("疑问：") or line.startswith("Question:"):
+                memory.add_question(line, "Planner")
+    
+    return plan
+
+def optimize_plan(task, memory):
+    plan = generate_plan(task, memory)
+    if memory.has_unresolved_questions():
+        resolve_questions("", memory)  # 空目录表示仅用已有信息解决
+        return optimize_plan(task, memory)  # 递归优化
+    return plan
+5. 主流程
+python
+Wrap
+Copy
+def refactor_project(project_dir, task):
+    memory = MemoryManager()
+    
+    # 初始分析和疑问解决
+    analyze_project(project_dir, memory)
+    resolve_questions(project_dir, memory)
+    
+    # 生成并优化计划
+    plan = optimize_plan(task, memory)
+    print("最终计划：", plan)
+
+# 测试
+refactor_project("./my_project", "为项目添加日志功能")
+改进亮点
+树形问题管理：
+每个问题节点有子问题，父问题依赖子问题的解决。
+用 qid 追踪父子关系。
+BFS 遍历：
+按层级解决，确保子问题优先处理。
+每次检查所有节点的状态。
+动态扩展：
+新子问题动态加入树中，保持结构的完整性。
+进一步优化
+优先级：为问题节点添加优先级（如影响范围大的先解决）。
+剪枝：若某个问题无解且不关键，可标记为忽略。
+并行：无依赖的子问题并行解决。
+这种设计应该能更好地处理复杂疑问的树形依赖。
