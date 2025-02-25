@@ -871,3 +871,336 @@ agent的数据结构有
 理解我的设计，你觉得有没有不合理的地方，能否改进？帮我完善他。
 给出关键代码的实现。
 
+----------------------------------------
+
+
+以下是一个重构多文件工程的vscode插件的相关代码（typescript）
+
+export async function queryCodeReDesign(
+    cvbContent: string,
+    userRequest: string,
+    outputChannel: vscode.OutputChannel,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const requestContent = `
+【格式说明】
+- CVB 格式说明：${Cvb.getFormatDescription()}
+- TCVB 格式说明：${TCVB.getFormatDescription()}
+
+【任务说明】
+请读取以下 CVB 格式代码，并根据需求修改代码。注意：
+1. 如果需求涉及“移动代码”，请务必修改原始代码，将代码重新封装到新位置，而非简单复制；
+2. 修改后的代码必须完整、可执行，不能有任何省略；
+3. 输出内容必须严格遵守 TCVB 格式（仅正文部分含 TCVB 标记，其他地方如有 TCVB 开始或结束符需转义），以确保后续合并正确；
+4. 注意不要将某文件的修改内容误认为是其他文件，请一条一条列出具体修改项及对应文件路径。
+
+【输出要求】
+1. 先输出你对需求及相关代码的理解，请按层级缩进列出笔记，便于整理思路；
+2. 再输出详细的方案大纲，格式如下：
+    需求理解:
+        …
+    查询资料:
+        列出每个关键修改点所在的文件路径
+    修改方案:
+        文件路径1:
+            描述修改点，避免用大块代码,注意只输出关键修改,不要太长, 不要加载无用的上下文。不要输出没有改动部分的代码
+        文件路径2:
+            描述修改点，同上
+        …
+    最后检查:
+        对以上输出的方案大纲进行反思，重新阅读输入代码，结合以上方案大纲，逐条检查有没有和原文对不上的地方。检查方案是否完备、文件路径是否正确，设计思路是否无误，如有问题请提出修正意见
+3. 请确保输出中既包含错误部分的修正说明，又完整保留原有正确部分，不得遗漏任何内容；
+4. 用最小改动实现需求目的。
+
+【输入部分】
+- 输入代码：${cvbContent}
+- 需求描述：${userRequest}
+
+【最终输出】
+请先输出思路与方案大纲，最后汇总输出符合 TCVB 格式的精确代码。
+`;
+
+    return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_TCVB', abortSignal); // 添加结束字符串
+}
+
+export class Cvb {
+  private m_recMetadata: Record<string, string>;
+  private m_recFiles: Record<string, string>;
+
+  constructor(cvbContent?: string) {
+    this.m_recMetadata = {};
+    this.m_recFiles = {};
+    if (cvbContent) {
+      const { metadata, files } = this.parse(cvbContent);
+      this.m_recMetadata = metadata;
+      this.m_recFiles = files;
+    }
+  }
+
+  public static getFormatDescription(): string {
+    return `
+CVB 格式介绍:
+- 文件以 "## BEGIN_CVB" 开头，以 "## END_CVB" 结尾。
+- 元数据部分以 "## META" 开头，以 "## END_META" 结尾，包含用户需求和时间戳。
+- 每个文件以 "## FILE:文件路径" 开头，紧接着是 Markdown 格式的代码块，包含文件内容。
+- 多个文件按顺序拼接在一起。
+`;
+  }
+}
+
+export class TCVB {
+ private m_arrOperations: TcvbOperation[] = [];
+  public static getFormatDescription(): string {
+    return `
+TCVB 格式规范：
+
+## BEGIN_TCVB
+[文件块1]
+[文件块2]
+...
+## END_TCVB
+
+文件块格式：
+## FILE:<文件绝对路径>
+[操作1]
+[操作2]
+...
+
+操作类型：
+
+1. 全局替换操作(GLOBAL-REPLACE):
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+[markdown代码块:被全局替换的内容, 可以在需要被替换的文本前后包含一些上下文帮助精确替换，一般是上下各3行。不要太长，不要带太多不必要的上下文，因为输出越长就越可能出错导致匹配不上。总长度不要超过10行，尽量不要大块的替换代码，而是切成很多小块替换。]
+## NEW_CONTENT
+[markdown代码块:新内容]
+
+2. 创建操作(CREATE):
+## OPERATION:CREATE
+[markdown代码块:直接跟正文内容，表示新文件的全部内容]
+
+注意：
+1. 所有OPERATION操作以行为单位
+2. 一个'## FILE'下可以有多个'## OPERATION'
+3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆(如果需要可以超过3行)
+4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉。
+5. 注意TCVB和CVB的区别。CVB是完整的内容，而TCVB是用来生成差量同步的，通过多个OPERATION去操作已有CVB合成新CVB
+6. 插入和删除操作都可以转化为替换操作
+7. 用来匹配的锚点必须和原文的格式完全一致，不能有缺失，不能丢弃注释。
+8. 注意不要丢失OPERATION而直接输出代码块
+9. 不要私自加入不必要的空行
+10.如果是在一个已有文件里插入大块代码，不应该用CREATE，而是用替换的方式插入
+`;
+  }
+}
+}
+
+
+/**
+ * 调用 DeepSeek API
+ * @param userContent 用户输入内容，可以是字符串或字符串数组
+ * @param systemContent 系统提示内容
+ * @param outputChannel 输出通道，用于实时显示流式内容
+ * @param streamMode 是否启用流式模式
+ * @param endstring 结束字符串，用于检查输出是否包含特定字符串
+ * @param abortSignal 用于中断请求的信号
+ * @returns API 返回的完整内容
+ */
+export async function callDeepSeekApi(
+    userContent: string | {role:string, content: string}[],  // 修改为支持 string 或 string[]
+    systemContent: string = 'You are a helpful assistant.',
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    endstring?: string,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig();
+    const userStopException = 'operation stop by user';
+
+    if (!apiKey) {
+        vscode.window.showErrorMessage('DeepSeek API Key is not configured. Please set it in the settings.');
+        return null;
+    }
+
+    if (!modelName || !apiBaseURL) {
+        vscode.window.showErrorMessage('DeepSeek Model Name or API Base URL is not configured.');
+        return null;
+    }
+
+    try {
+        const openai = new OpenAI({
+            apiKey: apiKey,
+            baseURL: apiBaseURL,
+        });
+
+        if (outputChannel) {
+            outputChannel.clear();
+            outputChannel.show();
+        }
+
+        // 构造消息体
+        let messages_body: OpenAI.ChatCompletionMessageParam[] = [];
+        if (Array.isArray(userContent)) {
+            messages_body.push({ role: 'system', content: systemContent });
+            // 如果 userContent 是数组，按交替方式生成消息
+            for (let i = 0; i < userContent.length; i++) {
+                const role = (userContent[i].role === 'user') ? 'user' : 'assistant';
+                messages_body.push({ role, content: userContent[i].content });
+            }
+        } else {
+            // 如果是单个字符串，默认是 'user' 角色
+            messages_body = [
+                { role: 'system', content: systemContent },
+                { role: 'user', content: userContent },
+            ];
+        }
+
+        let fullResponse = '';
+        let maxAttempts = 5;
+        let attempts = 0;
+
+        vscode.window.showInformationMessage('开始上传DeepSeek API');
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            const response = await openai.chat.completions.create({
+                model: modelName,
+                messages: messages_body,
+                stream: streamMode,
+                max_tokens: 8192,
+                temperature: 0
+            });
+            let thinking = false;
+
+            vscode.window.showInformationMessage('DeepSeek API 正在处理...');
+
+            let chunkResponse = '';
+            let finishReason: string | null = null;
+
+            if (streamMode) {
+                for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+                    if (abortSignal?.aborted) {
+                        throw new Error(userStopException);
+                    }
+                    const content = chunk.choices[0]?.delta?.content || '';
+                    const delta = chunk.choices[0]?.delta;
+                    const think = ('reasoning_content' in delta! && delta.reasoning_content) as string || "";
+
+                    if (!thinking && chunkResponse.length === 0 && think.length > 0){
+                        if (outputChannel) {
+                            outputChannel.append("<think>");
+                        }
+                        thinking = true;
+                    }
+
+                    chunkResponse += content;
+                    if (outputChannel) {
+                        outputChannel.append(content + think);
+                    }
+
+                    if (thinking && content.length > 0){
+                        thinking = false;
+                        if (outputChannel) {
+                            outputChannel.append("</think>");
+                        }
+                    }
+
+                    finishReason = chunk.choices[0]?.finish_reason || null;
+                }
+            } else {
+                const completion = response as OpenAI.Chat.Completions.ChatCompletion;
+                chunkResponse = completion.choices[0].message.content || "";
+                finishReason = completion.choices[0].finish_reason || null;
+                if (outputChannel) {
+                    outputChannel.append(chunkResponse);
+                }
+            }
+
+            // 累积完整响应
+            fullResponse += chunkResponse;
+
+            // 检查终止条件
+            const shouldContinue = 
+                finishReason === 'length' || 
+                (endstring && !fullResponse.includes(endstring));
+
+            if (!shouldContinue) {break;};
+
+            if (abortSignal?.aborted) {
+                throw new Error(userStopException);
+            }
+
+            vscode.window.showWarningMessage('超过最大Token数，正在重试...');
+
+            // 准备下一次请求
+            messages_body.push(
+                { role: 'assistant', content: fullResponse },
+                { role: 'user', content: '你的输出被截断了，请继续输出剩余部分, 不需要```做起始，直接继续输出纯内容:' }
+            );
+        }
+
+        // 最终检查
+        if (endstring && !fullResponse.includes(endstring)) {
+            vscode.window.showWarningMessage('响应未包含结束标记');
+        }
+
+        messages_body.push({ role: 'assistant', content: fullResponse });
+        lastMessageBody = messages_body;
+        return fullResponse;
+
+    } catch (error) {
+        if (error instanceof Error && error.message === userStopException) {
+            vscode.window.showInformationMessage('operation stop by user');
+            return null;
+        }
+        vscode.window.showErrorMessage('API调用失败: ' + (error as Error).message);
+        return null;
+    }
+}
+
+我需要你设计一种通用的agent，来把上面的功能兼容到长上下文
+也就是把调用api改为调用agent
+
+agent的大致数据结构和设计思路如下：
+
+我希望设计一个agent框架处理这个问题
+把多个文件、长上下文的代码块切成很多块，逐个调用agent
+
+agent的数据结构有
+核心工作提示词，指导工作的方式
+目标（用户输入的最终目标）
+互通信息记忆（和目标有关的一些记忆，用来在多轮对话中长期存储的记忆，比如某个函数的潜规则）
+笔记记忆（用来做长期记忆的笔记，用缩进表示层级结构）
+问题列表（从当前输入和互动记忆、笔记记忆中都找不到线索的遗留问题，留待后续输入中寻找线索的问题列表，并标注是否已经被解决）
+任务列表（列出为了达到目标设计的子任务清单，按执行顺序排序，其实就是一个调用栈，允许有层级结构，也就是某个任务下面可以拆成子任务，每个任务后面都有一个括号，里面标注是否已完成）
+当前agent正在执行的子任务
+输入数据：可能是代码块，如果输入完毕，会输入<InputFinish>
+
+输出：
+如果当前任务有子任务，就唤起一个新agent，设置他的子任务。直到所有子任务执行完，他才汇总返回
+对以上每一个数据的修改，要求结构化输出，方便处理
+比如根据新输入的块，修改记忆，问题列表添加新问题，或者标记问题已解答
+还可以增删任务列表，修改任务列表的状态（是否已解决）
+不要提出重复问题等
+根据当前子任务，返回应该返回的值
+
+可以看出，他是一个树状搜索的控制流
+对于长上下文，他如果想通读一遍，他可以每次唤起一个子任务，读取下一个分块,而这是个tool，可以自动给下一个唤起的子任务装填下一个代码分块
+
+理解我的设计，你觉得有没有不合理的地方，能否改进？帮我完善他。
+给出关键代码的实现。
+
+一些建议：
+把CVB进行扩展 -> ECVB (Extend CVB)
+把每个文件再加入切页，明确每个分页有一个压缩信息
+每个文件有一个总的压缩信息
+再引入一个Group，把相似功能的文件归类到一起，给一个总结（比如同名的头文件和cpp，或者一个子系统拆出来的MVC几个文件，其实是同一个功能的）
+Group里有文件列表和压缩信息
+压缩信息分两种
+1.摘要，列出所有的类、变量、函数，以及他们的含义和作用分析
+2.缩句，类似摘要，但是是代码连续的，可以让大模型帮忙生成，是一种缩句，把不重要的部分略去
+压缩信息是为了方便大模型能用小窗口加载
+
+ECVB提供接口设置和获取压缩信息，以及对应的metadata（文件路径和页码，或者对应的group等）
+
+我想设计的就是一个通用行的agent，他甚至能把别的chain，workflow也消化成自己的

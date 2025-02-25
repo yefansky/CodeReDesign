@@ -34,6 +34,15 @@ export function clearCurrentOperationController() {
     }
 }
 
+let currentOutputChannel: vscode.OutputChannel | null = null;
+export function getOutputChannel() : vscode.OutputChannel {
+    if (currentOutputChannel) {
+        return currentOutputChannel;
+    }
+    currentOutputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream', 'markdown');
+    return currentOutputChannel;
+}
+
 export async function doUploadCommand(cvbFilePath: string, userPrompt: string, outputChannel: vscode.OutputChannel){
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
@@ -152,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
     hideWorkspaceFolder();
 
     // 创建输出通道
-    const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream', 'markdown');
+    const outputChannel = getOutputChannel();
 
     // 注册命令:开始对话
     let startChatCommand = vscode.commands.registerCommand('codeReDesign.startChat', () => {

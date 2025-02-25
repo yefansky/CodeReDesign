@@ -5,6 +5,7 @@ import { applyCvbToWorkspace} from './cvbManager';
 import { analyzeCode } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand, saveAnalyzeCodeResult} from './extension';
 import { showInputMultiLineBox } from './UIComponents';
+import {getOutputChannel} from './extension';
 
 class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
   private content: Uint8Array = new Uint8Array();
@@ -325,7 +326,7 @@ async function uploadThisCvb(filePath: string) {
   if (!userPrompt) {
     return;
   }
-  const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
+  const outputChannel = getOutputChannel();
   doUploadCommand(filePath, userPrompt, outputChannel);
 }
 
@@ -344,7 +345,7 @@ async function analyzeThisCvb(filePath: string) {
   }
 
   const cvbContent = fs.readFileSync(filePath, 'utf-8');
-  const outputChannel = vscode.window.createOutputChannel('CodeReDesign API Stream');
+  const outputChannel = getOutputChannel();
 
   resetCurrentOperationController();
 
