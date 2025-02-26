@@ -228,7 +228,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     
         const userPrompt = await showInputMultiLineBox({
-            prompt: 'Enter your prompt for the refactoring',
+            prompt: '输入你的重构方案',
             placeHolder: 'e.g., Refactor the code to improve readability',
         });
     
@@ -329,7 +329,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         // 获取用户的分析需求
         const userRequest = await showInputMultiLineBox({
-            prompt: 'Enter your analysis request',
+            prompt: '输入你需要分析的需求',
             placeHolder: 'e.g., Analyze the code for potential bugs',
         });
 

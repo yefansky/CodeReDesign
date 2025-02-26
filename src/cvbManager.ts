@@ -3,9 +3,10 @@ import * as path from "path";
 import * as jschardet from "jschardet"; // 编码检测库
 import * as iconv from "iconv-lite"; // 编码转换库
 import * as vscode from "vscode";
-import { generateFilenameFromRequest } from "./deepseekApi";
+import { generateFilenameFromRequest, callDeepSeekApi } from "./deepseekApi";
 
 import { getLanguageFromPath } from "./languageMapping";
+import {getOutputChannel, getCurrentOperationController} from './extension'
 
 // ================== CVB 核心类 ==================
 export class Cvb {
@@ -693,6 +694,107 @@ function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>): Cvb {
   return cvb;
 }
 
+export async function compressCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
+  // 获取元数据和文件内容
+  const metadata = cvb.getMetadata();
+  const files = cvb.getFiles();
+  const compressedFiles: Record<string, string> = {};
+
+  const outputChannel = getOutputChannel();
+  const signal = getCurrentOperationController().signal;
+
+  // 遍历每个文件并压缩
+  for (const [filePath, fileContent] of Object.entries(files)) {
+      // 构造 API 请求内容
+      const requestContent = `
+      文件路径: ${filePath}
+      
+      文件内容:
+      \`\`\`
+      ${fileContent}
+      \`\`\`
+      
+      用户请求:
+      \`\`\`
+      ${userRequest}
+      \`\`\`
+      
+      请从文件内容中识别并提取出有价值的代码片段，这些片段对理解代码在用户请求中的上下文非常重要。你需要关注以下几点：
+      1. 提取出关键信息的代码块，这些代码块帮助理解用户请求中的核心上下文。比如在重构任务中，需要关注相关的函数、变量及其上下级调用等。
+      2. 需要被处理的内容（如重构代码），应该被提取出来。
+      3. 确定有必要作为“锚点”的代码段，以便后续处理时可以方便地替换。
+      
+      例如：
+      假设给定代码如下：
+      \`\`\`
+      function func1() {
+          // 代码块1
+      }
+      
+      function func2() {
+          // 代码块2
+      }
+      
+      function func3() {
+          // 代码块3
+      }
+      \`\`\`
+      
+      用户请求关注 \`func1\` 和 \`func2\`，并希望忽略 \`func3\`。你应该返回如下结果：
+      
+      \`\`\`
+      function func1() {
+          // 代码块1
+      }
+      ===SEGMENT===
+      function func2() {
+          // 代码块2
+      }
+      \`\`\`
+      
+      注意：
+      1. 只保留 \`func1\` 和 \`func2\`，并通过 \`===SEGMENT===\` 分隔。
+      2. \`func3\` 被丢弃，**但其位置仍然被正确地分隔开**，以确保后续的处理不会出现问题。
+      3. 例子里的 \`\`\` 只是为了便于说明格式清楚，你输出的时候不要有 \`\`\` 包裹代码
+      
+      返回时，请确保**每个代码片段**都保持原始结构，不要有任何多余的文字，并且使用 \`===SEGMENT===\` 来分隔它们，而不是使用 \`\`\`code\`\`\` 或其他分隔符。
+      
+      确保返回的格式是干净且可解析的，只包括代码片段和分隔符，不要包含任何额外的解释或注释信息！
+      
+      `;
+
+      // 系统提示
+      const systemContent = "你是一个代码分析助手。给定一个文件的内容和用户的请求，识别并提取出对理解代码在请求上下文中的有价值的代码片段。注意输出的时候不要有 \`\`\`";
+
+      // 调用 API
+      const response = await callDeepSeekApi(requestContent, systemContent, outputChannel, true, undefined, signal);
+      if (response) {
+          // 处理 API 响应，分隔并连接有价值的代码片段
+          const segments = response.split("===SEGMENT===").map(segment => segment.trim());
+          const compressedContent = segments.join("\n//...CCVB\n");
+          compressedFiles[filePath] = compressedContent;
+      } else {
+          // 如果 API 调用失败，保留原始内容
+          compressedFiles[filePath] = fileContent;
+      }
+  }
+
+  // 构建新的 CVB 对象
+  const newCvb = new Cvb();
+  // 保留原始元数据
+  for (const [key, value] of Object.entries(metadata)) {
+      newCvb.setMetaData(key, value);
+  }
+  // 设置压缩后的文件内容
+  for (const [filePath, content] of Object.entries(compressedFiles)) {
+      newCvb.setFile(filePath, content);
+  }
+
+  newCvb.setMetaData("用户需求", userRequest);
+
+  // 返回压缩后的 CVB 字符串
+  return newCvb;
+}
 // ================== 工具函数 ==================
 
 function escapeRegExp(str: string): string {

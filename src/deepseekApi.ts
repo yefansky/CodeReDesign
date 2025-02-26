@@ -95,7 +95,7 @@ export async function callDeepSeekApi(
 
         let systemPromot : OpenAI.ChatCompletionMessageParam = {role : "system",  content: systemContent};
 
-        if (modelName.includes('r')) {
+        if (/r1|reasoner/i.test(modelName)) {
             temperature = 0.6;
             systemPromot = {role : "user",  content: systemContent};
         }
@@ -130,10 +130,7 @@ export async function callDeepSeekApi(
             }
 
             // 如果是单个字符串，默认是 'user' 角色
-            messages_body = [
-                systemPromot,
-                { role: 'user', content: userContent },
-            ];
+            messages_body.push({ role: 'user', content: userContent });
         }
 
         vscode.window.showInformationMessage('开始上传DeepSeek API');

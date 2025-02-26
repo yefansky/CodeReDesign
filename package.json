@@ -19,7 +19,8 @@
     "onCommand:codeReDesign.applyThisCvb",
     "onCommand:codeReDesign.analyzeCode",
     "onCommand:codeReDesign.uploadThisCvb",
-    "onCommand:codeReDesign.analyzeThisCvb"
+    "onCommand:codeReDesign.analyzeThisCvb",
+    "onCommand:codeReDesign.compressThisCvb"
   ],
   "repository": {
     "type": "git",
@@ -85,6 +86,13 @@
         "icon": "${bug}"
       },
       {
+        "command": "codeReDesign.compressThisCvb",
+        "title": "sidebar compress this CVB",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${beaker}"
+      },
+      {
         "command": "codeReDesign.showGuide",
         "title": "Show Guide",
         "category": "CodeReDesign",
@@ -127,6 +135,10 @@
         },
         {
           "command": "codeReDesign.analyzeThisCvb",
+          "group": "cvb@1"
+        },
+        {
+          "command": "codeReDesign.compressThisCvb",
           "group": "cvb@1"
         }
       ],
