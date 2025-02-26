@@ -138,8 +138,32 @@ export class Cvb {
 CVB 格式介绍:
 - 文件以 "## BEGIN_CVB" 开头，以 "## END_CVB" 结尾。
 - 元数据部分以 "## META" 开头，以 "## END_META" 结尾，包含用户需求和时间戳。
-- 每个文件以 "## FILE:文件路径" 开头，紧接着是 Markdown 格式的代码块，包含文件内容。
+- 每个文件以 "## FILE:文件路径" 开头，紧接着是 Markdown 格式的代码块，也就是一定要用 \`\`\` 包裹文件内容。
 - 多个文件按顺序拼接在一起。
+- 所有 ## 开头的指令提示符前面都不能有空格，必须在行首
+例子：
+    ## BEGIN_CVB
+    ## META
+    需求: 代码重构
+    时间戳: 2025-02-26 12:34:56
+    ## END_META
+
+    ## FILE: /src/main.cpp
+    \`\`\`c++
+    #include <iostream>
+    int main() {
+        std::cout << "Hello, world!" << std::endl;
+        return 0;
+    }
+    \`\`\`
+    ## FILE: /src/utils.cpp
+    \`\`\`c++
+    #include <cmath>
+    double add(double a, double b) {
+        return a + b;
+    }
+    \`\`\`
+    ## END_CVB
 `;
   }
 }
@@ -414,44 +438,158 @@ export class TCVB {
     return `
 TCVB 格式规范：
 
-## BEGIN_TCVB
-[文件块1]
-[文件块2]
-...
-## END_TCVB
+  ## BEGIN_TCVB
+  [文件块1]
+  [文件块2]
+  ...
+  ## END_TCVB
 
-文件块格式：
-## FILE:<文件绝对路径>
-[操作1]
-[操作2]
-...
+  文件块格式：
+  ## FILE:<文件绝对路径>
+  [操作1]
+  [操作2]
+  ...
 
 操作类型：
 
-1. 全局替换操作(GLOBAL-REPLACE):
-## OPERATION:GLOBAL-REPLACE
-## OLD_CONTENT
-[markdown代码块:被全局替换的内容, 可以在需要被替换的文本前后包含一些上下文帮助精确替换，一般是上下各3行。不要太长，不要带太多不必要的上下文，因为输出越长就越可能出错导致匹配不上。总长度不要超过10行，尽量不要大块的替换代码，而是切成很多小块替换。]
-## NEW_CONTENT
-[markdown代码块:新内容]
+1. **全局替换操作(GLOBAL-REPLACE)**:
+    - 适用于需要在文件中替换某一段内容的情况。
+    - 提供被替换的旧内容（OLD_CONTENT）和新的替换内容（NEW_CONTENT）。
+    - 内容应尽量保持简洁，避免过长的上下文。上下文一般保留前后3行，可以根据需要增加，但总长度不要超过10行，避免出错。
+    - 替换操作中的内容需要完整包含在三个反引号（\`\`\`）包裹的代码块中。
+    
+    示例：
+    ## OPERATION:GLOBAL-REPLACE
+    ## OLD_CONTENT
+    \`\`\`
+    #include <iostream>
+    int main() {
+        std::cout << "Hello, world!" << std::endl;
+        return 0;
+    }
+    \`\`\`
+    ## NEW_CONTENT
+    \`\`\`
+    #include <iostream>
+    int main() {
+        std::cout << "Welcome to TCVB format!" << std::endl;
+        return 0;
+    }
+    \`\`\`
+    
+    - **操作说明**:
+        - **OLD_CONTENT**：包含旧代码，通常保留必要的上下文。
+        - **NEW_CONTENT**：包含新代码，将替换掉旧内容。
+        - **重要提示**：尽量避免长段内容的替换，细化为多个小块进行替换。不要丢失注释、空行等结构信息。
 
-2. 创建操作(CREATE):
-## OPERATION:CREATE
-[markdown代码块:直接跟正文内容，表示新文件的全部内容]
+2. **创建操作(CREATE)**:
+    - 创建一个新文件，后面直接给全文代码。
+    - 新文件的全部内容应完整写入代码块中。
+    - 如果文件已经存在，应该有GLOBAL-REPLACE来插入，而不是用CREATE
+    
+    示例：
+    ## OPERATION:CREATE
+    \`\`\`
+    #include <cmath>
+    double add(double a, double b) {
+        return a + b;
+    }
+    \`\`\`
 
-注意：
-1. 所有OPERATION操作以行为单位
-2. 一个'## FILE'下可以有多个'## OPERATION'
-3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆(如果需要可以超过3行)
-4. [markdown代码块], 一定要用\`\`\` ... \`\`\` 包裹,仔细检查不要漏掉。
-5. 注意TCVB和CVB的区别。CVB是完整的内容，而TCVB是用来生成差量同步的，通过多个OPERATION去操作已有CVB合成新CVB
-6. 插入和删除操作都可以转化为替换操作
+    - **操作说明**：
+        - 该操作用于新文件的创建或新增代码块。
+        - 新的代码必须以 Markdown 格式代码块包裹。
+        - 如果在已有文件中插入大块代码，应该使用替换操作，而不是 CREATE 操作。
+
+### 省略标识符规则：
+
+3. **省略标识符（//...CCVB）**:
+    - \`//...CCVB\` 是一个省略标识符，表示代码的某一部分过长或不需要显示，已被省略或删除。
+    - **注意**：省略标识符 **不能** 出现在被替换的内容中。
+    - 如果某段代码包含省略标识符 \`//...CCVB\`，则不能将该标识符的行当作替换操作的锚点的一部分。
+    - 被替换的内容必须位于 \`//...CCVB\` 标识符的上下方，不能跨越该标识符。
+    
+    示例：
+    假设以下代码中有一段被省略：
+    \`\`\`cpp
+    // Some initial setup code...
+    //...CCVB
+    // Remaining logic code...
+    \`\`\`
+
+    在进行全局替换操作时，不能选择跨越 \`//...CCVB\` 标识符的范围。例如：
+    错误的替换示例（跨越省略标识符）：
+    "
+    ## OPERATION:GLOBAL-REPLACE
+    ## OLD_CONTENT
+    \`\`\`
+    // Some initial setup code...
+    //...CCVB
+    // Remaining logic code...
+    \`\`\`
+    "
+
+    正确的替换示例（避免跨越省略标识符）：
+    "
+    ## OPERATION:GLOBAL-REPLACE
+    ## OLD_CONTENT
+    \`\`\`
+    // Some initial setup code...
+    \`\`\`
+    ## NEW_CONTENT
+    \`\`\`
+    // New code after the initial setup
+    \`\`\`
+    "
+
+### 注意：
+1. 所有 OPERATION 操作以行为单位。
+2. 一个 '## FILE' 下可以有多个 '## OPERATION'。
+3. 锚点为连续的多行内容：使用至少3行唯一文本作为锚点，用来标定范围，防止混淆（如果需要可以超过3行）。
+4. [markdown代码块] 一定要用 \`\`\` ... \`\`\` 包裹，仔细检查不要漏掉。
+5. 注意 TCVB 和 CVB 的区别。CVB 是完整的内容，而 TCVB 是用来生成差量同步的，通过多个 OPERATION 去操作已有 CVB 合成新 CVB。
+6. 插入和删除操作都可以转化为替换操作。
 7. 用来匹配的锚点必须和原文的格式完全一致，不能有缺失，不能丢弃注释。
-8. 注意不要丢失OPERATION而直接输出代码块
-9. 不要私自加入不必要的空行
-10.如果是在一个已有文件里插入大块代码，不应该用CREATE，而是用替换的方式插入
-`;
-  }
+8. 注意不要丢失 OPERATION 而直接输出代码块。
+9. 不要私自加入不必要的空行。
+10. 如果是在一个已有文件里插入大块代码，不应该用 CREATE，而是用替换的方式插入。
+11. 所有## 开头的提示符前面都不能有空格，要在行首
+
+示例：
+    ## BEGIN_TCVB
+
+    ## FILE:/src/main.cpp
+    ## OPERATION:GLOBAL-REPLACE
+    ## OLD_CONTENT
+    \`\`\`
+    #include <iostream>
+    int main() {
+        std::cout << "Hello, world!" << std::endl;
+        return 0;
+    }
+    \`\`\`
+    ## NEW_CONTENT
+    \`\`\`
+    #include <iostream>
+    int main() {
+        std::cout << "Welcome to TCVB format!" << std::endl;
+        return 0;
+    }
+    \`\`\`
+
+    ## FILE:/src/utils.cpp
+    ## OPERATION:CREATE
+    \`\`\`
+    #include <cmath>
+    double add(double a, double b) {
+        return a + b;
+    }
+    \`\`\`
+
+    ## END_TCVB
+    `;
+}
+
 }
 
 // ================== 合并函数 ==================
@@ -707,61 +845,61 @@ export async function compressCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
   for (const [filePath, fileContent] of Object.entries(files)) {
       // 构造 API 请求内容
       const requestContent = `
-      文件路径: ${filePath}
-      
-      文件内容:
-      \`\`\`
-      ${fileContent}
-      \`\`\`
-      
-      用户请求:
-      \`\`\`
-      ${userRequest}
-      \`\`\`
-      
-      请从文件内容中识别并提取出有价值的代码片段，这些片段对理解代码在用户请求中的上下文非常重要。你需要关注以下几点：
-      1. 提取出关键信息的代码块，这些代码块帮助理解用户请求中的核心上下文。比如在重构任务中，需要关注相关的函数、变量及其上下级调用等。
-      2. 需要被处理的内容（如重构代码），应该被提取出来。
-      3. 确定有必要作为“锚点”的代码段，以便后续处理时可以方便地替换。
-      
-      例如：
-      假设给定代码如下：
-      \`\`\`
-      function func1() {
-          // 代码块1
-      }
-      
-      function func2() {
-          // 代码块2
-      }
-      
-      function func3() {
-          // 代码块3
-      }
-      \`\`\`
-      
-      用户请求关注 \`func1\` 和 \`func2\`，并希望忽略 \`func3\`。你应该返回如下结果：
-      
-      \`\`\`
-      function func1() {
-          // 代码块1
-      }
-      ===SEGMENT===
-      function func2() {
-          // 代码块2
-      }
-      \`\`\`
-      
-      注意：
-      1. 只保留 \`func1\` 和 \`func2\`，并通过 \`===SEGMENT===\` 分隔。
-      2. \`func3\` 被丢弃，**但其位置仍然被正确地分隔开**，以确保后续的处理不会出现问题。
-      3. 例子里的 \`\`\` 只是为了便于说明格式清楚，你输出的时候不要有 \`\`\` 包裹代码
-      
-      返回时，请确保**每个代码片段**都保持原始结构，不要有任何多余的文字，并且使用 \`===SEGMENT===\` 来分隔它们，而不是使用 \`\`\`code\`\`\` 或其他分隔符。
-      
-      确保返回的格式是干净且可解析的，只包括代码片段和分隔符，不要包含任何额外的解释或注释信息！
-      
-      `;
+文件路径: ${filePath}
+
+文件内容:
+\`\`\`
+${fileContent}
+\`\`\`
+
+用户请求:
+\`\`\`
+${userRequest}
+\`\`\`
+
+请从文件内容中识别并提取出有价值的代码片段，这些片段对理解代码在用户请求中的上下文非常重要。你需要关注以下几点：
+1. 提取出关键信息的代码块，这些代码块帮助理解用户请求中的核心上下文。比如在重构任务中，需要关注相关的函数、变量及其上下级调用等。
+2. 需要被处理的内容（如重构代码），应该被提取出来。
+3. 确定有必要作为“锚点”的代码段，以便后续处理时可以方便地替换。
+
+例如：
+假设给定代码如下：
+\`\`\`
+function func1() {
+    // 代码块1
+}
+
+function func2() {
+    // 代码块2
+}
+
+function func3() {
+    // 代码块3
+}
+\`\`\`
+
+用户请求关注 \`func1\` 和 \`func2\`，并希望忽略 \`func3\`。你应该返回如下结果：
+
+\`\`\`
+function func1() {
+    // 代码块1
+}
+===SEGMENT===
+function func2() {
+    // 代码块2
+}
+\`\`\`
+
+注意：
+1. 只保留 \`func1\` 和 \`func2\`，并通过 \`===SEGMENT===\` 分隔。
+2. \`func3\` 被丢弃，**但其位置仍然被正确地分隔开**，以确保后续的处理不会出现问题。
+3. 例子里的 \`\`\` 只是为了便于说明格式清楚，你输出的时候不要有 \`\`\` 包裹代码
+
+返回时，请确保**每个代码片段**都保持原始结构，不要有任何多余的文字，并且使用 \`===SEGMENT===\` 来分隔它们，而不是使用 \`\`\`code\`\`\` 或其他分隔符。
+
+确保返回的格式是干净且可解析的，只包括代码片段和分隔符，不要包含任何额外的解释或注释信息！
+  
+  `;
 
       // 系统提示
       const systemContent = "你是一个代码分析助手。给定一个文件的内容和用户的请求，识别并提取出对理解代码在请求上下文中的有价值的代码片段。注意输出的时候不要有 \`\`\`";
