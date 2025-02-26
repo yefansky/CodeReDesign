@@ -402,7 +402,10 @@ async function compressThisCvb(filePath: string) {
     return;
   }
 
-  newCvb.setMetaData("comressFrom", filePath);
+  if (!newCvb.getMetaData("compressFrom")) {
+    newCvb.setMetaData("compressFrom", filePath);
+  }
+
   filePath = getCompressedFileName(filePath);
 
   fs.writeFileSync(filePath, newCvb.toString(), 'utf-8');

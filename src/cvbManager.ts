@@ -27,6 +27,10 @@ export class Cvb {
     return this.m_recMetadata;
   }
 
+  public getMetaData(key: string) : string | null {
+    return this.m_recMetadata[key];
+  }
+
   public setMetaData(strKey: string, strValue: string): void {
     this.m_recMetadata[strKey] = strValue;
   }
@@ -595,6 +599,13 @@ TCVB 格式规范：
 // ================== 合并函数 ==================
 
 export function mergeCvb(baseCvb: Cvb, tcvb: TCVB): Cvb {
+
+  if (baseCvb.getMetaData("compressFrom")) {
+    const orignalPath = baseCvb.getMetaData("compressFrom") || "";
+    const cvbContent = fs.readFileSync(orignalPath, 'utf-8');
+    baseCvb = new Cvb(cvbContent);
+  }
+
   // 先将 baseCvb 中的所有文件内容存入 Map
   const mapMergedFiles: Map<string, string> = new Map<string, string>(
     Object.entries(baseCvb.getFiles())
@@ -861,6 +872,7 @@ ${userRequest}
 1. 提取出关键信息的代码块，这些代码块帮助理解用户请求中的核心上下文。比如在重构任务中，需要关注相关的函数、变量及其上下级调用等。
 2. 需要被处理的内容（如重构代码），应该被提取出来。
 3. 确定有必要作为“锚点”的代码段，以便后续处理时可以方便地替换。
+4. 如果不确定是否相关的代码，就先当不相关处理，也就是丢弃这部分代码
 
 例如：
 假设给定代码如下：
@@ -913,7 +925,6 @@ function func2() {
           compressedFiles[filePath] = compressedContent;
       } else {
           // 如果 API 调用失败，保留原始内容
-          compressedFiles[filePath] = fileContent;
       }
   }
 
