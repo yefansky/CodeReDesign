@@ -18,3 +18,4 @@ Thumbs.db
 tmp/*
 .CodeReDesignWorkSpace/*
 *.vsix
+llms/paraphrase-multilingual-MiniLM-L12-v2_quint8_avx2.onnx
