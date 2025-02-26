@@ -87,26 +87,54 @@ export async function callDeepSeekApi(
             outputChannel.show();
         }
 
+        let fullResponse = '';
+        let maxAttempts = 5;
+        let attempts = 0;
+        let maxToken = 1024 * 8;
+        let temperature = 0;
+
+        let systemPromot : OpenAI.ChatCompletionMessageParam = {role : "system",  content: systemContent};
+
+        if (modelName.includes('r')) {
+            temperature = 0.6;
+            systemPromot = {role : "user",  content: systemContent};
+        }
+
         // 构造消息体
         let messages_body: OpenAI.ChatCompletionMessageParam[] = [];
         if (Array.isArray(userContent)) {
-            messages_body.push({ role: 'system', content: systemContent });
+            if (systemPromot.role === 'user') {
+                userContent[0].content = systemPromot.content + "\n\n" + userContent[0].content;
+            }
+            else{
+                messages_body.push(systemPromot);
+            }
+
+            {
+                const role = (userContent[0].role === 'user') ? 'user' : 'assistant';
+                messages_body.push({ role, content: userContent[0].content });
+            }
+
             // 如果 userContent 是数组，按交替方式生成消息
-            for (let i = 0; i < userContent.length; i++) {
+            for (let i = 1; i < userContent.length; i++) {
                 const role = (userContent[i].role === 'user') ? 'user' : 'assistant';
                 messages_body.push({ role, content: userContent[i].content });
             }
         } else {
+
+            if (systemPromot.role === 'user') {
+                userContent = systemPromot.content + "\n\n" + userContent;
+            }
+            else{
+                messages_body.push(systemPromot);
+            }
+
             // 如果是单个字符串，默认是 'user' 角色
             messages_body = [
-                { role: 'system', content: systemContent },
+                systemPromot,
                 { role: 'user', content: userContent },
             ];
         }
-
-        let fullResponse = '';
-        let maxAttempts = 5;
-        let attempts = 0;
 
         vscode.window.showInformationMessage('开始上传DeepSeek API');
 
@@ -116,8 +144,8 @@ export async function callDeepSeekApi(
                 model: modelName,
                 messages: messages_body,
                 stream: streamMode,
-                max_tokens: 8192,
-                temperature: 0
+                max_tokens: maxToken,
+                temperature: temperature
             });
             let thinking = false;
 
