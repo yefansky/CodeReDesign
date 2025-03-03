@@ -402,6 +402,7 @@
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^9.16.0",
+    "openai": "^4.86.1",
     "standard-version": "^9.5.0",
     "ts-loader": "^9.5.1",
     "typescript": "^5.7.2",
@@ -410,7 +411,6 @@
   },
   "dependencies": {
     "iconv-lite": "^0.6.3",
-    "jschardet": "^3.1.4",
-    "openai": "^4.85.2"
+    "jschardet": "^3.1.4"
   }
 }
