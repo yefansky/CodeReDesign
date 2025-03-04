@@ -6,7 +6,9 @@ import * as vscode from "vscode";
 import { generateFilenameFromRequest, callDeepSeekApi } from "./deepseekApi";
 
 import { getLanguageFromPath } from "./languageMapping";
-import {getOutputChannel, getCurrentOperationController} from './extension'
+import {getOutputChannel, getCurrentOperationController} from './extension';
+
+import * as FuzzyMatch from './fuzzyMatch';
 
 // ================== CVB 核心类 ==================
 export class Cvb {
@@ -780,7 +782,33 @@ function applyExactReplace(
   return strContent.replace(regPattern, strReplacement);
 }
 
-function applyGlobalReplace(
+// 调整缩进的函数
+function adjustIndentation(originalContent: string, matchStart: number, newContent: string): string {
+  // 找到匹配部分的起始行
+  const linesBeforeMatch = originalContent.substring(0, matchStart).split("\n");
+  const lastLineBeforeMatch = linesBeforeMatch[linesBeforeMatch.length - 1];
+  
+  // 获取匹配部分的缩进（前导空白字符）
+  const indentMatch = lastLineBeforeMatch.match(/^(\s*)/)?.[1] || "";
+  
+  // 处理新内容的每一行，添加匹配的缩进
+  const newLines = newContent.split("\n");
+  const adjustedLines = newLines.map((line, index) => {
+    // 第一行保持与匹配内容相同的缩进，后续行根据需要可保持相对缩进
+    if (index === 0) {
+      return line.trimStart(); // 只移除行首多余空格，保留内容本身可能的缩进
+    }
+    // 如果是最后一行且为空，不添加缩进
+    if (index === newLines.length - 1 && line.trim().length === 0) {
+      return "";
+    }
+    return indentMatch + line; // 后续行直接加上缩进
+  });
+  
+  return adjustedLines.join("\n");
+}
+
+export function applyGlobalReplace(
   strContent: string,
   op: GlobalReplaceOperation
 ): string {
@@ -795,15 +823,20 @@ function applyGlobalReplace(
     "gs"
   );
 
-  regPattern.lastIndex = 0;
-  if (!regPattern.test(strContent)) {
+  if (regPattern.test(strContent)) {
+    regPattern.lastIndex = 0;
+    return strContent.replace(regPattern, (match, offset) => {
+      return adjustIndentation(strContent, offset, op.m_strNewContent);
+    });
+  }
+
+  try {
+    return FuzzyMatch.applyFuzzyGlobalReplace(strContent, op.m_strOldContent, op.m_strNewContent);
+  } catch {
     const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" 中未找到OLD_CONTENT: "${op.m_strOldContent}" 可能是和原文有细微差异，或者文件路径和别的文件搞错了`;
     console.log(errorMsg + `\n表达式: ${regPattern}`);
     throw new Error(errorMsg);
   }
-  regPattern.lastIndex = 0;
-
-  return strContent.replace(regPattern, op.m_strNewContent);
 }
 
 // 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）
@@ -950,35 +983,58 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\&]/g, (match) => "\\" + match);
 }
 
-function normalizeLineWhitespace(anchor: string): string {
-  // 按行拆分后对每行做空白归一化处理
-  let aszNormalized_Arr: string[] = anchor
-    .split("\n")
-    .map((szLine_Str: string, unIndex_Uint: number, aszArr_Arr: string[]) => {
-      szLine_Str = szLine_Str.trim();
-      if (szLine_Str.length > 0) {
-        // 将行内连续空白替换为 \s*
-        szLine_Str = szLine_Str.replace(/\s+/g, "\\s*");
-        // 在每行前后各增加一个 \s*
-        szLine_Str = `\\s*${szLine_Str}\\s*`;
-      } else {
-        // 空行处理：直接使用 \s*
-        szLine_Str = "\\s*";
-      }
-      return szLine_Str;
-    });
-
-  // 去除整体结果中最开头和最末尾多余的 \s*
-  if (aszNormalized_Arr.length > 0) {
-    // 第1行：移除行首的 \s*
-    aszNormalized_Arr[0] = aszNormalized_Arr[0].replace(/^\\s\*/, "");
-    // 最后一行：移除行尾的 \s*
-    aszNormalized_Arr[aszNormalized_Arr.length - 1] = aszNormalized_Arr[
-      aszNormalized_Arr.length - 1
-    ].replace(/\\s\*$/, "");
+export function normalizeInput(anchor: string): string {
+  let lines: string[] = anchor.split("\n");
+  
+  // 移除首行空行
+  while (lines.length > 0 && lines[0].trim().length === 0) {
+    lines.shift();
   }
+  
+  // 移除末尾空行
+  while (lines.length > 0 && lines[lines.length - 1].trim().length === 0) {
+    lines.pop();
+  }
+  
+  // 如果全是空行，返回空字符串
+  if (lines.length === 0) {
+    return "";
+  }
+  
+  return lines.join("\n");
+}
 
-  return aszNormalized_Arr.join("\n");
+// 处理空白字符的规范化函数
+function normalizeLineWhitespace(anchor: string): string {
+  if (anchor === "") {
+    return "\\s*";
+  }
+  
+  let lines: string[] = anchor.split("\n");
+  
+  // 处理每一行的空白字符
+  let normalizedLines: string[] = lines.map((line: string, index: number, arr: string[]) => {
+    const isFirstLine = index === 0;
+    const isLastLine = index === arr.length - 1;
+    line = line.trim();
+    
+    if (line.length > 0) {
+      // 将行内连续空白替换为 \s*
+      line = line.replace(/\s+/g, "\\s*");
+      
+      // 根据行位置添加前后 \s*
+      if (isFirstLine) {
+        return `${line}\\s*`;
+      } else if (isLastLine) {
+        return `\\s*${line}`;
+      } else {
+        return `\\s*${line}\\s*`;
+      }
+    }
+    return "\\s*"; // 空行处理
+  });
+  
+  return normalizedLines.join("\n");
 }
 
 function filePathNormalize(strRawPath: string): string {

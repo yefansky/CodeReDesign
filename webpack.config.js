@@ -40,7 +40,8 @@ const extensionConfig = {
       }
     ]
   },
-  devtool: 'nosources-source-map',
+  //devtool: 'nosources-source-map',
+  devtool: "source-map",
   infrastructureLogging: {
     level: "log", // enables logging required for problem matchers
   },
