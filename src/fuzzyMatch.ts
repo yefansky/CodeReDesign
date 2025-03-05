@@ -131,43 +131,58 @@ export function removeSymbolSpaces(strContentIn: string): { content: string; map
 }
 
 // 辅助函数3：将换行符改为空格，并合并连续的空格
-export function normalizeWhitespace(content: string): { content: string; mapping: number[] } {
-    let newContent = '';
-    const mapping: number[] = [];
-    let inNonNewlineWhitespace = false; // 跟踪连续的非换行空白字符
-    let inNewlineSequence = false;      // 跟踪连续的换行符
+export function normalizeWhitespace(content: string): { content: string; mapping: number[] }
+{
+    let strNewContent: string = "";
+    let arrMapping: number[] = [];
+    let bAtLineStart: boolean = true;          // 标记当前是否处于行首
+    let nPendingSpaceIndex: number | null = null; // 待添加空格的原始索引
 
-    for (let i = 0; i < content.length; i++) {
-        const char = content[i];
+    for (let nIdx = 0; nIdx < content.length; nIdx++)
+    {
+        const chChar: string = content[nIdx];
 
-        if (char === '\n') {
-            if (!inNewlineSequence) {
-                // 第一个换行符，保留
-                newContent += '\n';
-                mapping.push(i);
-                inNewlineSequence = true;
+        if (chChar === '\n')
+        {
+            // 遇到换行符时，丢弃待添加的空格（避免行尾空格）
+            nPendingSpaceIndex = null;
+            // 如果输出为空或上一个字符不是换行符，则添加换行符
+            if (strNewContent.length === 0 || strNewContent[strNewContent.length - 1] !== '\n')
+            {
+                strNewContent += '\n';
+                arrMapping.push(nIdx);
             }
-            // 重置非换行空白字符状态
-            inNonNewlineWhitespace = false;
-        } else if (/\s/.test(char)) { // 非换行空白字符（如空格、制表符）
-            if (!inNonNewlineWhitespace) {
-                // 第一个非换行空白字符，转换为单个空格
-                newContent += ' ';
-                mapping.push(i);
-                inNonNewlineWhitespace = true;
+            bAtLineStart = true;
+        }
+        else if (/\s/.test(chChar))
+        {
+            // 遇到非换行空白字符：如果在行首，则忽略；否则，记录第一个空白字符索引
+            if (!bAtLineStart)
+            {
+                if (nPendingSpaceIndex === null)
+                {
+                    nPendingSpaceIndex = nIdx;
+                }
             }
-            // 重置换行符状态
-            inNewlineSequence = false;
-        } else {
-            // 非空白字符，直接添加
-            newContent += char;
-            mapping.push(i);
-            inNonNewlineWhitespace = false;
-            inNewlineSequence = false;
+        }
+        else
+        {
+            // 遇到非空白字符时，如果有待添加的空格则先输出一个空格
+            if (nPendingSpaceIndex !== null)
+            {
+                strNewContent += ' ';
+                arrMapping.push(nPendingSpaceIndex);
+                nPendingSpaceIndex = null;
+            }
+            strNewContent += chChar;
+            arrMapping.push(nIdx);
+            bAtLineStart = false;
         }
     }
-    return { content: newContent, mapping };
+
+    return { content: strNewContent, mapping: arrMapping };
 }
+
 
 export function normalizePattern(pattern: string): string {
     const { content } = normalizeContent(pattern);
