@@ -206,12 +206,6 @@ class ExactReplaceOperation extends TcvbOperation {
   }
 }
 
-// 函数：规范化 GlobalReplaceOperation 实例的成员
-export function normalizeData(operation: GlobalReplaceOperation): GlobalReplaceOperation {
-    operation.m_strOldContent = normalizeInput(operation.m_strOldContent);
-    operation.m_strNewContent = normalizeInput(operation.m_strNewContent);
-    return operation;
-}
 
 // 2. 全局替换操作（GLOBAL-REPLACE）
 class GlobalReplaceOperation extends TcvbOperation {

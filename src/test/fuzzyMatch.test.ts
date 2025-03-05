@@ -1,7 +1,18 @@
 ﻿import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { applyGlobalReplace, normalizeInput, normalizeData } from '../cvbManager';
 import * as fuzzyMatch from '../fuzzyMatch';
+import * as cvbMgr from '../cvbManager';
+
+const normalizeInput = (cvbMgr as any).normalizeInput;
+const applyGlobalReplace =  (cvbMgr as any).applyGlobalReplace;
+
+// 函数：规范化 GlobalReplaceOperation 实例的成员
+export function normalizeData(operation: GlobalReplaceOperation): GlobalReplaceOperation {
+    operation.m_strOldContent = normalizeInput(operation.m_strOldContent);
+    operation.m_strNewContent = normalizeInput(operation.m_strNewContent);
+    return operation;
+}
+
 
 // 定义 GlobalReplaceOperation 接口
 
