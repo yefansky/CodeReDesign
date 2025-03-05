@@ -830,13 +830,11 @@ export function applyGlobalReplace(
     });
   }
 
-  try {
     return FuzzyMatch.applyFuzzyGlobalReplace(strContent, op.m_strOldContent, op.m_strNewContent);
-  } catch {
+    
     const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" 中未找到OLD_CONTENT: "${op.m_strOldContent}" 可能是和原文有细微差异，或者文件路径和别的文件搞错了`;
     console.log(errorMsg + `\n表达式: ${regPattern}`);
     throw new Error(errorMsg);
-  }
 }
 
 // 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）

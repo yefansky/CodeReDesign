@@ -1,6 +1,7 @@
 ﻿import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { applyGlobalReplace, normalizeInput } from '../cvbManager';
+import { normalizeContent, removeComments, normalizeWhitespace, normalizePattern, removeSymbolSpaces} from '../fuzzyMatch';
 
 // 定义 GlobalReplaceOperation 接口
 
@@ -34,7 +35,7 @@ function normalizeData(operation: GlobalReplaceOperation): GlobalReplaceOperatio
     operation.m_strNewContent = normalizeInput(operation.m_strNewContent);
     return operation;
 }
-  
+
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
 
@@ -260,5 +261,154 @@ function empty() {}
         assert.throws(() => {
             applyGlobalReplace(content, normalizeData(op));
         }, /GLOBAL-REPLACE 失败：FILE:"test.js" OLD_CONTENT 是空的/);
+    });
+});
+  
+suite('Normalization Full Coverage Test Suite', () => 
+{
+    // 1. 测试 removeComments：多行混合注释的情况
+    test('removeComments - 多行代码包含注释', () => 
+    {
+        const strInput: string = `function test() { // 这是一个函数
+    let nValue = 10; // 这里初始化变量
+    // 这是一整行注释
+    return nValue; // 返回变量
+} // 结束函数
+`;
+
+        const stResult = removeComments(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string =
+            "function test() { \n" +
+            "    let nValue = 10; \n" +
+            "    \n" +
+            "    return nValue; \n" +
+            "} \n";
+
+        assert.strictEqual(strContent, strExpectedContent, "removeComments 多行内容不正确");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "removeComments 多行 mapping 长度不正确");
+    });
+
+    // 2. 测试 removeSymbolSpaces：符号前后空格
+    test('removeSymbolSpaces - 符号前后带空格', () => 
+    {
+        const strInput: string = `a +  b
+( x - y )
+{ c *  d }`;
+        const stResult = removeSymbolSpaces(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string =
+            "a+b\n" +
+            "(x-y)\n" +
+            "{c*d}";
+
+        assert.strictEqual(strContent, strExpectedContent, "removeSymbolSpaces 符号空格去除不正确");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "removeSymbolSpaces mapping 长度不正确");
+    });
+
+    // 3. 测试 normalizeWhitespace：空白字符处理
+    test('normalizeWhitespace - 处理换行符、tab 和连续空格', () => 
+    {
+        const strInput: string = `abc   def
+ghi\t\tjkl
+mno    pqr`;
+        const stResult = normalizeWhitespace(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string = "abc def\nghi jkl\nmno pqr";
+
+        assert.strictEqual(strContent, strExpectedContent, "normalizeWhitespace 处理空白字符错误");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "normalizeWhitespace mapping 长度错误");
+    });
+
+    // 4. 测试 removeComments 对全是注释的代码
+    test('removeComments - 代码全是注释', () => 
+    {
+        const strInput: string = `// 这是注释
+// 这也是注释
+// 还有注释
+`;
+
+        const stResult = removeComments(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string = "\n\n\n";
+
+        assert.strictEqual(strContent, strExpectedContent, "removeComments 全注释去除不正确");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "removeComments 全注释 mapping 错误");
+    });
+
+    // 5. 测试 normalizeWhitespace 处理连续换行
+    test('normalizeWhitespace - 处理连续换行', () => 
+    {
+        const strInput: string = `abc
+
+
+def`;
+        const stResult = normalizeWhitespace(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string = "abc\ndef";
+
+        assert.strictEqual(strContent, strExpectedContent, "normalizeWhitespace 处理连续换行错误");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "normalizeWhitespace mapping 长度错误");
+    });
+
+    // 6. 测试 removeSymbolSpaces 处理特殊符号混合情况
+    test('removeSymbolSpaces - 复杂符号空格情况', () => 
+    {
+        const strInput: string = `a  + ( b *  c ) / [ d -  e ]`;
+        const stResult = removeSymbolSpaces(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string = "a+(b*c)/[d-e]";
+
+        assert.strictEqual(strContent, strExpectedContent, "removeSymbolSpaces 复杂符号空格处理错误");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "removeSymbolSpaces mapping 长度错误");
+    });
+
+    // 7. 测试 normalizeWhitespace 处理只有空格和换行符的输入
+    test('normalizeWhitespace - 只有空格和换行符', () => 
+    {
+        const strInput: string = "   \n   \n   ";
+        const stResult = normalizeWhitespace(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string = "\n";
+
+        assert.strictEqual(strContent, strExpectedContent, "normalizeWhitespace 纯空格处理错误");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "normalizeWhitespace mapping 长度错误");
+    });
+
+    // 8. 综合测试 normalizeContent
+    test('normalizeContent - 复杂综合测试', () => 
+    {
+        const strInput: string = `function test() { // 这是注释
+    let a  =  5 + 6 ;  // 多个空格
+    let b = a *  2;  // 还有注释
+    return  b;
+}`; 
+        const stResult = normalizeContent(strInput);
+        const strContent: string = stResult.content;
+        const arrMapping: number[] = stResult.mapping;
+
+        const strExpectedContent: string = 
+            "function test(){\n" +
+            "let a=5+6;\n" +
+            "let b=a*2;\n" +
+            "return b;\n" +
+            "}";
+
+        assert.strictEqual(strContent, strExpectedContent, "normalizeContent 复杂测试错误");
+        assert.strictEqual(arrMapping.length, strExpectedContent.length, "normalizeContent mapping 长度错误");
     });
 });
