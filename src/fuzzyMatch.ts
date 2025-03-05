@@ -189,106 +189,126 @@ export function normalizePattern(pattern: string): string {
     return content;
 }
 
-function findCandidatePositions(content: string, pattern: string): number[] {
+export function findCandidatePositions(content: string, pattern: string): number[] {
     const candidates = new Set<number>();
-    const segments = splitPattern(pattern, SEGMENT_COUNT);
-
-    // 查找每个分片的匹配位置
-    segments.forEach(segment => {
-            let pos = -1;
-            while ((pos = content.indexOf(segment, pos + 1)) !== -1) {
-            if (pos === -1) {
-                break;
-            }
-            // 向前后扩展可能的匹配范围
-            const start = Math.max(0, pos - pattern.length);
-            const end = Math.min(content.length, pos + pattern.length * 2);
-            for (let i = start; i < end; i++) {
+    const segments = splitPatternWithStart(pattern, SEGMENT_COUNT);
+    segments.forEach(({ segment, start }) => {
+        let pos = -1;
+        while ((pos = content.indexOf(segment, pos + 1)) !== -1) {
+            const expectedStart = pos - start;
+            const minStart = Math.max(0, expectedStart - MAX_EDIT_DISTANCE);
+            const maxStart = Math.min(content.length - pattern.length, expectedStart + MAX_EDIT_DISTANCE);
+            for (let i = minStart; i <= maxStart; i++) {
                 candidates.add(i);
             }
         }
     });
-
     return Array.from(candidates).sort((a, b) => a - b);
 }
 
-function verifyMatches(
+export function verifyMatches(
     content: string,
     pattern: string,
     candidates: number[],
     mapping: number[]
 ): MatchPosition[] {
     let bestMatch: MatchPosition | null = null;
-    let minDistance = MAX_EDIT_DISTANCE + 1; // 设为比允许的最大距离大1
-
+    let minDistance = Infinity;
+    let bestCandidate: number = -1;
     const patternLen = pattern.length;
 
     candidates.forEach(start => {
-        const end = start + patternLen;
-        if (end > content.length) {
+        if (start + patternLen > content.length) {
             return;
         }
 
-        const substring = content.substring(start, end);
+        const substring = content.substring(start, start + patternLen + MAX_EDIT_DISTANCE);
         const distance = calculateEditDistance(substring, pattern, MAX_EDIT_DISTANCE);
-
-        if (distance < minDistance) {
+        if (distance <= MAX_EDIT_DISTANCE && distance < minDistance) {
             minDistance = distance;
+            bestCandidate = start;
+            const end = start + patternLen + distance;
             bestMatch = {
                 start: mapping[start],
-                end: mapping[end] || mapping[mapping.length - 1]
+                end: mapping[Math.min(end, content.length - 1)]
             };
         }
     });
+    
+    // 如果找到了最佳候选，则用贪心方式扩展匹配范围
+    if (bestMatch && bestCandidate !== -1)
+    {
+        let candidateIdx: number = bestCandidate;
+        let patternIdx: number = 0;
+        let startIndex: number = -1;
+        // 从最佳候选起点开始，贪心扫描候选区域，遇到匹配的字符则同步推进模式串下标
+        while (candidateIdx < content.length && patternIdx < pattern.length)
+        {
+            if (content.charAt(candidateIdx) === pattern.charAt(patternIdx))
+            {
+                patternIdx++;
+
+                if (startIndex === -1) {
+                    startIndex = candidateIdx;
+                }
+            }
+            candidateIdx++;
+        }
+
+        let tmpMatch : MatchPosition = bestMatch;
+        // nCandidateIdx 作为最终匹配结束位置（注意这里是最后一次匹配后加1的位置）
+        tmpMatch.start = mapping[startIndex];
+        tmpMatch.end = mapping[Math.min(candidateIdx, content.length - 1)];
+        bestMatch = tmpMatch;
+    }
 
     return bestMatch ? [bestMatch] : [];
 }
-// ================ 工具函数 ================
-function splitPattern(pattern: string, count: number): string[] {
-    const segments: string[] = [];
 
-    if (pattern.length / count < 3) {
-        count = pattern.length / 3;
+// ================ 工具函数 ================
+function splitPatternWithStart(pattern: string, count: number): { segment: string, start: number }[] {
+    const segments: { segment: string, start: number }[] = [];
+    const minSegmentLength = 3;
+    if (pattern.length < minSegmentLength * count) {
+        count = Math.max(1, Math.floor(pattern.length / minSegmentLength));
     }
 
     const baseLength = Math.floor(pattern.length / count);
     let remaining = pattern.length % count;
     let pos = 0;
-
     for (let i = 0; i < count; i++) {
         const length = baseLength + (remaining-- > 0 ? 1 : 0);
-        segments.push(pattern.substr(pos, length));
+        segments.push({ segment: pattern.substr(pos, length), start: pos });
         pos += length;
     }
-
-    return segments.filter(s => s.length > 0);
+    return segments.filter(s => s.segment.length > 0);
 }
 
 function calculateEditDistance(a: string, b: string, maxDistance: number): number {
-if (Math.abs(a.length - b.length) > maxDistance) {
-    return Infinity;
-}
+    if (Math.abs(a.length - b.length) > maxDistance) {
+        return Infinity;
+    }
 
-// 使用滚动数组优化
-let prevRow = Array(b.length + 1).fill(0).map((_, i) => i);
-let currentRow = new Array(b.length + 1);
+    // 使用滚动数组优化
+    let prevRow = Array(b.length + 1).fill(0).map((_, i) => i);
+    let currentRow = new Array(b.length + 1);
 
-for (let i = 1; i <= a.length; i++) {
+    for (let i = 1; i <= a.length; i++) {
         currentRow[0] = i;
         let minInRow = i;
 
         for (let j = 1; j <= b.length; j++) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        currentRow[j] = Math.min(
-            prevRow[j] + 1,
-            currentRow[j - 1] + 1,
-            prevRow[j - 1] + cost
-        );
-        minInRow = Math.min(minInRow, currentRow[j]);
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            currentRow[j] = Math.min(
+                prevRow[j] + 1,
+                currentRow[j - 1] + 1,
+                prevRow[j - 1] + cost
+            );
+            minInRow = Math.min(minInRow, currentRow[j]);
         }
 
         if (minInRow > maxDistance) {
-        return Infinity;
+            return Infinity;
         }
         [prevRow, currentRow] = [currentRow, prevRow];
     }
@@ -300,20 +320,14 @@ function processOverlaps(matches: MatchPosition[]): MatchPosition[] {
     return matches
         .sort((a, b) => a.start - b.start)
         .filter((match, index, arr) => {
-        return index === 0 || match.start >= arr[index - 1].end;
+            return index === 0 || match.start >= arr[index - 1].end;
         });
 }
 
-function applyReplacements(
-    original: string,
-    matches: MatchPosition[],
-    replacement: string
-): string {
-    let result = original;
-    // 从后往前替换避免影响索引
-    for (let i = matches.length - 1; i >= 0; i--) {
-        const { start, end } = matches[i];
-        result = result.slice(0, start) + replacement + result.slice(end);
+export function applyReplacements(content: string, matches: MatchPosition[], newContent: string): string {
+    let result = content;
+    for (const match of matches.reverse()) {
+        result = result.slice(0, match.start) + newContent + result.slice(match.end);
     }
     return result;
 }

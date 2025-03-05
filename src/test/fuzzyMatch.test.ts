@@ -1,7 +1,7 @@
 ﻿import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { applyGlobalReplace, normalizeInput } from '../cvbManager';
-import { normalizeContent, removeComments, normalizeWhitespace, normalizePattern, removeSymbolSpaces} from '../fuzzyMatch';
+import * as fuzzyMatch from '../fuzzyMatch';
 
 // 定义 GlobalReplaceOperation 接口
 
@@ -276,7 +276,7 @@ suite('Normalization Full Coverage Test Suite', () =>
 } // 结束函数
 `;
 
-        const stResult = removeComments(strInput);
+        const stResult = fuzzyMatch.removeComments(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -297,7 +297,7 @@ suite('Normalization Full Coverage Test Suite', () =>
         const strInput: string = `a +  b
 ( x - y )
 { c *  d }`;
-        const stResult = removeSymbolSpaces(strInput);
+        const stResult = fuzzyMatch.removeSymbolSpaces(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -316,7 +316,7 @@ suite('Normalization Full Coverage Test Suite', () =>
         const strInput: string = `abc   def
 ghi\t\tjkl
 mno    pqr`;
-        const stResult = normalizeWhitespace(strInput);
+        const stResult = fuzzyMatch.normalizeWhitespace(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -334,7 +334,7 @@ mno    pqr`;
 // 还有注释
 `;
 
-        const stResult = removeComments(strInput);
+        const stResult = fuzzyMatch.removeComments(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -351,7 +351,7 @@ mno    pqr`;
 
 
 def`;
-        const stResult = normalizeWhitespace(strInput);
+        const stResult = fuzzyMatch.normalizeWhitespace(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -365,7 +365,7 @@ def`;
     test('removeSymbolSpaces - 复杂符号空格情况', () => 
     {
         const strInput: string = `a  + ( b *  c ) / [ d -  e ]`;
-        const stResult = removeSymbolSpaces(strInput);
+        const stResult = fuzzyMatch.removeSymbolSpaces(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -379,7 +379,7 @@ def`;
     test('normalizeWhitespace - 只有空格和换行符', () => 
     {
         const strInput: string = "   \n   \n   ";
-        const stResult = normalizeWhitespace(strInput);
+        const stResult = fuzzyMatch.normalizeWhitespace(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -397,7 +397,7 @@ def`;
     let b = a *  2;  // 还有注释
     return  b;
 }`; 
-        const stResult = normalizeContent(strInput);
+        const stResult = fuzzyMatch.normalizeContent(strInput);
         const strContent: string = stResult.content;
         const arrMapping: number[] = stResult.mapping;
 
@@ -410,5 +410,115 @@ def`;
 
         assert.strictEqual(strContent, strExpectedContent, "normalizeContent 复杂测试错误");
         assert.strictEqual(arrMapping.length, strExpectedContent.length, "normalizeContent mapping 长度错误");
+    });
+});
+
+// 测试套件
+suite('Fuzzy Global Replace Test Suite', () => {
+    vscode.window.showInformationMessage('Start all fuzzy global replace tests.');
+
+    const originalContent = `
+function logMessage(message) {
+    console.log(message);
+}
+
+function logError(error) {
+    console.log(error);
+}
+
+function logWarning(warning) {
+    console.log(warning);
+}
+    `.trim();
+    const oldContent = `
+console.log(warn);
+    `.trim();
+    const newContent = `
+console.warn(warning);
+    `.trim();
+    const expectedContent = `
+function logMessage(message) {
+    console.log(message);
+}
+
+function logError(error) {
+    console.log(error);
+}
+
+function logWarning(warning) {
+    console.warn(warning);
+}
+    `.trim();
+
+    test('normalizeContent should correctly normalize content and provide accurate mapping', () => {
+        const { content: normContent, mapping } = fuzzyMatch.normalizeContent(originalContent);
+        const logWarningStart = originalContent.indexOf('console.log(warning);');
+        const logWarningEnd = logWarningStart + 'console.log(warning);'.length;
+        const normLogWarningStart = normContent.indexOf('console.log(warning);');
+
+        assert.ok(normContent.includes('console.log(warning);'), 'Normalized content should contain the target string');
+        assert.strictEqual(
+            mapping[normLogWarningStart],
+            logWarningStart,
+            'Mapping should point to original start position'
+        );
+        assert.strictEqual(
+            mapping[normLogWarningStart + 'console.log(warning);'.length] || mapping[mapping.length - 1],
+            logWarningEnd,
+            'Mapping should point to original end position'
+        );
+    });
+
+    test('normalizePattern should correctly normalize the old content', () => {
+        const normPattern = fuzzyMatch.normalizePattern(oldContent);
+        assert.strictEqual(
+            normPattern.trim(),
+            'console.log(warn);',
+            'Pattern should be normalized correctly'
+        );
+    });
+
+    test('findCandidatePositions should find potential match positions', () => {
+        const { content: normContent } = fuzzyMatch.normalizeContent(originalContent);
+        const normPattern = fuzzyMatch.normalizePattern(oldContent);
+        const candidates = fuzzyMatch.findCandidatePositions(normContent, normPattern);
+
+        assert.ok(candidates.length > 0, 'Should find at least one candidate position');
+        const logWarningPos = normContent.indexOf('console.log(warning);');
+        assert.ok(
+            candidates.some(pos => Math.abs(pos - logWarningPos) < normPattern.length * 2),
+            'Should include a position near the target string'
+        );
+    });
+
+    test('verifyMatches should select the best match with correct positions', () => {
+        const { content: normContent, mapping } = fuzzyMatch.normalizeContent(originalContent);
+        const normPattern = fuzzyMatch.normalizePattern(oldContent);
+        const candidates = fuzzyMatch.findCandidatePositions(normContent, normPattern);
+        const matches = fuzzyMatch.verifyMatches(normContent, normPattern, candidates, mapping);
+
+        assert.strictEqual(matches.length, 1, 'Should find exactly one best match');
+        assert.strictEqual(
+            originalContent.slice(matches[0].start, matches[0].end).trim(),
+            'console.log(warning);',
+            'Best match should correspond to the closest substring'
+        );
+    });
+
+    test('applyReplacements should replace content correctly without extra characters', () => {
+        const matches = [{
+            start: originalContent.indexOf('console.log(warning);'),
+            end: originalContent.indexOf('console.log(warning);') + 'console.log(warning);'.length
+        }];
+        const result = fuzzyMatch.applyReplacements(originalContent, matches, newContent);
+
+        assert.strictEqual(result.trim(), expectedContent, 'Replacement should match expected output');
+        assert.ok(!result.includes('g);'), 'Result should not contain extra characters like "g);"');
+    });
+
+    test('applyFuzzyGlobalReplace should perform the full replacement correctly', () => {
+        const result = fuzzyMatch.applyFuzzyGlobalReplace(originalContent, oldContent, newContent);
+        assert.strictEqual(result.trim(), expectedContent, 'Full fuzzy replace should produce the expected output');
+        assert.ok(!result.includes('g);'), 'Result should not contain extra characters like "g);"');
     });
 });
