@@ -1,6 +1,6 @@
 ﻿import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { applyGlobalReplace, normalizeInput } from '../cvbManager';
+import { applyGlobalReplace, normalizeInput, normalizeData } from '../cvbManager';
 import * as fuzzyMatch from '../fuzzyMatch';
 
 // 定义 GlobalReplaceOperation 接口
@@ -27,13 +27,6 @@ class GlobalReplaceOperation extends TcvbOperation {
         this.m_strOldContent = normalizeInput(m_strOldContent);
         this.m_strNewContent = normalizeInput(m_strNewContent);
     }
-}
-
-// 函数：规范化 GlobalReplaceOperation 实例的成员
-function normalizeData(operation: GlobalReplaceOperation): GlobalReplaceOperation {
-    operation.m_strOldContent = normalizeInput(operation.m_strOldContent);
-    operation.m_strNewContent = normalizeInput(operation.m_strNewContent);
-    return operation;
 }
 
 suite('Extension Test Suite', () => {
@@ -236,7 +229,7 @@ function anotherCompute(a, b) {
             m_strType: "global-replace",
             m_strFilePath: 'test.js',
             m_strOldContent: `
-return a + b;
+return aaa + bbb;
             `,
             m_strNewContent: `
 return a - b;
@@ -513,12 +506,12 @@ function logWarning(warning) {
         const result = fuzzyMatch.applyReplacements(originalContent, matches, newContent);
 
         assert.strictEqual(result.trim(), expectedContent, 'Replacement should match expected output');
-        assert.ok(!result.includes('g);'), 'Result should not contain extra characters like "g);"');
+        assert.ok(!result.includes('warn);'), 'Result should not contain incorrectly replaced warn);');
     });
 
     test('applyFuzzyGlobalReplace should perform the full replacement correctly', () => {
         const result = fuzzyMatch.applyFuzzyGlobalReplace(originalContent, oldContent, newContent);
         assert.strictEqual(result.trim(), expectedContent, 'Full fuzzy replace should produce the expected output');
-        assert.ok(!result.includes('g);'), 'Result should not contain extra characters like "g);"');
+        assert.ok(!result.includes('warn);'), 'Result should not contain incorrectly replaced warn);');
     });
 });

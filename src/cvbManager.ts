@@ -206,19 +206,26 @@ class ExactReplaceOperation extends TcvbOperation {
   }
 }
 
+// 函数：规范化 GlobalReplaceOperation 实例的成员
+export function normalizeData(operation: GlobalReplaceOperation): GlobalReplaceOperation {
+    operation.m_strOldContent = normalizeInput(operation.m_strOldContent);
+    operation.m_strNewContent = normalizeInput(operation.m_strNewContent);
+    return operation;
+}
+
 // 2. 全局替换操作（GLOBAL-REPLACE）
 class GlobalReplaceOperation extends TcvbOperation {
   public m_strOldContent: string;
   public m_strNewContent: string;
 
   constructor(
-    m_strFilePath: string,
-    m_strOldContent: string,
-    m_strNewContent: string
+    strFilePath: string,
+    strOldContent: string,
+    strNewContent: string
   ) {
-    super(m_strFilePath, "global-replace");
-    this.m_strOldContent = m_strOldContent;
-    this.m_strNewContent = m_strNewContent;
+    super(strFilePath, "global-replace");
+    this.m_strOldContent = normalizeInput(strOldContent);
+    this.m_strNewContent = normalizeInput(strNewContent);
   }
 }
 
@@ -830,11 +837,13 @@ export function applyGlobalReplace(
     });
   }
 
+  try {
     return FuzzyMatch.applyFuzzyGlobalReplace(strContent, op.m_strOldContent, op.m_strNewContent);
-    
+  }catch (error : any) {
     const errorMsg = `GLOBAL-REPLACE 失败：FILE:"${op.m_strFilePath}" 中未找到OLD_CONTENT: "${op.m_strOldContent}" 可能是和原文有细微差异，或者文件路径和别的文件搞错了`;
     console.log(errorMsg + `\n表达式: ${regPattern}`);
     throw new Error(errorMsg);
+  }
 }
 
 // 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）
