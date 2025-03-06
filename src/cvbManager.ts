@@ -492,7 +492,7 @@ TCVB 格式规范：
 2. **创建操作(CREATE)**:
     - 创建一个新文件，后面直接给全文代码。
     - 新文件的全部内容应完整写入代码块中。
-    - 如果文件已经存在，应该有GLOBAL-REPLACE来插入，而不是用CREATE
+    - 如果文件已经存在，应该有GLOBAL-REPLACE来插入，而不是用CREATE。如果是已有的文件，会直接把内容插入末尾。
     
     示例：
     ## OPERATION:CREATE
@@ -637,12 +637,11 @@ export function mergeCvb(baseCvb: Cvb, tcvb: TCVB): Cvb {
           strContent = applyGlobalReplace(strContent, op);
         } else if (op instanceof CreateOperation) {
           if (mapMergedFiles.has(strFilePath)) {
-            throw new Error(
-              `${strFilePath} 已经存在，不可以使用 ## OPERATION:CREATE`
-            );
+            strContent = applyInsertTail(strContent, op);
           }
-          // CREATE 操作：直接以新内容覆盖原有内容
-          strContent = op.m_strContent;
+          else {
+            strContent = op.m_strContent;
+          }
         }
       }
       mapMergedFiles.set(strFilePath, strContent);
@@ -839,6 +838,13 @@ export function applyGlobalReplace(
     throw new Error(errorMsg);
   }
 }
+
+export function applyInsertTail(
+  strContent: string,
+  op: CreateOperation){
+    strContent += "\n" + op.m_strContent;
+    return strContent;
+  }
 
 // 根据前锚点、内容、后锚点构建正则表达式（dotall 模式）
 function buildPattern(
