@@ -480,10 +480,14 @@ export class ChatPanel {
     }
 
     private saveChatToFile(): void {
-        if (!this.chatFilePath) return;
+        if (!this.chatFilePath) {
+            return;
+        }
 
         const now = Date.now();
-        if (now - this.lastSaveTime < 10000) return;
+        if (now - this.lastSaveTime < 10000) {
+            return;
+        }
 
         const mdContent = this.conversation.map(msg => {
             return `@${msg.role === 'user' ? 'user' : 'AI'}:\n\n${msg.content}\n\n`;
