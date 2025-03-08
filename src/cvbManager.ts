@@ -888,16 +888,17 @@ export async function compressCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
   const metadata = cvb.getMetadata();
   const files = cvb.getFiles();
   const compressedFiles: Record<string, string> = {};
+  const MAX_CONCURRENT = 5; // 设置最大并行数量为5
 
   const outputChannel = getOutputChannel();
   const signal = getCurrentOperationController().signal;
 
   outputChannel.appendLine("compress task start");
 
-  // 遍历每个文件并压缩
-  for (const [filePath, fileContent] of Object.entries(files)) {
-      // 构造 API 请求内容
-      const requestContent = `
+  // 将文件处理任务放入队列
+  const fileEntries = Object.entries(files);
+  const processFile = async ([filePath, fileContent]: [string, string]) => {
+    const requestContent = `
 文件路径: ${filePath}
 
 文件内容:
@@ -952,44 +953,65 @@ function func2() {
 返回时，请确保**每个代码片段**都保持原始结构，不要有任何多余的文字，并且使用 \`===SEGMENT===\` 来分隔它们，而不是使用 \`\`\`code\`\`\` 或其他分隔符。
 
 确保返回的格式是干净且可解析的，只包括代码片段和分隔符，不要包含任何额外的解释或注释信息！
-  
-  `;
+    `;
 
-      // 系统提示
-      const systemContent = "你是一个代码分析助手。给定一个文件的内容和用户的请求，识别并提取出对理解代码在请求上下文中的有价值的代码片段。注意输出的时候不要有 \`\`\`";
+    const systemContent = "你是一个代码分析助手。给定一个文件的内容和用户的请求，识别并提取出对理解代码在请求上下文中的有价值的代码片段。注意输出的时候不要有 \`\`\`";
 
-      outputChannel.appendLine(`compress processing .. ${filePath}`);
-      // 调用 API
+    outputChannel.appendLine(`compress processing .. ${filePath}`);
+    try {
       const response = await callDeepSeekApi(requestContent, systemContent, undefined, true, undefined, signal, true);
       if (response) {
-          // 处理 API 响应，分隔并连接有价值的代码片段
-          const segments = response.split("===SEGMENT===").map(segment => segment.trim());
-          const compressedContent = segments.join("\n//...CCVB\n");
-          compressedFiles[filePath] = compressedContent;
-
-          outputChannel.appendLine(`compress processing .. ${filePath} [success]`);
+        const segments = response.split("===SEGMENT===").map(segment => segment.trim());
+        const compressedContent = segments.join("\n//...CCVB\n");
+        compressedFiles[filePath] = compressedContent;
+        outputChannel.appendLine(`compress processing .. ${filePath} [success]`);
       } else {
-          // 如果 API 调用失败，保留原始内容
-          outputChannel.appendLine(`compress processing .. ${filePath} [failed]`);
+        outputChannel.appendLine(`compress processing .. ${filePath} [failed]`);
       }
-  }
+    } catch (error) {
+      outputChannel.appendLine(`compress processing .. ${filePath} [failed: ${error}]`);
+    }
+  };
+
+  // 创建并行处理队列
+  const processQueue = async () => {
+    const activePromises: Promise<void>[] = [];
+    
+    for (const entry of fileEntries) {
+      // 当达到最大并行数时，等待任意一个任务完成
+      if (activePromises.length >= MAX_CONCURRENT) {
+        await Promise.race(activePromises);
+      }
+      
+      // 创建新任务
+      const promise = processFile(entry).then(() => {
+        // 任务完成后从活动promise数组中移除
+        const index = activePromises.indexOf(promise);
+        if (index !== -1) {
+          activePromises.splice(index, 1);
+        }
+      });
+      
+      activePromises.push(promise);
+    }
+    
+    // 等待所有剩余任务完成
+    await Promise.all(activePromises);
+  };
+
+  await processQueue();
 
   outputChannel.appendLine("compress task finish");
 
-  // 构建新的 CVB 对象
   const newCvb = new Cvb();
-  // 保留原始元数据
   for (const [key, value] of Object.entries(metadata)) {
-      newCvb.setMetaData(key, value);
+    newCvb.setMetaData(key, value);
   }
-  // 设置压缩后的文件内容
   for (const [filePath, content] of Object.entries(compressedFiles)) {
-      newCvb.setFile(filePath, content);
+    newCvb.setFile(filePath, content);
   }
 
   newCvb.setMetaData("用户需求", userRequest);
-
-  // 返回压缩后的 CVB 字符串
   return newCvb;
 }
 // ================== 工具函数 ==================
