@@ -166,16 +166,12 @@
         "codeReDesign.modelConfig": {
           "type": "string",
           "default": "deepseek-chat",
-          "description": "DeepSeek Model Configuration",
-          "enum": [
-            "deepseek-chat",
-            "deepseek-reasoner",
-            "custom1",
-            "custom2",
-            "custom3",
-            "custom4",
-            "custom5"
-          ]
+          "description": "DeepSeek Model Configuration"
+        },
+        "codeReDesign.fastModelConfig": {
+          "type": "string",
+          "default": "deepseek-chat",
+          "description": "DeepSeek Model Configuration"
         },
         "codeReDesign.custom1APIKey": {
           "type": "string",

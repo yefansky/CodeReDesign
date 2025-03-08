@@ -6,10 +6,17 @@ import { Cvb, TCVB } from './cvbManager';
  * 获取 DeepSeek 模型配置
  * @returns { modelName: string, apiBaseURL: string }
  */
-function getDeepSeekModelConfig(): { modelName: string, apiBaseURL: string, apiKey: string | null} {
+function getDeepSeekModelConfig(needFast: boolean = false): { modelName: string, apiBaseURL: string, apiKey: string | null} {
     const config = vscode.workspace.getConfiguration('codeReDesign');
-    const modelConfig = config.get<string>('modelConfig') || 'deepseek-chat';
+    let modelConfig = config.get<string>('modelConfig') || 'deepseek-chat';
     const apiKey = config.get<string>('deepSeekApiKey') || null;
+
+    if (needFast) {
+        let fastModelConfig = config.get<string>('fastModelConfig');
+        if (fastModelConfig){
+            modelConfig = fastModelConfig;
+        }
+    }
 
     if (modelConfig.startsWith('custom')) {
         const customModelName = config.get<string>(`${modelConfig}ModelName`) || '';
@@ -61,9 +68,10 @@ export async function callDeepSeekApi(
     outputChannel?: vscode.OutputChannel,
     streamMode: boolean = true,
     endstring?: string,
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    needFast: boolean = false
 ): Promise<string | null> {
-    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig();
+    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig(needFast);
     const userStopException = 'operation stop by user';
 
     if (!apiKey) {
@@ -238,7 +246,7 @@ export async function callDeepSeekFixApi(
     streamMode: boolean = true,
     abortSignal?: AbortSignal
 ): Promise<string | null> {
-    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig();
+    const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig(false);
     const userStopException = 'operation stop by user';
 
     if (!apiKey) {
@@ -447,7 +455,9 @@ export async function generateFilenameFromRequest(userRequest: string): Promise<
         `请简单概括一下需求，输出字符串作为文件名。如果描述里有版本名称，这个名称一定要保留并放在开头。 需求："${userRequest}"`,
         '你是一个工具函数，接收请求，只返回纯结果，不要有附加说明.',
         undefined,
-        false
+        false,
+        undefined, undefined,
+        true
     );
 
     let summary = summaryResponse || '';

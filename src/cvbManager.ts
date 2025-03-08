@@ -892,6 +892,8 @@ export async function compressCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
   const outputChannel = getOutputChannel();
   const signal = getCurrentOperationController().signal;
 
+  outputChannel.appendLine("compress task start");
+
   // 遍历每个文件并压缩
   for (const [filePath, fileContent] of Object.entries(files)) {
       // 构造 API 请求内容
@@ -956,17 +958,23 @@ function func2() {
       // 系统提示
       const systemContent = "你是一个代码分析助手。给定一个文件的内容和用户的请求，识别并提取出对理解代码在请求上下文中的有价值的代码片段。注意输出的时候不要有 \`\`\`";
 
+      outputChannel.appendLine(`compress processing .. ${filePath}`);
       // 调用 API
-      const response = await callDeepSeekApi(requestContent, systemContent, outputChannel, true, undefined, signal);
+      const response = await callDeepSeekApi(requestContent, systemContent, undefined, true, undefined, signal, true);
       if (response) {
           // 处理 API 响应，分隔并连接有价值的代码片段
           const segments = response.split("===SEGMENT===").map(segment => segment.trim());
           const compressedContent = segments.join("\n//...CCVB\n");
           compressedFiles[filePath] = compressedContent;
+
+          outputChannel.appendLine(`compress processing .. ${filePath} [success]`);
       } else {
           // 如果 API 调用失败，保留原始内容
+          outputChannel.appendLine(`compress processing .. ${filePath} [failed]`);
       }
   }
+
+  outputChannel.appendLine("compress task finish");
 
   // 构建新的 CVB 对象
   const newCvb = new Cvb();

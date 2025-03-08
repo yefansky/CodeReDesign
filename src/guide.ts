@@ -29,6 +29,9 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
         case 'updateModelConfig':
           await this.updateModelConfig(message.selectedModel, webviewView);
           break;
+        case 'updateFastModelConfig':
+          await this.updateFastModelConfig(message.selectedFastModel, webviewView);
+          break;
         default:
           vscode.commands.executeCommand(message.command);
           break;
@@ -44,6 +47,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
       
       // 保存模型配置
       await config.update('modelConfig', data.selectedModel, vscode.ConfigurationTarget.Global);
+      await config.update('fastModelConfig', data.selectedFastModel, vscode.ConfigurationTarget.Global);
 
       // 如果选择的是自定义模型，保存自定义配置
       const customModelMatch = data.selectedModel.match(/^custom(\d+)$/);
@@ -68,10 +72,18 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this.getWebviewContent(webviewView, {"details": "open"});
   }
 
+  private async updateFastModelConfig(selectedModel: string, webviewView: vscode.WebviewView) {
+    const config = vscode.workspace.getConfiguration('codeReDesign');
+    await config.update('fastModelConfig', selectedModel, vscode.ConfigurationTarget.Global);
+    webviewView.webview.html = this.getWebviewContent(webviewView, {"details": "open"});
+  }
+
+
   private getWebviewContent(webviewView: vscode.WebviewView, state: any): string {
     const config = vscode.workspace.getConfiguration('codeReDesign');
     const apiKey = config.get('deepSeekApiKey') || '';
     const currentModelConfig = config.get('modelConfig') || 'deepseek-chat';
+    const currentFastModelConfig = config.get('fastModelConfig') || 'deepseek-chat';
   
     // 获取所有以 'custom' 开头的模型配置
     const customConfigs = [];
@@ -183,7 +195,15 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
           <label for="apiKey">DeepSeek 官方 API Key：</label>
           <input type="text" id="apiKey" value="${apiKey}" placeholder="请输入您的 DeepSeek API 密钥" />
           <summary>自定义模型配置</summary>
-          <label for="modelConfig">选择模型</label>
+          <label for="fastModelConfig" style="margin-top: 15px;">快速模型配置(主要用于文件取名等简单的基础操作)：</label>
+          <select id="fastModelConfig">
+            ${modelConfigEnum.map(option => `
+              <option value="${option.value}" ${option.value === currentFastModelConfig ? 'selected' : ''}>
+                ${option.label}
+              </option>
+            `).join('')}
+          </select>
+          <label for="modelConfig">主模型配置：</label>
           <select id="modelConfig">
             ${modelConfigEnum.map(option => `
               <option value="${option.value}" ${option.value === currentModelConfig ? 'selected' : ''}>
@@ -245,6 +265,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
         document.getElementById('saveAllConfig').addEventListener('click', () => {
           const apiKey = document.getElementById('apiKey').value;
           const selectedModel = document.getElementById('modelConfig').value;
+          const selectedFastModel = document.getElementById('fastModelConfig').value;
           const customBaseURL = document.getElementById('customBaseURL').value;
           const customModelName = document.getElementById('customModelName').value;
           const customModelNickname = document.getElementById('customModelNickname').value;
@@ -253,22 +274,28 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
           vscode.postMessage({
             command: 'saveAllConfig',
             data: {
-              deepSeekApiKey: apiKey,
-              selectedModel: selectedModel,
-              customBaseURL: customBaseURL,
-              customModelName: customModelName,
-              customModelNickname: customModelNickname,
-              customAPIKey: customAPIKey
-            }
+                          deepSeekApiKey: apiKey,
+                          selectedModel: selectedModel,
+                          selectedFastModel: selectedFastModel,
+                          customBaseURL: customBaseURL,
+                          customModelName: customModelName,
+                          customModelNickname: customModelNickname,
+                          customAPIKey: customAPIKey
+                        }
           });
         });
   
         document.getElementById('modelConfig').addEventListener('change', (event) => {
-          const selectedModel = event.target.value;
-          const customConfigSection = document.getElementById('customConfigSection');
-          customConfigSection.style.display = selectedModel.startsWith('custom') ? 'block' : 'none';
-          vscode.postMessage({ command: 'updateModelConfig', selectedModel });
-        });
+                  const selectedModel = event.target.value;
+                  const customConfigSection = document.getElementById('customConfigSection');
+                  customConfigSection.style.display = selectedModel.startsWith('custom') ? 'block' : 'none';
+                  vscode.postMessage({ command: 'updateModelConfig', selectedModel });
+                });
+        
+        document.getElementById('fastModelConfig').addEventListener('change', (event) => {
+                  const selectedFastModel = event.target.value;
+                  vscode.postMessage({ command: 'updateFastModelConfig', selectedFastModel });
+                });
   
         (function() {
           const selectedModel = document.getElementById('modelConfig').value;
