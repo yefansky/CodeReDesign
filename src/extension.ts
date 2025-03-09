@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
-import { generateCvb, applyCvbToWorkspace, generateTimestamp, Cvb, TCVB, mergeCvb} from './cvbManager';
+import { generateCvb, applyCvbToWorkspace, generateTimestamp, Cvb, TCVB, mergeCvb, compressCvb} from './cvbManager';
 import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode, callDeepSeekFixApi, GetLastMessageBody } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
@@ -66,7 +66,16 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
         i++;
     }
 
-    const cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
+    let cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
+    const CVB_QUERY_LENGTH_LIMIT = 1024 * 2;
+    if(cvbContent.length > CVB_QUERY_LENGTH_LIMIT) {
+        const inputCvb = new Cvb(cvbContent);
+        if (!inputCvb.getMetaData("compressFrom")) {
+            currentOutputChannel?.appendLine("输入数据过于巨大,先进行压缩预处理...");
+            const compressedCvb = await compressCvb(inputCvb, userPrompt);
+            cvbContent = compressedCvb.toString();
+        }
+    }
 
     let apiResponse = await queryCodeReDesign(cvbContent, userPrompt, outputChannel, CurrentOperationController.signal);
     let processSuccess = true;

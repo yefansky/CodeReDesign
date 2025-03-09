@@ -961,19 +961,19 @@ function func2() {
 
     const systemContent = "你是一个代码分析助手。给定一个文件的内容和用户的请求，识别并提取出对理解代码在请求上下文中的有价值的代码片段。注意输出的时候不要有 \`\`\`";
 
-    outputChannel.appendLine(`compress processing .. ${filePath}`);
+    outputChannel.appendLine(`compress processing .. ${filePath} [🚀start]`);
     try {
       const response = await callDeepSeekApi(requestContent, systemContent, undefined, true, undefined, signal, true);
       if (response) {
         const segments = response.split("===SEGMENT===").map(segment => segment.trim());
         const compressedContent = segments.join("\n//...CCVB\n");
         compressedFiles[filePath] = compressedContent;
-        outputChannel.appendLine(`compress processing .. ${filePath} [success]`);
+        outputChannel.appendLine(`compress processing .. ${filePath} [✅success]`);
       } else {
-        outputChannel.appendLine(`compress processing .. ${filePath} [failed]`);
+        outputChannel.appendLine(`compress processing .. ${filePath} [❌failed]`);
       }
     } catch (error) {
-      outputChannel.appendLine(`compress processing .. ${filePath} [failed: ${error}]`);
+      outputChannel.appendLine(`compress processing .. ${filePath} [⚠️error: ${error}]`);
     }
   };
 
