@@ -68,11 +68,12 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
 
     let cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
     const CVB_QUERY_LENGTH_LIMIT = 1024 * 2;
-    if(cvbContent.length > CVB_QUERY_LENGTH_LIMIT) {
-        const inputCvb = new Cvb(cvbContent);
+    const inputCvb = new Cvb(cvbContent);
+    if(cvbContent.length > CVB_QUERY_LENGTH_LIMIT && !inputCvb.getMetaData("compressFrom")) {
         if (!inputCvb.getMetaData("compressFrom")) {
             currentOutputChannel?.appendLine("输入数据过于巨大,先进行压缩预处理...");
             const compressedCvb = await compressCvb(inputCvb, userPrompt);
+            compressedCvb.setMetaData("compressFrom", cvbFilePath);
             cvbContent = compressedCvb.toString();
         }
     }
