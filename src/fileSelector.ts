@@ -6,7 +6,16 @@ import { g_objLanguageMapping } from './languageMapping';
 // 配置常量
 const ALLOWED_FILENAMES = ['package.json']; // 文件名白名单
 const INCLUDED_EXTENSIONS = Object.keys(g_objLanguageMapping); // 扩展名白名单
-const EXCLUDED_DIRECTORIES = ['node_modules', '.git', 'build', 'dist', 'out', 'vendor']; // 排除目录
+const EXCLUDED_DIRECTORIES = [
+    'node_modules', 
+    '.git', 
+    'build', 
+    'dist', 
+    'out', 
+    'vendor', 
+    'venv', // Python 虚拟环境
+    'site-packages', // Python 的 site-packages 目录
+]; // 排除目录
 
 /**
  * 解析 ignore 文件内容并返回匹配模式数组
