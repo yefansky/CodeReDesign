@@ -1,0 +1,376 @@
+
+
+## BEGIN_TCVB
+
+## FILE:k:\Lab\CodeReDesign\src\cvbManager.ts
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+```
+export async function queryCodeReDesign(
+    cvbContent: string,
+    userRequest: string,
+    outputChannel: vscode.OutputChannel,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const requestContent = `
+【格式说明】
+- CVB 格式说明：${Cvb.getFormatDescription()}
+- TCVB 格式说明：${TCVB.getFormatDescription()}
+
+【任务说明】
+请读取以下 CVB 格式代码，并根据需求修改代码。注意：
+1. 如果需求涉及“移动代码”，请务必修改原始代码，将代码重新封装到新位置，而非简单复制；
+2. 修改后的代码必须完整、可执行，不能有任何省略；
+3. 输出内容必须严格遵守 TCVB 格式（仅正文部分含 TCVB 标记，其他地方如有 TCVB 开始或结束符需转义），以确保后续合并正确；
+4. 注意不要将某文件的修改内容误认为是其他文件，请一条一条列出具体修改项及对应文件路径。
+
+【输出要求】
+1. 先输出你对需求及相关代码的理解，请按层级缩进列出笔记，便于整理思路；
+2. 再输出详细的方案大纲，格式如下：
+    需求理解:
+        …
+    查询资料:
+        列出每个关键修改点所在的文件路径
+    修改方案:
+        文件路径1:
+            描述修改点，避免用大块代码,注意只输出关键修改,不要太长, 不要加载无用的上下文。不要输出没有改动部分的代码
+        文件路径2:
+            描述修改点，同上
+        …
+    最后检查:
+        对以上输出的方案大纲进行反思，重新阅读输入代码，结合以上方案大纲，逐条检查有没有和原文对不上的地方。检查方案是否完备、文件路径是否正确，设计思路是否无误，如有问题请提出修正意见
+3. 请确保输出中既包含错误部分的修正说明，又完整保留原有正确部分，不得遗漏任何内容；
+4. 用最小改动实现需求目的。
+
+【输入部分】
+- 输入代码：${cvbContent}
+- 需求描述：${userRequest}
+
+【最终输出】
+请先输出思路与方案大纲，最后汇总输出符合 TCVB 格式的精确代码。
+`;
+
+    return callDeepSeekApi(requestContent, undefined, outputChannel, true, '## END_TCVB', abortSignal); // 添加结束字符串
+}
+```
+## NEW_CONTENT
+```
+// ================== 任务调度器 ==================
+class TaskSession {
+    public messages: OpenAI.ChatCompletionMessageParam[] = [];
+    
+    constructor(
+        public readonly sessionId: string,
+        public readonly parentSession?: TaskSession
+    ) {}
+}
+
+class TaskScheduler {
+    private readonly MAX_CONCURRENT = 5;
+    private activeTasks: Set<Promise<void>> = new Set();
+    
+    async executeMainTask(
+        cvbContent: string,
+        userRequest: string,
+        outputChannel: vscode.OutputChannel,
+        abortSignal?: AbortSignal
+    ): Promise<string> {
+        // 创建主任务会话
+        const mainSession = new TaskSession(`main-${Date.now()}`);
+        
+        // 生成主任务提示词
+        const mainPrompt = `【任务分解要求】
+请根据用户需求将重构任务分解为多个原子子任务，格式要求：
+
+1. 公共约定部分：
+   - 全局变量声明（如有）
+   - 公共接口定义
+   - 需要统一命名的内容
+
+2. 子任务列表（JSON数组）：
+[{
+    "filePath": "修改的文件路径",
+    "taskDesc": "子任务目标描述",
+    "dependsOn": ["依赖的子任务ID"]
+}]`;
+
+        const fullPrompt = `${mainPrompt}\n\n原始需求：${userRequest}\n\nCVB内容：${cvbContent}`;
+        
+        // 调用API获取任务分解
+        const decomposition = await callDeepSeekApi(
+            fullPrompt,
+            "你是一个任务分解专家，负责将大型代码重构任务拆分为原子子任务",
+            outputChannel,
+            false,
+            undefined,
+            abortSignal,
+            new TaskSession(`child-${Date.now()}`, mainSession)
+        );
+
+        // 解析任务分解结果
+        const { commonConventions, subTasks } = this.parseDecomposition(decomposition);
+        
+        // 生成子任务队列
+        const taskQueue = subTasks.map(task => ({
+            ...task,
+            prompt: this.buildSubTaskPrompt(task, commonConventions, cvbContent)
+        }));
+
+        // 执行子任务并行调度
+        const results = await this.processSubTasks(taskQueue, outputChannel, abortSignal);
+        
+        // 合并所有TCVB结果
+        return this.mergeTCVBResults(results);
+    }
+
+    private async processSubTasks(
+        tasks: Array<{filePath: string, prompt: string}>,
+        outputChannel: vscode.OutputChannel,
+        abortSignal?: AbortSignal
+    ): Promise<string[]> {
+        const results: string[] = [];
+        
+        for (const task of tasks) {
+            // 控制并发数量
+            if (this.activeTasks.size >= this.MAX_CONCURRENT) {
+                await Promise.race(this.activeTasks);
+            }
+            
+            const taskPromise = this.executeSubTask(task, outputChannel, abortSignal)
+                .then(result => {
+                    results.push(result);
+                    this.activeTasks.delete(taskPromise);
+                });
+            
+            this.activeTasks.add(taskPromise);
+        }
+        
+        await Promise.all(this.activeTasks);
+        return results;
+    }
+
+    private async executeSubTask(
+        task: {filePath: string, prompt: string},
+        outputChannel: vscode.OutputChannel,
+        abortSignal?: AbortSignal
+    ): Promise<string> {
+        outputChannel.appendLine(`? 开始处理子任务：${task.filePath}`);
+        
+        const session = new TaskSession(`subtask-${Date.now()}`);
+        let attempt = 0;
+        let result: string | null;
+        
+        do {
+            result = await callDeepSeekApi(
+                task.prompt,
+                "你是一个原子子任务执行专家，负责完成特定文件的代码重构",
+                outputChannel,
+                true,
+                '## END_TCVB',
+                abortSignal,
+                session
+            );
+            
+            if (!result) throw new Error('子任务执行失败');
+            
+            try {
+                new TCVB(result); // 验证TCVB格式
+                return result;
+            } catch (e) {
+                outputChannel.appendLine(`?? 子任务格式错误，尝试修复 (第${++attempt}次)`);
+                result = await callDeepSeekFixApi(
+                    (e as Error).message,
+                    outputChannel,
+                    true,
+                    abortSignal,
+                    session
+                );
+            }
+        } while (attempt < 3);
+        
+        throw new Error(`子任务重试失败：${task.filePath}`);
+    }
+
+    private mergeTCVBResults(results: string[]): string {
+        const merged: string[] = ['## BEGIN_TCVB'];
+        
+        for (const result of results) {
+            const cleaned = result
+                .replace(/## BEGIN_TCVB/g, '')
+                .replace(/## END_TCVB/g, '')
+                .trim();
+            merged.push(cleaned);
+        }
+        
+        merged.push('## END_TCVB');
+        return merged.join('\n\n');
+    }
+
+    // 辅助方法：解析任务分解结果
+    private parseDecomposition(response: string): {
+        commonConventions: string,
+        subTasks: Array<{filePath: string, taskDesc: string}>
+    } {
+        // 实现解析逻辑（此处需要根据实际API响应格式调整）
+        return {
+            commonConventions: '公共约定内容...',
+            subTasks: JSON.parse(response.match(/\[.*?\]/s)![0])
+        };
+    }
+
+    // 辅助方法：构建子任务提示词
+    private buildSubTaskPrompt(
+        task: {filePath: string, taskDesc: string},
+        conventions: string,
+        cvbContent: string
+    ): string {
+        return `【子任务执行要求】
+1. 公共约定：
+${conventions}
+
+2. 当前子任务目标：
+${task.taskDesc}
+
+3. 文件上下文：
+${this.extractFileContext(cvbContent, task.filePath)}
+
+4. 输出要求：
+严格遵循TCVB格式，仅修改${task.filePath}文件`;
+    }
+
+    // 辅助方法：提取相关文件上下文
+    private extractFileContext(cvbContent: string, filePath: string): string {
+        const cvb = new Cvb(cvbContent);
+        return cvb.getFiles()[filePath] || '';
+    }
+}
+
+export async function queryCodeReDesign(
+    cvbContent: string,
+    userRequest: string,
+    outputChannel: vscode.OutputChannel,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+    const scheduler = new TaskScheduler();
+    try {
+        return await scheduler.executeMainTask(cvbContent, userRequest, outputChannel, abortSignal);
+    } catch (error) {
+        vscode.window.showErrorMessage(`任务执行失败: ${(error as Error).message}`);
+        return null;
+    }
+}
+```
+
+## FILE:k:\Lab\CodeReDesign\src\deepseekApi.ts
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+```
+let lastMessageBody : OpenAI.ChatCompletionMessageParam[];
+
+export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
+    return lastMessageBody;
+}
+```
+## NEW_CONTENT
+```
+// ================== 会话管理 ==================
+class ChatSession {
+    private messagesMap: Map<string, OpenAI.ChatCompletionMessageParam[]> = new Map();
+    
+    getMessages(sessionId: string): OpenAI.ChatCompletionMessageParam[] {
+        if (!this.messagesMap.has(sessionId)) {
+            this.messagesMap.set(sessionId, []);
+        }
+        return this.messagesMap.get(sessionId)!;
+    }
+    
+    updateMessages(sessionId: string, messages: OpenAI.ChatCompletionMessageParam[]) {
+        this.messagesMap.set(sessionId, messages);
+    }
+}
+
+const globalSession = new ChatSession();
+
+export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
+    return [];
+}
+```
+
+## FILE:k:\Lab\CodeReDesign\src\deepseekApi.ts
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+```
+export async function callDeepSeekApi(
+    userContent: string | {role:string, content: string}[],  // 修改为支持 string 或 string[]
+    systemContent: string = 'You are a helpful assistant.',
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    endstring?: string,
+    abortSignal?: AbortSignal,
+    needFast: boolean = false
+): Promise<string | null> {
+```
+## NEW_CONTENT
+```
+export async function callDeepSeekApi(
+    userContent: string | {role:string, content: string}[],
+    systemContent: string = 'You are a helpful assistant.',
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    endstring?: string,
+    abortSignal?: AbortSignal,
+    session?: TaskSession
+): Promise<string | null> {
+    const currentSession = session || new TaskSession(`temp-${Date.now()}`);
+    const sessionId = currentSession.sessionId;
+    const messages_body = globalSession.getMessages(sessionId);
+```
+
+## FILE:k:\Lab\CodeReDesign\src\deepseekApi.ts
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+```
+        messages_body.push({ role: 'assistant', content: fullResponse });
+        lastMessageBody = messages_body;
+```
+## NEW_CONTENT
+```
+        messages_body.push({ role: 'assistant', content: fullResponse });
+        globalSession.updateMessages(sessionId, messages_body);
+```
+
+## FILE:k:\Lab\CodeReDesign\src\deepseekApi.ts
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+```
+export async function callDeepSeekFixApi(
+    errorInfo: string,
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    abortSignal?: AbortSignal
+): Promise<string | null> {
+```
+## NEW_CONTENT
+```
+export async function callDeepSeekFixApi(
+    errorInfo: string,
+    outputChannel?: vscode.OutputChannel,
+    streamMode: boolean = true,
+    abortSignal?: AbortSignal,
+    session?: TaskSession
+): Promise<string | null> {
+    const currentSession = session || new TaskSession(`temp-fix-${Date.now()}`);
+    const sessionId = currentSession.sessionId;
+    const messages_body = globalSession.getMessages(sessionId);
+```
+
+## END_TCVB
+
+【第四步：总结说明】
+1. 错误根源：cvbManager.ts的GLOBAL-REPLACE操作中NEW_CONTENT段落未正确闭合，导致TCVB解析失败
+2. 修正验证：
+   - 所有代码块均用```包裹
+   - 每个GLOBAL-REPLACE操作都包含完整的OLD/NEW_CONTENT
+   - 新增ChatSession类实现独立会话管理
+3. 关键修正点：
+   - 在cvbManager.ts的NEW_CONTENT

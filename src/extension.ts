@@ -67,7 +67,7 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
     }
 
     let cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
-    const CVB_QUERY_LENGTH_LIMIT = 1024 * 2;
+    const CVB_QUERY_LENGTH_LIMIT = 1024 * 4;
     const inputCvb = new Cvb(cvbContent);
     if(cvbContent.length > CVB_QUERY_LENGTH_LIMIT && !inputCvb.getMetaData("compressFrom")) {
         if (!inputCvb.getMetaData("compressFrom")) {

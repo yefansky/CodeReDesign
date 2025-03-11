@@ -1232,3 +1232,9 @@ queryCodeReDesign 这个函数输出的代码太长了，超过了大模型的to
 这些子任务执行的时候就不需要实时的输出内容到channel了
 只需要在主调度的地方输出开始+子任务内容， 子任务结束的提示就行
 主任务可以在生成后也在channel输出一次
+
+同时注意原流程里有一个callDeepSeekFixApi的自我修正流程
+里面的实现依赖于lastmessage
+但是在多并发的改造下，这个实现会出现冲突
+需要把这个lastmessage改为每个对话自由有一个独立的session
+也就是每个子任务有自己的session，输出的TCVB自己尝试merge，失败了就调用自己的callDeepSeekFixApi
