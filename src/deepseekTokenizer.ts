@@ -152,12 +152,18 @@ class SimpleBPETokenizer {
         }
         const words = text.split(' ');
         for (const word of words) {
-            if (!word) continue;
+            if (!word) {
+                continue;
+            }
             const bpeTokens = this.bpe(word);
             tokenCount += bpeTokens.length;
-            if (tokenCount >= limit) return false; // 超过限制，立即返回
+            if (tokenCount >= limit) {
+                return false; // 超过限制，立即返回
+            }
         }
-        if (this.addEosToken) tokenCount++; // EOS token
+        if (this.addEosToken) {
+            tokenCount++; // EOS token
+        }
         return tokenCount < limit;
     }
 }
