@@ -9,6 +9,7 @@ import { registerCvbContextMenu } from './siderBar';
 import { showInputMultiLineBox } from './UIComponents';
 import { activateGuide } from './guide';
 import {ChatPanel} from './chatPanel';
+import { isUnderTokenLimit, initTokenizer } from './deepseekTokenizer';
 
 let currentOperationController: AbortController | null = null;
 
@@ -69,7 +70,8 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
     let cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
     const CVB_QUERY_LENGTH_LIMIT = 1024 * 4;
     const inputCvb = new Cvb(cvbContent);
-    if(cvbContent.length > CVB_QUERY_LENGTH_LIMIT && !inputCvb.getMetaData("compressFrom")) {
+    const is_token_underlimit = await isUnderTokenLimit(cvbContent, CVB_QUERY_LENGTH_LIMIT);
+    if(!is_token_underlimit && !inputCvb.getMetaData("compressFrom")) {
         if (!inputCvb.getMetaData("compressFrom")) {
             currentOutputChannel?.appendLine("输入数据过于巨大,先进行压缩预处理...");
             const compressedCvb = await compressCvb(inputCvb, userPrompt);
@@ -167,6 +169,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "CodeReDesign" is now active!');
     
     activateGuide(context);
+    initTokenizer(context);
 
     hideWorkspaceFolder();
 
