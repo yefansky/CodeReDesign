@@ -895,6 +895,12 @@ export async function compressCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
   const MAX_CONCURRENT = 5; // 设置最大并行数量为5
 
   const outputChannel = getOutputChannel();
+
+  if (outputChannel) {
+    outputChannel.clear();
+    outputChannel.show();
+  }
+
   const signal = getCurrentOperationController().signal;
 
   outputChannel.appendLine("compress task start");
