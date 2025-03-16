@@ -68,7 +68,7 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
     }
 
     let cvbContent = fs.readFileSync(cvbFilePath, 'utf-8');
-    const CVB_QUERY_LENGTH_LIMIT = 1024 * 4;
+    const CVB_QUERY_LENGTH_LIMIT = (64 - 32 - 8) * 1024; // 64K上下文，reasoner的思考链最多栈32k，最大输出长度8k
     const inputCvb = new Cvb(cvbContent);
     const is_token_underlimit = await isUnderTokenLimit(cvbContent, CVB_QUERY_LENGTH_LIMIT);
     if(!is_token_underlimit && !inputCvb.getMetaData("compressFrom")) {

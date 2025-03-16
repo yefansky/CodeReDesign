@@ -1,0 +1,104 @@
+我们现在要个CallDeepSeekAPI提供一个调用外部工具的能力
+也就是function call能力
+请看下面的文档：
+
+Function Calling
+Function Calling 让模型能够调用外部工具，来增强自身能力。
+
+提示
+当前版本 deepseek-chat 模型 Function Calling 功能效果不稳定，会出现循环调用、空回复的情况。我们正在积极修复中，预计将在下一个版本中得到修复。
+
+样例代码
+这里以获取用户当前位置的天气信息为例，展示了使用 Function Calling 的完整 Python 代码。
+
+Function Calling 的具体 API 格式请参考对话补全文档。
+
+from openai import OpenAI
+
+def send_messages(messages):
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=messages,
+        tools=tools
+    )
+    return response.choices[0].message
+
+client = OpenAI(
+    api_key="<your api key>",
+    base_url="https://api.deepseek.com",
+)
+
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get weather of an location, the user shoud supply a location first",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. San Francisco, CA",
+                    }
+                },
+                "required": ["location"]
+            },
+        }
+    },
+]
+
+messages = [{"role": "user", "content": "How's the weather in Hangzhou?"}]
+message = send_messages(messages)
+print(f"User>\t {messages[0]['content']}")
+
+tool = message.tool_calls[0]
+messages.append(message)
+
+messages.append({"role": "tool", "tool_call_id": tool.id, "content": "24℃"})
+message = send_messages(messages)
+print(f"Model>\t {message.content}")
+
+这个例子的执行流程如下：
+
+用户：询问现在的天气
+模型：返回 function get_weather({location: 'Hangzhou'})
+用户：调用 function get_weather({location: 'Hangzhou'})，并传给模型。
+模型：返回自然语言，"The current temperature in Hangzhou is 24°C."
+注：上述代码中 get_weather 函数功能需由用户提供，模型本身不执行具体函数。
+
+
+我来具体解释一下，function Call 其实不是模型真的调用了外部函数
+而是本地代码申明了一些函数的使用方法，用json格式，在一开始的对话里告诉了api，
+大模型自行决策当前的情况是否需要调用到这些tool，并通过对话输出
+
+然后本地接收respond的时候先进行解析而不是立刻显示
+解析到模型的调用请求后，把大模型传参通过json解开，传给真正的本地函数
+把调用结果再按照约定格式重新返回给大模型（也就是通过下一轮对话发上去）
+
+文档里的tools是openai的api约定好的
+需要服务端提供支持
+但是不是所有的deepseek服务商都提供了这套机制
+所以我要你写一套通用的，不依赖服务器支持的function call，也就是通过对话原理进行实现
+把相关的实现封成一个函数
+同时让现在的callapi函数有一个参数指定是否可以有调用tools的能力
+注意可能一次有多个调用，要让模型提供tool_call_id来区分，返回结果的时候也要用上这个toolid
+注意是你自己实现，不要依赖openai里的接口，因为有些服务商没支持，我需要你把
+
+response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=messages,
+        tools=tools
+    )
+
+tool = message.tool_calls[0]
+
+做一个通用的封装
+
+也就是有一个开关，如果服务商支持我就开启，不支持我就用自己的实现
+
+你最好再提供一个好用的注册tool函数的接口
+注册完以后，就能在模型会调里自动解析找到函数执行
+
+你现在实现一下：
+
