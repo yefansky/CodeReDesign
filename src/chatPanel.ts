@@ -22,12 +22,12 @@ class WebviewOutputChannel implements vscode.OutputChannel {
 
     append(value: string): void {
         this.webview.postMessage({ role: 'model', content: value });
-        //getOutputChannel().append(value);
+        getOutputChannel().append(value);
     }
 
     appendLine(value: string): void {
         this.append(value + '\n');
-        //getOutputChannel().appendLine(value);
+        getOutputChannel().append(value + '\n');
     }
 
     clear(): void {
@@ -196,6 +196,26 @@ export class ChatPanel {
                         border: none;
                         cursor: pointer;
                     }
+                    #mermaid-toggle-container {
+                        position: absolute;
+                        top: 10px;
+                        right: 80px;
+                    }
+                    #mermaid-toggle {
+                        cursor: pointer;
+                    }
+                    .mermaid {
+                        margin: 10px 0;
+                    }
+                    .mermaid-raw {
+                        display: none;
+                    }
+                    .mermaid-rendered .mermaid-raw {
+                        display: block;
+                    }
+                    .mermaid-rendered .mermaid {
+                        display: none;
+                    }
                 </style>
             </head>
             <body>
@@ -205,12 +225,16 @@ export class ChatPanel {
                     <button id="send">Send</button>
                     <button id="stop" style="display: none;">Stop</button>
                     <button id="new-session" style="position: absolute; top: 10px; right: 10px;">New Session</button>
-
+                    <div id="mermaid-toggle-container">
+                        <input type="checkbox" id="mermaid-toggle">
+                        <label for="mermaid-toggle">Show Mermaid Raw Code</label>
+                    </div>
                     <input type="checkbox" id="web-search">
                     <label for="web-search">联网搜索</label>
                 </div>
                 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
                 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
                 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
                 <script>
@@ -221,6 +245,13 @@ export class ChatPanel {
                     const stopButton = document.getElementById('stop');
                     const newSessionButton = document.getElementById('new-session');
                     const webSearchCheckbox = document.getElementById('web-search');
+                    const mermaidToggle = document.getElementById('mermaid-toggle');
+
+                    // 初始化 Mermaid
+                    mermaid.initialize({
+                        startOnLoad: false,
+                        theme: 'dark'
+                    });
 
                     // 配置代码高亮
                     hljs.configure({ ignoreUnescapedHTML: true });
@@ -292,44 +323,68 @@ export class ChatPanel {
                      * 把 container.innerHTML 里所有的 $$…$$ 块，
                      * 用 katex.renderToString 直接渲染成 HTML
                      */
-                    function fnRenderDisplayMath(webviewDiv)
-                    {
-                        // 1) 获取原始 HTML
+                    function fnRenderDisplayMath(webviewDiv) {
                         const strRawHtml = webviewDiv.innerHTML;
-
-                        // 2) 匹配所有 $$…$$（非贪婪）
                         const rgxDisplayMath = /\$\$([\s\S]+?)\$\$/g;
-
-                        // 3) 替换成 katex 渲染结果
-                        const strReplacedHtml = strRawHtml.replace(rgxDisplayMath
-                        ,
-                        (strMatch, strInnerTex) =>
-                        {
-                            try
-                            {
-                                // trim 首尾空白，保持 display 模式
+                        const strReplacedHtml = strRawHtml.replace(rgxDisplayMath, (strMatch, strInnerTex) => {
+                            try {
                                 const strTex = strInnerTex.replace(/^\s+|\s+$/g, '');
-                                return katex.renderToString(strTex
-                                ,
-                                {
+                                return katex.renderToString(strTex, {
                                     displayMode: true,
                                     throwOnError: false
                                 });
-                            }
-                            catch (err)
-                            {
+                            } catch (err) {
                                 console.error('KaTeX render error:', err);
-                                // 渲染失败就返回原始 $$…$$
                                 return strMatch;
                             }
                         });
-
-                        // 4) 更新回 DOM
                         webviewDiv.innerHTML = strReplacedHtml;
                     }
 
+                    // 渲染 Mermaid 图表
+                    async function renderMermaid(webviewDiv) {
+                        const codeBlocks = webviewDiv.querySelectorAll('pre code.language-mermaid');
+                        for (const codeBlock of codeBlocks) {
+                            const parentPre = codeBlock.closest('pre');
+                            const mermaidCode = codeBlock.textContent;
+                            try {
+                                const { svg } = await mermaid.render('mermaid-diagram-' + Date.now(), mermaidCode);
+                                const mermaidDiv = document.createElement('div');
+                                mermaidDiv.className = 'mermaid';
+                                mermaidDiv.innerHTML = svg;
+
+                                const rawDiv = document.createElement('div');
+                                rawDiv.className = 'mermaid-raw';
+                                rawDiv.innerHTML = \`<pre><code class="language-mermaid">\${mermaidCode}</code></pre>\`;
+
+                                const container = document.createElement('div');
+                                container.className = 'mermaid-container';
+                                container.appendChild(mermaidDiv);
+                                container.appendChild(rawDiv);
+
+                                parentPre.replaceWith(container);
+                            } catch (err) {
+                                console.error('Mermaid render error:', err);
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'mermaid-error';
+                                errorDiv.textContent = 'Failed to render Mermaid diagram';
+                                parentPre.replaceWith(errorDiv);
+                            }
+                        }
+                    }
+
+                    // 切换 Mermaid 显示模式
+                    function toggleMermaidDisplay() {
+                        const containers = document.querySelectorAll('.mermaid-container');
+                        if (mermaidToggle.checked) {
+                            containers.forEach(container => container.classList.add('mermaid-rendered'));
+                        } else {
+                            containers.forEach(container => container.classList.remove('mermaid-rendered'));
+                        }
+                    }
+
                     // 渲染消息内容
-                    function renderMessage(role, content, index) {
+                    async function renderMessage(role, content, index) {
                         const lastChild = chat.lastElementChild;
                         let targetDiv;
 
@@ -352,6 +407,7 @@ export class ChatPanel {
                             });
 
                             fnRenderDisplayMath(targetDiv);
+                            await renderMermaid(targetDiv);
 
                             renderMathInElement(targetDiv, {
                                 delimiters: [
@@ -373,11 +429,11 @@ export class ChatPanel {
                     }
 
                     // 处理 Webview 消息
-                    window.addEventListener('message', (event) => {
+                    window.addEventListener('message', async (event) => {
                         const data = event.data;
 
                         if (data.role && data.content) {
-                            renderMessage(data.role, data.content, data.index);
+                            await renderMessage(data.role, data.content, data.index);
                             return;
                         }
 
@@ -411,6 +467,7 @@ export class ChatPanel {
 
                     // 初始化事件监听
                     setupCopyButtonDelegation();
+                    mermaidToggle.addEventListener('change', toggleMermaidDisplay);
 
                     // 发送消息
                     sendButton.addEventListener('click', () => {
@@ -503,7 +560,7 @@ export class ChatPanel {
 
         try {
             const tools = message.webSearch ? [apiTools.searchTool] : null;
-            const nomalSystemPromot = "用markdown输出。";
+            const nomalSystemPromot = "用markdown输出。数学公式要用$$包裹，每条一行不要换行。流程图(Mermaid)里的每个字符串都要用引号包裹。";
             const systemPrompt = message.webSearch ? "每次回答问题前，一定要先上网搜索一下再回答。" + nomalSystemPromot : nomalSystemPromot;
             const response = await callDeepSeekApi(
                 this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
