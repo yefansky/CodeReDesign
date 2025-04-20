@@ -4,6 +4,7 @@ import { getCurrentOperationController, resetCurrentOperationController } from '
 import path from 'path';
 import * as fs from "fs";
 import * as apiTools from './apiTools';
+import {getOutputChannel} from './extension';
 
 // Webview 输出通道实现
 class WebviewOutputChannel implements vscode.OutputChannel {
@@ -21,10 +22,12 @@ class WebviewOutputChannel implements vscode.OutputChannel {
 
     append(value: string): void {
         this.webview.postMessage({ role: 'model', content: value });
+        //getOutputChannel().append(value);
     }
 
     appendLine(value: string): void {
         this.append(value + '\n');
+        //getOutputChannel().appendLine(value);
     }
 
     clear(): void {
@@ -284,6 +287,47 @@ export class ChatPanel {
                         });
                     }
 
+                    /**
+                     * fnRenderDisplayMath
+                     * 把 container.innerHTML 里所有的 $$…$$ 块，
+                     * 用 katex.renderToString 直接渲染成 HTML
+                     */
+                    function fnRenderDisplayMath(webviewDiv)
+                    {
+                        // 1) 获取原始 HTML
+                        const strRawHtml = webviewDiv.innerHTML;
+
+                        // 2) 匹配所有 $$…$$（非贪婪）
+                        const rgxDisplayMath = /\$\$([\s\S]+?)\$\$/g;
+
+                        // 3) 替换成 katex 渲染结果
+                        const strReplacedHtml = strRawHtml.replace(rgxDisplayMath
+                        ,
+                        (strMatch, strInnerTex) =>
+                        {
+                            try
+                            {
+                                // trim 首尾空白，保持 display 模式
+                                const strTex = strInnerTex.replace(/^\s+|\s+$/g, '');
+                                return katex.renderToString(strTex
+                                ,
+                                {
+                                    displayMode: true,
+                                    throwOnError: false
+                                });
+                            }
+                            catch (err)
+                            {
+                                console.error('KaTeX render error:', err);
+                                // 渲染失败就返回原始 $$…$$
+                                return strMatch;
+                            }
+                        });
+
+                        // 4) 更新回 DOM
+                        webviewDiv.innerHTML = strReplacedHtml;
+                    }
+
                     // 渲染消息内容
                     function renderMessage(role, content, index) {
                         const lastChild = chat.lastElementChild;
@@ -301,11 +345,14 @@ export class ChatPanel {
 
                         if (role === 'model') {
                             targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
-                                breaks: true,
+                                breaks: false,
                                 mangle: false,
                                 headerIds: false,
                                 highlight: (code, lang) => hljs.highlight(hljs.getLanguage(lang) ? lang : 'plaintext', code).value
                             });
+
+                            fnRenderDisplayMath(targetDiv);
+
                             renderMathInElement(targetDiv, {
                                 delimiters: [
                                     { left: '$$', right: '$$', display: true },
@@ -456,7 +503,8 @@ export class ChatPanel {
 
         try {
             const tools = message.webSearch ? [apiTools.searchTool] : null;
-            const systemPrompt = message.webSearch ? "每次回答问题前，一定要先上网搜索一下再回答。" : 'You are a helpful assistant. Always format answers with Markdown.'
+            const nomalSystemPromot = "用markdown输出。";
+            const systemPrompt = message.webSearch ? "每次回答问题前，一定要先上网搜索一下再回答。" + nomalSystemPromot : nomalSystemPromot;
             const response = await callDeepSeekApi(
                 this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
                 systemPrompt,
