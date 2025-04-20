@@ -8,8 +8,7 @@ call npm install --save-dev ^
     @types/vscode@1.70.0 ^
     @types/estree ^
     standard-version
-call npm install openai
-
+call npm install openai axios cheerio
 REM global install vsce
 call npm install -g vsce
 

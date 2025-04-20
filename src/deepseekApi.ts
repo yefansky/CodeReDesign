@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import * as vscode from 'vscode';
 import { Cvb, TCVB } from './cvbManager';
+import * as apiTools from './apiTools';
 
 /**
  * 获取 DeepSeek 模型配置
@@ -53,23 +54,26 @@ export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
 }
 
 /**
- * 调用 DeepSeek API
- * @param userContent 用户输入内容，可以是字符串或字符串数组
+ * 调用 DeepSeek API，支持 Function Calling
+ * @param userContent 用户输入内容，可以是字符串或消息数组
  * @param systemContent 系统提示内容
  * @param outputChannel 输出通道，用于实时显示流式内容
  * @param streamMode 是否启用流式模式
  * @param endstring 结束字符串，用于检查输出是否包含特定字符串
  * @param abortSignal 用于中断请求的信号
+ * @param needFast 是否使用快速模式
+ * @param tools 可用的工具列表，没有工具的话传入 null
  * @returns API 返回的完整内容
  */
 export async function callDeepSeekApi(
-    userContent: string | {role:string, content: string}[],  // 修改为支持 string 或 string[]
+    userContent: string | { role: string, content: string }[],
     systemContent: string = 'You are a helpful assistant.',
     outputChannel?: vscode.OutputChannel,
     streamMode: boolean = true,
     endstring?: string,
     abortSignal?: AbortSignal,
-    needFast: boolean = false
+    needFast: boolean = false,
+    tools: apiTools.Tool[] | null= null
 ): Promise<string | null> {
     const { modelName, apiBaseURL, apiKey } = getDeepSeekModelConfig(needFast);
     const userStopException = 'operation stop by user';
@@ -111,12 +115,8 @@ export async function callDeepSeekApi(
         // 构造消息体
         let messages_body: OpenAI.ChatCompletionMessageParam[] = [];
         if (Array.isArray(userContent)) {
-            if (systemPromot.role === 'user') {
-                userContent[0].content = systemPromot.content + "\n\n" + userContent[0].content;
-            }
-            else{
-                messages_body.push(systemPromot);
-            }
+            if (systemPromot.role === 'user') { userContent[0].content = systemPromot.content + "\n\n" + userContent[0].content; }
+            else{ messages_body.push(systemPromot); }
 
             {
                 const role = (userContent[0].role === 'user') ? 'user' : 'assistant';
@@ -128,14 +128,10 @@ export async function callDeepSeekApi(
                 const role = (userContent[i].role === 'user') ? 'user' : 'assistant';
                 messages_body.push({ role, content: userContent[i].content });
             }
-        } else {
-
-            if (systemPromot.role === 'user') {
-                userContent = systemPromot.content + "\n\n" + userContent;
-            }
-            else{
-                messages_body.push(systemPromot);
-            }
+        } 
+        else {
+            if (systemPromot.role === 'user') { userContent = systemPromot.content + "\n\n" + userContent; }
+            else{ messages_body.push(systemPromot); }
 
             // 如果是单个字符串，默认是 'user' 角色
             messages_body.push({ role: 'user', content: userContent });
@@ -145,17 +141,36 @@ export async function callDeepSeekApi(
 
         while (attempts < maxAttempts) {
             attempts++;
-            const response = await openai.chat.completions.create({
-                model: modelName,
-                messages: messages_body,
-                stream: streamMode,
-                max_tokens: maxToken,
-                temperature: temperature
-            });
+            let response = null;
+
+            // Function Calling 处理
+            if (tools) {
+                tools.forEach(tool => apiTools.registerTool(tool)); // 注册工具
+
+                const isNativeSupported = apiTools.isToolsSupported(apiBaseURL); // 检查服务商是否支持 tools
+
+                if (isNativeSupported) {
+                    response = await apiTools.handleNativeFunctionCalling(
+                        openai, modelName, messages_body, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
+                    );
+                } else {
+                    response = await apiTools.handleSimulatedFunctionCalling(
+                        openai, modelName, messages_body, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
+                    );
+                }
+            }
+            else {
+                response = await openai.chat.completions.create({
+                    model: modelName,
+                    messages: messages_body,
+                    stream: streamMode,
+                    max_tokens: maxToken,
+                    temperature: temperature,
+                });
+            }
             let thinking = false;
 
             vscode.window.showInformationMessage('DeepSeek API 正在处理...');
-
             let chunkResponse = '';
             let finishReason: string | null = null;
 
@@ -229,13 +244,12 @@ export async function callDeepSeekApi(
         messages_body.push({ role: 'assistant', content: fullResponse });
         lastMessageBody = messages_body;
         return fullResponse;
-
     } catch (error) {
         if (error instanceof Error && error.message === userStopException) {
-            vscode.window.showInformationMessage('operation stop by user');
+            vscode.window.showInformationMessage('操作被用户中止');
             return null;
         }
-        vscode.window.showErrorMessage('API调用失败: ' + (error as Error).message);
+        vscode.window.showErrorMessage('API 调用失败: ' + (error as Error).message);
         return null;
     }
 }

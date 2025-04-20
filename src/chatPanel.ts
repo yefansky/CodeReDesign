@@ -3,6 +3,7 @@ import { callDeepSeekApi } from './deepseekApi';
 import { getCurrentOperationController, resetCurrentOperationController } from './extension';
 import path from 'path';
 import * as fs from "fs";
+import * as apiTools from './apiTools';
 
 // Webview 输出通道实现
 class WebviewOutputChannel implements vscode.OutputChannel {
@@ -201,6 +202,9 @@ export class ChatPanel {
                     <button id="send">Send</button>
                     <button id="stop" style="display: none;">Stop</button>
                     <button id="new-session" style="position: absolute; top: 10px; right: 10px;">New Session</button>
+
+                    <input type="checkbox" id="web-search">
+                    <label for="web-search">联网搜索</label>
                 </div>
                 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
@@ -213,6 +217,7 @@ export class ChatPanel {
                     const sendButton = document.getElementById('send');
                     const stopButton = document.getElementById('stop');
                     const newSessionButton = document.getElementById('new-session');
+                    const webSearchCheckbox = document.getElementById('web-search');
 
                     // 配置代码高亮
                     hljs.configure({ ignoreUnescapedHTML: true });
@@ -364,7 +369,7 @@ export class ChatPanel {
                     sendButton.addEventListener('click', () => {
                         const text = input.value.trim();
                         if (text) {
-                            vscode.postMessage({ command: 'sendMessage', text });
+                            vscode.postMessage({ command: 'sendMessage', text, webSearch: webSearchCheckbox.checked });
                             input.value = '';
                         }
                     });
@@ -387,7 +392,7 @@ export class ChatPanel {
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                             const text = input.value.trim();
                             if (text) {
-                                vscode.postMessage({ command: 'sendMessage', text });
+                                vscode.postMessage({ command: 'sendMessage', text , webSearch: webSearchCheckbox.checked });
                                 input.value = '';
                             }
                         }
@@ -450,13 +455,16 @@ export class ChatPanel {
         this.panel.webview.postMessage({ command: 'showStopButton' });
 
         try {
+            const tools = message.webSearch ? [apiTools.searchTool] : null;
+            const systemPrompt = message.webSearch ? "每次回答问题前，一定要先上网搜索一下再回答。" : 'You are a helpful assistant. Always format answers with Markdown.'
             const response = await callDeepSeekApi(
                 this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
-                'You are a helpful assistant. Always format answers with Markdown.',
+                systemPrompt,
                 webviewOutputChannel,
                 true,
                 undefined,
-                getCurrentOperationController().signal
+                getCurrentOperationController().signal,
+                false, tools
             );
 
             this.conversation.push({ role: 'model', content: response || '' });
