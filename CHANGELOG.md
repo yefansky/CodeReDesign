@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.122 (2025-04-20)
+
+
+### Features
+
+* 支持functioncall，支持chat联网模式 ([af8f1ba](https://github.com/yefansky/CodeReDesign/commit/af8f1ba71ae6fbc2dd97350914392d7856f8b223))
+
 ### 0.0.121 (2025-03-16)
 
 ### 0.0.120 (2025-03-14)
