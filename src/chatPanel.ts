@@ -4,7 +4,7 @@ import { getCurrentOperationController, resetCurrentOperationController } from '
 import path from 'path';
 import * as fs from "fs";
 import * as apiTools from './apiTools';
-import {getOutputChannel} from './extension';
+import { getOutputChannel } from './extension';
 
 // Webview 输出通道实现
 class WebviewOutputChannel implements vscode.OutputChannel {
@@ -34,18 +34,9 @@ class WebviewOutputChannel implements vscode.OutputChannel {
         this.webview.postMessage({ role: 'model', content: '' });
     }
 
-    show(columnOrPreserve?: vscode.ViewColumn | boolean, preserveFocus?: boolean): void {
-        // 根据参数类型处理显示逻辑（这里简化为无操作，实际可扩展）
-    }
-
-    hide(): void {
-        // 可选实现
-    }
-
-    dispose(): void {
-        // 可选清理逻辑
-    }
-
+    show(): void { /* 可选实现 */ }
+    hide(): void { /* 可选实现 */ }
+    dispose(): void { /* 可选清理逻辑 */ }
     replace(value: string): void {
         this.webview.postMessage({ role: 'model', content: value });
     }
@@ -55,22 +46,26 @@ class WebviewOutputChannel implements vscode.OutputChannel {
 export class ChatPanel {
     private static readonly viewType = 'chatPanel';
     private static currentPanel: ChatPanel | undefined;
+    
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
     private conversation: { role: string; content: string }[] = [];
     private userMessageIndex: number = 0;
     private chatFilePath: string | null = null;
     private lastSaveTime: number = Date.now();
+    private readonly context: vscode.ExtensionContext;
 
-    private constructor(panel: vscode.WebviewPanel) {
+    private constructor(panel: vscode.WebviewPanel, context: vscode.ExtensionContext) {
         this.panel = panel;
-        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+        this.context = context;
+        this.setupPanelEventListeners();
         this.panel.webview.html = this.getHtmlForWebview();
-        this.panel.webview.onDidReceiveMessage((message) => this.handleMessage(message), this, this.disposables);
     }
 
-    public static createOrShow(): void {
+    // ==================== 公共静态方法 ====================
+    public static createOrShow(context: vscode.ExtensionContext): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
+        
         if (ChatPanel.currentPanel) {
             ChatPanel.currentPanel.panel.reveal(column);
             return;
@@ -82,523 +77,171 @@ export class ChatPanel {
             column || vscode.ViewColumn.One,
             { enableScripts: true, retainContextWhenHidden: true }
         );
-        ChatPanel.currentPanel = new ChatPanel(panel);
+        
+        ChatPanel.currentPanel = new ChatPanel(panel, context);
     }
 
+    // ==================== 私有方法 - 初始化 ====================
+    private setupPanelEventListeners(): void {
+        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+        this.panel.webview.onDidReceiveMessage(
+            (message) => this.handleMessage(message), 
+            this, 
+            this.disposables
+        );
+    }
+
+    // ==================== 私有方法 - HTML 生成 ====================
     private getHtmlForWebview(): string {
         return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src vscode-resource: https:; script-src vscode-resource: 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src vscode-resource: 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src https://cdn.jsdelivr.net;">
-                <title>Chat with Model</title>
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
-                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-                <style>
-                    #chat {
-                        height: calc(100vh - 170px);
-                        overflow-y: auto;
-                        padding: 8px;
-                    }
-                    .user {
-                        position: relative;
-                        background-color: #a3a3a3;
-                        color: black;
-                        padding: 8px 12px 8px 40px;
-                        margin: 4px 0;
-                        border-radius: 4px;
-                        white-space: pre-wrap;
-                    }
-                    .edit-btn {
-                        position: absolute;
-                        left: 8px;
-                        top: 50%;
-                        transform: translateY(-50%);
-                        display: none;
-                        background: none;
-                        border: none;
-                        color: #fff;
-                        cursor: pointer;
-                        padding: 4px;
-                    }
-                    .user:hover .edit-btn {
-                        display: block;
-                    }
-                    .model {
-                        background-color: #333;
-                        color: white;
-                        padding: 12px;
-                        margin: 4px 0;
-                        border-radius: 4px;
-                    }
-                    .model pre code {
-                        background-color: #040404 !important;
-                        padding: 1em;
-                        border-radius: 4px;
-                        display: block;
-                        overflow-x: auto;
-                    }
-                    .model code {
-                        background-color: #040404;
-                        padding: 2px 4px;
-                        border-radius: 3px;
-                    }
-                    .copy-btn {
-                        position: absolute;
-                        right: 8px;
-                        top: 8px;
-                        padding: 4px 8px;
-                        background: #616161;
-                        border: none;
-                        color: white;
-                        cursor: pointer;
-                        border-radius: 4px;
-                        font-size: 0.8em;
-                        transition: opacity 0.3s;
-                    }
-                    .copy-btn:hover {
-                        background: #757575;
-                    }
-                    .model pre {
-                        position: relative;
-                        padding-top: 30px !important;
-                    }
-                    .katex {
-                        color: white !important;
-                        background-color: transparent !important;
-                    }
-                    .katex-display > .katex {
-                        padding: 1em 0;
-                    }
-                    #input-container {
-                        position: fixed;
-                        bottom: 0;
-                        width: 100%;
-                        background-color: var(--vscode-editor-background);
-                        padding: 10px;
-                        box-sizing: border-box;
-                    }
-                    #input {
-                        width: 100%;
-                        height: 100px;
-                        padding: 8px;
-                        margin-bottom: 8px;
-                        color: var(--vscode-input-foreground);
-                        background-color: var(--vscode-input-background);
-                        border: 1px solid var(--vscode-input-border);
-                    }
-                    button {
-                        padding: 8px 16px;
-                        background-color: var(--vscode-button-background);
-                        color: var(--vscode-button-foreground);
-                        border: none;
-                        cursor: pointer;
-                    }
-                    #mermaid-toggle-container {
-                        position: absolute;
-                        top: 10px;
-                        right: 80px;
-                    }
-                    #mermaid-toggle {
-                        cursor: pointer;
-                    }
-                    .mermaid {
-                        margin: 10px 0;
-                    }
-                    .mermaid-raw {
-                        display: none;
-                    }
-                    .mermaid-rendered .mermaid-raw {
-                        display: block;
-                    }
-                    .mermaid-rendered .mermaid {
-                        display: none;
-                    }
-
-                    /* 右上角智能弹性容器 */
-                    .top-right-flex-container {
-                        position: absolute;
-                        top: 10px;
-                        right: 10px;
-                        display: flex;
-                        flex-direction: row-reverse; /* 反向排列确保New Session在最右 */
-                        align-items: center;
-                        gap: 15px;
-                        max-width: 90vw; /* 视窗宽度限制 */
-                        background: rgba(65, 54, 54, 0.9); /* 可选背景防止透叠 */
-                        padding: 5px 10px;
-                        border-radius: 4px;
-                        box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* 可选投影增强可视性 */
-                    }
-                    .bottom-controls {
-                        width: 100%;
-                    }
-                    .left-controls {
-                        display: flex;
-                        flex-wrap: nowrap;
-                        align-items: center;
-                        gap: 10px;
-                        overflow-x: auto;
-                        padding: 5px 0;
-                    }
-
-                    .mermaid-wrapper {
-                        display: flex;
-                        align-items: center;
-                        flex-shrink: 1; /* 允许适当收缩 */
-                        min-width: 0; /* 关键：允许内容溢出检测 */
-                    }
-
-                    .mermaid-wrapper label {
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis; /* 文字过长时显示省略号 */
-                        max-width: 200px; /* 根据实际需要调整 */
-                    }
-
-                    .fixed-width-btn {
-                        flex-shrink: 0; /* 禁止按钮收缩 */
-                        width: 120px; /* 固定按钮宽度 */
-                    }
-                </style>
+                ${this.getHeadContent()}
             </head>
             <body>
                 <div id="chat"></div>
-                <div id="input-container">
-                    <!-- 右上角智能布局容器 -->
-                    <div class="top-right-flex-container">
-                            <button id="new-session" class="fixed-width-btn">New Session</button>
-                        <div class="mermaid-wrapper">
-                            <input type="checkbox" id="mermaid-toggle">
-                            <label for="mermaid-toggle">Show Mermaid Raw Code</label>
-                        </div>
-
-                    </div>
-
-                    <textarea id="input" placeholder="Type your message here..."></textarea>
-
-                    <div class="bottom-controls">
-                        <div class="left-controls">
-                            <button id="send">Send</button>
-                            <button id="stop" style="display:none;">Stop</button>
-                            <div class="web-search">
-                                <input type="checkbox" id="web-search">
-                                <label for="web-search">联网搜索</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
-                <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
-                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+                ${this.getInputContainerHtml()}
+                ${this.getScriptTags()}
                 <script>
-                    const vscode = acquireVsCodeApi();
-                    const chat = document.getElementById('chat');
-                    const input = document.getElementById('input');
-                    const sendButton = document.getElementById('send');
-                    const stopButton = document.getElementById('stop');
-                    const newSessionButton = document.getElementById('new-session');
-                    const webSearchCheckbox = document.getElementById('web-search');
-                    const mermaidToggle = document.getElementById('mermaid-toggle');
-
-                    // 初始化 Mermaid
-                    mermaid.initialize({
-                        startOnLoad: false,
-                        theme: 'dark'
-                    });
-
-                    // 配置代码高亮
-                    hljs.configure({ ignoreUnescapedHTML: true });
-
-                    // 添加编辑按钮功能
-                    function setupEditButtons() {
-                        document.querySelectorAll('.edit-btn').forEach(btn => {
-                            btn.onclick = (event) => {
-                                const userDiv = event.target.closest('.user');
-                                const contentDiv = userDiv.querySelector('.user-content');
-                                userDiv.innerHTML = \`
-                                    <textarea class="edit-textarea" style="width:100%; min-height:100px; resize:vertical; margin-bottom:8px; padding:8px; box-sizing:border-box;">\${contentDiv.textContent}</textarea>
-                                    <div class="edit-buttons" style="display:flex; gap:8px; justify-content:flex-end;">
-                                        <button class="edit-send" style="padding:6px 12px;">发送</button>
-                                        <button class="edit-cancel" style="padding:6px 12px;">取消</button>
-                                    </div>\`;
-
-                                const editSend = userDiv.querySelector('.edit-send');
-                                const editCancel = userDiv.querySelector('.edit-cancel');
-
-                                editSend.onclick = () => {
-                                    const newText = userDiv.querySelector('textarea').value;
-                                    vscode.postMessage({ command: 'editMessage', index: parseInt(userDiv.dataset.index), text: newText });
-                                    userDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${newText}</div>\`;
-                                    setupEditButtons();
-                                };
-
-                                editCancel.onclick = () => {
-                                    userDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${contentDiv.textContent}</div>\`;
-                                    setupEditButtons();
-                                };
-                            };
-                        });
-                    }
-
-                    // 为代码块添加复制按钮
-                    function ensureCopyButtons() {
-                        document.querySelectorAll('.model pre').forEach(pre => {
-                            if (!pre.querySelector('.copy-btn')) {
-                                const button = document.createElement('button');
-                                button.className = 'copy-btn';
-                                button.textContent = 'Copy';
-                                pre.appendChild(button);
-                            }
-                        });
-                    }
-
-                    // 处理复制按钮点击（事件委托）
-                    function setupCopyButtonDelegation() {
-                        chat.addEventListener('click', (event) => {
-                            const copyBtn = event.target.closest('.copy-btn');
-                            if (!copyBtn) return;
-
-                            const preElement = copyBtn.closest('pre');
-                            if (!preElement) return;
-
-                            const code = preElement.querySelector('code').textContent;
-                            navigator.clipboard.writeText(code)
-                                .then(() => {
-                                    copyBtn.textContent = 'Copied!';
-                                    setTimeout(() => copyBtn.textContent = 'Copy', 2000);
-                                })
-                                .catch(err => console.error('Copy failed:', err));
-                        });
-                    }
-
-                    /**
-                     * fnRenderDisplayMath
-                     * 把 container.innerHTML 里所有的 $$…$$ 块，
-                     * 用 katex.renderToString 直接渲染成 HTML
-                     */
-                    function fnRenderDisplayMath(webviewDiv) {
-                        const strRawHtml = webviewDiv.innerHTML;
-                        const rgxDisplayMath = /\$\$([\s\S]+?)\$\$/g;
-                        const strReplacedHtml = strRawHtml.replace(rgxDisplayMath, (strMatch, strInnerTex) => {
-                            try {
-                                const strTex = strInnerTex.replace(/^\s+|\s+$/g, '');
-                                return katex.renderToString(strTex, {
-                                    displayMode: true,
-                                    throwOnError: false
-                                });
-                            } catch (err) {
-                                console.error('KaTeX render error:', err);
-                                return strMatch;
-                            }
-                        });
-                        webviewDiv.innerHTML = strReplacedHtml;
-                    }
-
-                    // 渲染 Mermaid 图表
-                    async function renderMermaid(webviewDiv) {
-                        const codeBlocks = webviewDiv.querySelectorAll('pre code.language-mermaid');
-                        for (const codeBlock of codeBlocks) {
-                            const parentPre = codeBlock.closest('pre');
-                            const mermaidCode = codeBlock.textContent;
-                            try {
-                                const { svg } = await mermaid.render('mermaid-diagram-' + Date.now(), mermaidCode);
-                                const mermaidDiv = document.createElement('div');
-                                mermaidDiv.className = 'mermaid';
-                                mermaidDiv.innerHTML = svg;
-
-                                const rawDiv = document.createElement('div');
-                                rawDiv.className = 'mermaid-raw';
-                                rawDiv.innerHTML = \`<pre><code class="language-mermaid">\${mermaidCode}</code></pre>\`;
-
-                                const container = document.createElement('div');
-                                container.className = 'mermaid-container';
-                                container.appendChild(mermaidDiv);
-                                container.appendChild(rawDiv);
-
-                                parentPre.replaceWith(container);
-                            } catch (err) {
-                                console.error('Mermaid render error:', err);
-                                const errorDiv = document.createElement('div');
-                                errorDiv.className = 'mermaid-error';
-                                errorDiv.textContent = 'Failed to render Mermaid diagram';
-                                parentPre.replaceWith(errorDiv);
-                            }
-                        }
-                    }
-
-                    // 切换 Mermaid 显示模式
-                    function toggleMermaidDisplay() {
-                        const containers = document.querySelectorAll('.mermaid-container');
-                        if (mermaidToggle.checked) {
-                            containers.forEach(container => container.classList.add('mermaid-rendered'));
-                        } else {
-                            containers.forEach(container => container.classList.remove('mermaid-rendered'));
-                        }
-                    }
-
-                    // 渲染消息内容
-                    async function renderMessage(role, content, index) {
-                        const lastChild = chat.lastElementChild;
-                        let targetDiv;
-
-                        if (lastChild && lastChild.classList.contains(role)) {
-                            targetDiv = lastChild;
-                            targetDiv.dataset.markdownContent += content;
-                        } else {
-                            targetDiv = document.createElement('div');
-                            targetDiv.className = role;
-                            targetDiv.dataset.markdownContent = content;
-                            chat.appendChild(targetDiv);
-                        }
-
-                        if (role === 'model') {
-                            targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
-                                breaks: false,
-                                mangle: false,
-                                headerIds: false,
-                                highlight: (code, lang) => hljs.highlight(hljs.getLanguage(lang) ? lang : 'plaintext', code).value
-                            });
-
-                            fnRenderDisplayMath(targetDiv);
-                            await renderMermaid(targetDiv);
-
-                            renderMathInElement(targetDiv, {
-                                delimiters: [
-                                    { left: '$$', right: '$$', display: true },
-                                    { left: '$', right: '$', display: false },
-                                    { left: '\\[', right: '\\]', display: true },
-                                    { left: '\\(', right: '\\)', display: false }
-                                ],
-                                throwOnError: false
-                            });
-                            ensureCopyButtons();
-                            hljs.highlightAll();
-                        } else {
-                            targetDiv.innerHTML = \`<button class="edit-btn">✎</button><div class="user-content">\${targetDiv.dataset.markdownContent}</div>\`;
-                            targetDiv.dataset.index = index;
-                            setupEditButtons();
-                        }
-                        chat.scrollTop = chat.scrollHeight;
-                    }
-
-                    // 处理 Webview 消息
-                    window.addEventListener('message', async (event) => {
-                        const data = event.data;
-
-                        if (data.role && data.content) {
-                            await renderMessage(data.role, data.content, data.index);
-                            return;
-                        }
-
-                        if (!data.command) return;
-
-                        switch (data.command) {
-                            case 'disableSendButton':
-                                sendButton.disabled = true;
-                                break;
-                            case 'enableSendButton':
-                                sendButton.disabled = false;
-                                break;
-                            case 'showStopButton':
-                                stopButton.style.display = 'inline-block';
-                                break;
-                            case 'hideStopButton':
-                                stopButton.style.display = 'none';
-                                break;
-                            case 'clearAfterIndex':
-                                const clearIndex = data.index;
-                                document.querySelectorAll('.user').forEach(userDiv => {
-                                    if (parseInt(userDiv.dataset.index) >= clearIndex) {
-                                        const modelDiv = userDiv.nextElementSibling;
-                                        if (modelDiv?.classList.contains('model')) modelDiv.remove();
-                                        userDiv.remove();
-                                    }
-                                });
-                                break;
-                        }
-                    });
-
-                    // 初始化事件监听
-                    setupCopyButtonDelegation();
-                    mermaidToggle.addEventListener('change', toggleMermaidDisplay);
-
-                    // 发送消息
-                    sendButton.addEventListener('click', () => {
-                        const text = input.value.trim();
-                        if (text) {
-                            vscode.postMessage({ command: 'sendMessage', text, webSearch: webSearchCheckbox.checked });
-                            input.value = '';
-                        }
-                    });
-
-                    // 新会话
-                    newSessionButton.addEventListener('click', () => {
-                        vscode.postMessage({ command: 'newSession' });
-                        chat.innerHTML = '';
-                        sendButton.disabled = false;
-                        stopButton.style.display = 'none';
-                    });
-
-                    // 停止操作
-                    stopButton.addEventListener('click', () => {
-                        vscode.postMessage({ command: 'stop' });
-                    });
-
-                    // Ctrl+Enter 发送
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                            const text = input.value.trim();
-                            if (text) {
-                                vscode.postMessage({ command: 'sendMessage', text , webSearch: webSearchCheckbox.checked });
-                                input.value = '';
-                            }
-                        }
-                    });
+                    ${this.getWebviewScript()}
                 </script>
             </body>
             </html>
         `;
     }
 
+    private getHeadContent(): string {
+        const cssUri = this.getCssUri();
+        return `
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src vscode-resource: https:; script-src vscode-resource: 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src vscode-resource: 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src https://cdn.jsdelivr.net;">
+            <title>Chat with Model</title>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+            <link rel="stylesheet" href="${cssUri}">
+        `;
+    }
+
+    private getCssUri(): vscode.Uri {
+        // 获取 css 文件的 URI
+        const scriptUri = this.panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this.context.extensionUri, 'src', 'resources', 'chatPanel.css')
+        );
+        return scriptUri;
+    }
+
+    private getInputContainerHtml(): string {
+        return `
+            <div id="input-container">
+                <div class="top-right-flex-container">
+                    <button id="new-session" class="fixed-width-btn">New Session</button>
+                    <div class="mermaid-wrapper">
+                        <input type="checkbox" id="mermaid-toggle">
+                        <label for="mermaid-toggle">Show Mermaid Raw Code</label>
+                    </div>
+                </div>
+                <textarea id="input" placeholder="Type your message here..."></textarea>
+                <div class="bottom-controls">
+                    <div class="left-controls">
+                        <button id="send">Send</button>
+                        <button id="stop" style="display:none;">Stop</button>
+                        <div class="web-search">
+                            <input type="checkbox" id="web-search">
+                            <label for="web-search">联网搜索</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    private getScriptTags(): string {
+        return `
+            <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+        `;
+    }
+
+    private getWebviewScript(): string {
+        // 获取 JavaScript 文件的 URI
+        const scriptUri = this.panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this.context.extensionUri, 'src', 'resources', 'chatPanelScript.js')
+        );
+    
+        return `
+            // 全局变量声明
+            const vscode = acquireVsCodeApi();
+            const chat = document.getElementById('chat');
+            const input = document.getElementById('input');
+            const sendButton = document.getElementById('send');
+            const stopButton = document.getElementById('stop');
+            const newSessionButton = document.getElementById('new-session');
+            const webSearchCheckbox = document.getElementById('web-search');
+            const mermaidToggle = document.getElementById('mermaid-toggle');
+    
+            // 加载外部脚本
+            const script = document.createElement('script');
+            script.src = '${scriptUri}';
+            //script.onload = initializeWebview;
+            document.body.appendChild(script);
+        `;
+    }
+
+    // ==================== 私有方法 - 消息处理 ====================
     private async handleMessage(message: any): Promise<void> {
         const webviewOutputChannel = new WebviewOutputChannel(this.panel.webview, 'DeepSeek API Output');
 
-        if (message.command === 'sendMessage' || message.command === 'editMessage') {
-            await this.handleSendOrEdit(message, webviewOutputChannel);
-            this.saveChatToFile();
-            return;
-        }
-
-        if (message.command === 'newSession') {
-            this.chatFilePath = null;
-        }
-
-        if (message.command === 'newSession') {
-            this.conversation = [];
-            this.userMessageIndex = 0;
-            resetCurrentOperationController();
-            this.panel.webview.postMessage({ command: 'clearAfterIndex', index: -1 });
-            return;
-        }
-
-        if (message.command === 'stop') {
-            resetCurrentOperationController();
-            this.panel.webview.postMessage({ role: 'model', content: '\n\n**Operation stopped by user**' });
+        switch (message.command) {
+            case 'sendMessage':
+            case 'editMessage':
+                await this.handleSendOrEditMessage(message, webviewOutputChannel);
+                this.saveChatToFile();
+                break;
+                
+            case 'newSession':
+                this.handleNewSession();
+                break;
+                
+            case 'stop':
+                this.handleStopCommand();
+                break;
         }
     }
 
-    private async handleSendOrEdit(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<void> {
+    private async handleSendOrEditMessage(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<void> {
         if (message.command === 'editMessage' && message.index < this.conversation.length) {
             this.conversation.splice(message.index + 1);
             this.panel.webview.postMessage({ command: 'clearAfterIndex', index: message.index });
             this.userMessageIndex = message.index;
         }
 
+        this.prepareChatFilePath();
+        
+        this.conversation.push({ role: 'user', content: message.text });
+        this.panel.webview.postMessage({ 
+            role: 'user', 
+            content: message.text, 
+            index: this.userMessageIndex++ 
+        });
+
+        this.updateUIForSending();
+
+        try {
+            const response = await this.callModelApi(message, webviewOutputChannel);
+            this.conversation.push({ role: 'model', content: response || '' });
+        } catch (error) {
+            this.handleApiError(error);
+        }
+
+        this.updateUIAfterResponse();
+    }
+
+    private prepareChatFilePath(): void {
         if (!this.chatFilePath) {
             const workspaceFolders = vscode.workspace.workspaceFolders;
             if (workspaceFolders) {
@@ -609,62 +252,91 @@ export class ChatPanel {
                 this.chatFilePath = path.join(tmpDir, filename);
             }
         }
+    }
 
-        this.conversation.push({ role: 'user', content: message.text });
-        this.panel.webview.postMessage({ role: 'user', content: message.text, index: this.userMessageIndex++ });
-
+    private updateUIForSending(): void {
         this.panel.webview.postMessage({ command: 'disableSendButton' });
         this.panel.webview.postMessage({ command: 'showStopButton' });
+    }
 
-        try {
-            const tools = message.webSearch ? [apiTools.searchTool] : null;
-            const nomalSystemPromot = "用markdown输出。数学公式要用$$包裹，每条一行不要换行。流程图(Mermaid)里的每个字符串都要用引号包裹。";
-            const systemPrompt = message.webSearch ? "每次回答问题前，一定要先上网搜索一下再回答。" + nomalSystemPromot : nomalSystemPromot;
-            const response = await callDeepSeekApi(
-                this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
-                systemPrompt,
-                webviewOutputChannel,
-                true,
-                undefined,
-                getCurrentOperationController().signal,
-                false, tools
-            );
-
-            this.conversation.push({ role: 'model', content: response || '' });
-        } catch (error) {
-            this.panel.webview.postMessage({
-                role: 'model',
-                content: `**Error**: ${error instanceof Error ? error.message : 'Unknown error'}`
-            });
-        }
-
+    private updateUIAfterResponse(): void {
         this.panel.webview.postMessage({ command: 'enableSendButton' });
         this.panel.webview.postMessage({ command: 'hideStopButton' });
     }
 
-    public dispose(): void {
-        ChatPanel.currentPanel = undefined;
-        this.panel.dispose();
-        while (this.disposables.length) {
-            this.disposables.pop()?.dispose();
+    private async callModelApi(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<string | null> {
+        const tools = message.webSearch ? [apiTools.searchTool] : null;
+        const normalSystemPrompt = "用markdown输出。数学公式要用$$包裹，每条一行不要换行。流程图(Mermaid)里的每个字符串都要用引号包裹。";
+        const systemPrompt = message.webSearch 
+            ? "每次回答问题前，一定要先上网搜索一下再回答。" + normalSystemPrompt 
+            : normalSystemPrompt;
+
+        return await callDeepSeekApi(
+            this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
+            systemPrompt,
+            webviewOutputChannel,
+            true,
+            undefined,
+            getCurrentOperationController().signal,
+            false, 
+            tools
+        );
+    }
+
+    private handleApiError(error: any): void {
+        this.panel.webview.postMessage({
+            role: 'model',
+            content: `**Error**: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+    }
+
+    private handleNewSession(): void {
+        this.chatFilePath = null;
+        this.conversation = [];
+        this.userMessageIndex = 0;
+        resetCurrentOperationController();
+        this.panel.webview.postMessage({ command: 'clearAfterIndex', index: -1 });
+    }
+
+    private handleStopCommand(): void {
+        resetCurrentOperationController();
+        this.panel.webview.postMessage({ 
+            role: 'model', 
+            content: '\n\n**Operation stopped by user**' 
+        });
+    }
+
+    // ==================== 私有方法 - 文件操作 ====================
+    private saveChatToFile(): void {
+        if (!this.chatFilePath || Date.now() - this.lastSaveTime < 10000) {
+            return;
+        }
+
+        try {
+            const mdContent = this.conversation.map(msg => {
+                return `@${msg.role === 'user' ? 'user' : 'AI'}:\n\n${msg.content}\n\n`;
+            }).join('\n');
+
+            // 确保路径存在
+            const dirPath = path.dirname(this.chatFilePath);
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath, { recursive: true });
+            }
+
+            fs.writeFileSync(this.chatFilePath, mdContent, 'utf-8');
+            this.lastSaveTime = Date.now();
+        } catch (error) {
+            console.error('Failed to save chat file:', error);
         }
     }
 
-    private saveChatToFile(): void {
-        if (!this.chatFilePath) {
-            return;
+    // ==================== 清理方法 ====================
+    public dispose(): void {
+        ChatPanel.currentPanel = undefined;
+        this.panel.dispose();
+        
+        while (this.disposables.length) {
+            this.disposables.pop()?.dispose();
         }
-
-        const now = Date.now();
-        if (now - this.lastSaveTime < 10000) {
-            return;
-        }
-
-        const mdContent = this.conversation.map(msg => {
-            return `@${msg.role === 'user' ? 'user' : 'AI'}:\n\n${msg.content}\n\n`;
-        }).join('\n');
-
-        fs.writeFileSync(this.chatFilePath, mdContent, 'utf-8');
-        this.lastSaveTime = now;
     }
 }

@@ -1,0 +1,160 @@
+#chat {
+    height: calc(100vh - 170px);
+    overflow-y: auto;
+    padding: 8px;
+}
+.user {
+    position: relative;
+    background-color: #a3a3a3;
+    color: black;
+    padding: 8px 12px 8px 40px;
+    margin: 4px 0;
+    border-radius: 4px;
+    white-space: pre-wrap;
+}
+.edit-btn {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 4px;
+}
+.user:hover .edit-btn {
+    display: block;
+}
+.model {
+    background-color: #333;
+    color: white;
+    padding: 12px;
+    margin: 4px 0;
+    border-radius: 4px;
+}
+.model pre code {
+    background-color: #040404 !important;
+    padding: 1em;
+    border-radius: 4px;
+    display: block;
+    overflow-x: auto;
+}
+.model code {
+    background-color: #040404;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+.copy-btn {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    padding: 4px 8px;
+    background: #616161;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.8em;
+    transition: opacity 0.3s;
+}
+.copy-btn:hover {
+    background: #757575;
+}
+.model pre {
+    position: relative;
+    padding-top: 30px !important;
+}
+.katex {
+    color: white !important;
+    background-color: transparent !important;
+}
+.katex-display > .katex {
+    padding: 1em 0;
+}
+#input-container {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: var(--vscode-editor-background);
+    padding: 10px;
+    box-sizing: border-box;
+}
+#input {
+    width: 100%;
+    height: 100px;
+    padding: 8px;
+    margin-bottom: 8px;
+    color: var(--vscode-input-foreground);
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+}
+button {
+    padding: 8px 16px;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    cursor: pointer;
+}
+#mermaid-toggle-container {
+    position: absolute;
+    top: 10px;
+    right: 80px;
+}
+#mermaid-toggle {
+    cursor: pointer;
+}
+.mermaid {
+    margin: 10px 0;
+}
+.mermaid-raw {
+    display: none;
+}
+.mermaid-rendered .mermaid-raw {
+    display: block;
+}
+.mermaid-rendered .mermaid {
+    display: none;
+}
+.top-right-flex-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 15px;
+    max-width: 90vw;
+    background: rgba(65, 54, 54, 0.9);
+    padding: 5px 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.bottom-controls {
+    width: 100%;
+}
+.left-controls {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 5px 0;
+}
+.mermaid-wrapper {
+    display: flex;
+    align-items: center;
+    flex-shrink: 1;
+    min-width: 0;
+}
+.mermaid-wrapper label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+.fixed-width-btn {
+    flex-shrink: 0;
+    width: 120px;
+}

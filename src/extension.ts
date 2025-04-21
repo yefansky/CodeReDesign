@@ -178,7 +178,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 注册命令:开始对话
     let startChatCommand = vscode.commands.registerCommand('codeReDesign.startChat', () => {
-        ChatPanel.createOrShow();
+        ChatPanel.createOrShow(context);
     });
 
     // 注册命令:选择文件并生成 CVB
