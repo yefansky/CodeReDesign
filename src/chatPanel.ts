@@ -62,7 +62,6 @@ export class ChatPanel {
         this.panel.webview.html = this.getHtmlForWebview();
     }
 
-    // ==================== 公共静态方法 ====================
     public static createOrShow(context: vscode.ExtensionContext): void {
         const column = vscode.window.activeTextEditor?.viewColumn;
         
@@ -81,7 +80,6 @@ export class ChatPanel {
         ChatPanel.currentPanel = new ChatPanel(panel, context);
     }
 
-    // ==================== 私有方法 - 初始化 ====================
     private setupPanelEventListeners(): void {
         this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
         this.panel.webview.onDidReceiveMessage(
@@ -91,7 +89,6 @@ export class ChatPanel {
         );
     }
 
-    // ==================== 私有方法 - HTML 生成 ====================
     private getHtmlForWebview(): string {
         return `
             <!DOCTYPE html>
@@ -187,12 +184,10 @@ export class ChatPanel {
             // 加载外部脚本
             const script = document.createElement('script');
             script.src = '${scriptUri}';
-            //script.onload = initializeWebview;
             document.body.appendChild(script);
         `;
     }
 
-    // ==================== 私有方法 - 消息处理 ====================
     private async handleMessage(message: any): Promise<void> {
         const webviewOutputChannel = new WebviewOutputChannel(this.panel.webview, 'DeepSeek API Output');
 
@@ -306,7 +301,6 @@ export class ChatPanel {
         });
     }
 
-    // ==================== 私有方法 - 文件操作 ====================
     private saveChatToFile(): void {
         if (!this.chatFilePath || Date.now() - this.lastSaveTime < 10000) {
             return;
@@ -330,7 +324,6 @@ export class ChatPanel {
         }
     }
 
-    // ==================== 清理方法 ====================
     public dispose(): void {
         ChatPanel.currentPanel = undefined;
         this.panel.dispose();

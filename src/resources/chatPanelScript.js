@@ -1,5 +1,3 @@
-// src/resources/webviewScript.js
-
 // 初始化 Mermaid 和代码高亮
 function initializeLibraries() {
     mermaid.initialize({ startOnLoad: false, theme: 'dark' });
