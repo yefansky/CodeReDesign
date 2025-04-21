@@ -76,11 +76,14 @@ function fnRenderDisplayMath(webviewDiv) {
 // 渲染 Mermaid 图表
 async function renderMermaid(webviewDiv) {
     const codeBlocks = webviewDiv.querySelectorAll('pre code.language-mermaid');
+    let counter = 0;  // 使用计数器确保唯一性
+    
     for (const codeBlock of codeBlocks) {
         const parentPre = codeBlock.closest('pre');
         const mermaidCode = codeBlock.textContent;
         try {
-            const { svg } = await mermaid.render('mermaid-diagram-' + Date.now(), mermaidCode);
+            const diagramId = `mermaid-diagram-${counter++}-${performance.now()}`;
+            const { svg } = await mermaid.render(diagramId, mermaidCode);
             const mermaidDiv = document.createElement('div');
             mermaidDiv.className = 'mermaid';
             mermaidDiv.innerHTML = svg;

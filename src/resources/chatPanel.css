@@ -97,26 +97,6 @@ button {
     border: none;
     cursor: pointer;
 }
-#mermaid-toggle-container {
-    position: absolute;
-    top: 10px;
-    right: 80px;
-}
-#mermaid-toggle {
-    cursor: pointer;
-}
-.mermaid {
-    margin: 10px 0;
-}
-.mermaid-raw {
-    display: none;
-}
-.mermaid-rendered .mermaid-raw {
-    display: block;
-}
-.mermaid-rendered .mermaid {
-    display: none;
-}
 .top-right-flex-container {
     position: absolute;
     top: 10px;
@@ -142,6 +122,31 @@ button {
     overflow-x: auto;
     padding: 5px 0;
 }
+.fixed-width-btn {
+    flex-shrink: 0;
+    width: 120px;
+}
+
+#mermaid-toggle-container {
+    position: absolute;
+    top: 10px;
+    right: 80px;
+}
+#mermaid-toggle {
+    cursor: pointer;
+}
+.mermaid {
+    margin: 10px 0;
+}
+.mermaid-raw {
+    display: none;
+}
+.mermaid-rendered .mermaid-raw {
+    display: block;
+}
+.mermaid-rendered .mermaid {
+    display: none;
+}
 .mermaid-wrapper {
     display: flex;
     align-items: center;
@@ -153,8 +158,4 @@ button {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 200px;
-}
-.fixed-width-btn {
-    flex-shrink: 0;
-    width: 120px;
 }
