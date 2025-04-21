@@ -23,6 +23,7 @@ llms/paraphrase-multilingual-MiniLM-L12-v2_quint8_avx2.onnx
 # 测试文件
 *.js.map
 *.js
+!src/**/*.js
 .vscode-test
 
 
