@@ -216,21 +216,79 @@ export class ChatPanel {
                     .mermaid-rendered .mermaid {
                         display: none;
                     }
+
+                    /* 右上角智能弹性容器 */
+                    .top-right-flex-container {
+                        position: absolute;
+                        top: 10px;
+                        right: 10px;
+                        display: flex;
+                        flex-direction: row-reverse; /* 反向排列确保New Session在最右 */
+                        align-items: center;
+                        gap: 15px;
+                        max-width: 90vw; /* 视窗宽度限制 */
+                        background: rgba(65, 54, 54, 0.9); /* 可选背景防止透叠 */
+                        padding: 5px 10px;
+                        border-radius: 4px;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* 可选投影增强可视性 */
+                    }
+                    .bottom-controls {
+                        width: 100%;
+                    }
+                    .left-controls {
+                        display: flex;
+                        flex-wrap: nowrap;
+                        align-items: center;
+                        gap: 10px;
+                        overflow-x: auto;
+                        padding: 5px 0;
+                    }
+
+                    .mermaid-wrapper {
+                        display: flex;
+                        align-items: center;
+                        flex-shrink: 1; /* 允许适当收缩 */
+                        min-width: 0; /* 关键：允许内容溢出检测 */
+                    }
+
+                    .mermaid-wrapper label {
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis; /* 文字过长时显示省略号 */
+                        max-width: 200px; /* 根据实际需要调整 */
+                    }
+
+                    .fixed-width-btn {
+                        flex-shrink: 0; /* 禁止按钮收缩 */
+                        width: 120px; /* 固定按钮宽度 */
+                    }
                 </style>
             </head>
             <body>
                 <div id="chat"></div>
                 <div id="input-container">
-                    <textarea id="input" placeholder="Type your message here... (Ctrl+Enter to send)"></textarea>
-                    <button id="send">Send</button>
-                    <button id="stop" style="display: none;">Stop</button>
-                    <button id="new-session" style="position: absolute; top: 10px; right: 10px;">New Session</button>
-                    <div id="mermaid-toggle-container">
-                        <input type="checkbox" id="mermaid-toggle">
-                        <label for="mermaid-toggle">Show Mermaid Raw Code</label>
+                    <!-- 右上角智能布局容器 -->
+                    <div class="top-right-flex-container">
+                            <button id="new-session" class="fixed-width-btn">New Session</button>
+                        <div class="mermaid-wrapper">
+                            <input type="checkbox" id="mermaid-toggle">
+                            <label for="mermaid-toggle">Show Mermaid Raw Code</label>
+                        </div>
+
                     </div>
-                    <input type="checkbox" id="web-search">
-                    <label for="web-search">联网搜索</label>
+
+                    <textarea id="input" placeholder="Type your message here..."></textarea>
+
+                    <div class="bottom-controls">
+                        <div class="left-controls">
+                            <button id="send">Send</button>
+                            <button id="stop" style="display:none;">Stop</button>
+                            <div class="web-search">
+                                <input type="checkbox" id="web-search">
+                                <label for="web-search">联网搜索</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
