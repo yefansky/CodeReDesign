@@ -261,7 +261,7 @@ export class ChatPanel {
 
     private async callModelApi(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<string | null> {
         const tools = message.webSearch ? [apiTools.searchTool] : null;
-        const normalSystemPrompt = "用markdown输出。数学公式要用$$包裹，每条一行不要换行。流程图(Mermaid)里的每个字符串都要用引号包裹。";
+        const normalSystemPrompt = "用markdown输出。如果有数学公式要用$$包裹，每条一行不要换行。如果有流程图(Mermaid)里的每个字符串都要用引号包裹。";
         const systemPrompt = message.webSearch 
             ? "每次回答问题前，一定要先上网搜索一下再回答。" + normalSystemPrompt 
             : normalSystemPrompt;

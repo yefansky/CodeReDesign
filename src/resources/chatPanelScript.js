@@ -73,38 +73,55 @@ function fnRenderDisplayMath(webviewDiv) {
     webviewDiv.innerHTML = strReplacedHtml;
 }
 
-// 渲染 Mermaid 图表
+// 全局 Mermaid 缓存
+window.mermaidCache = window.mermaidCache || [];
+
 async function renderMermaid(webviewDiv) {
     const codeBlocks = webviewDiv.querySelectorAll('pre code.language-mermaid');
-    let counter = 0;  // 使用计数器确保唯一性
     
-    for (const codeBlock of codeBlocks) {
+    // 创建渲染承诺数组
+    const renderPromises = Array.from(codeBlocks).map(async (codeBlock, index) => {
         const parentPre = codeBlock.closest('pre');
         const mermaidCode = codeBlock.textContent;
         try {
-            const diagramId = `mermaid-diagram-${counter++}-${performance.now()}`;
+            const diagramId = `mermaid-diagram-${index}`;
             const { svg } = await mermaid.render(diagramId, mermaidCode);
+            // 更新全局缓存
+            window.mermaidCache[index] = svg;
+            return { index, svg, mermaidCode, parentPre };
+        } catch (err) {
+            console.error('Mermaid 渲染错误，索引', index, ':', err);
+            // 使用缓存中的 SVG（如果存在）
+            const cachedSvg = window.mermaidCache[index] || null;
+            return { index, svg: cachedSvg, mermaidCode, parentPre };
+        }
+    });
+
+    // 等待所有渲染尝试完成
+    const results = await Promise.all(renderPromises);
+
+    // 批量处理结果并更新 DOM
+    for (const result of results) {
+        const { svg, mermaidCode, parentPre } = result;
+        const container = document.createElement('div');
+        container.className = 'mermaid-container';
+
+        // 始终显示原始代码
+        const rawDiv = document.createElement('div');
+        rawDiv.className = 'mermaid-raw';
+        rawDiv.innerHTML = `<pre><code class="language-mermaid">${mermaidCode}</code></pre>`;
+        container.appendChild(rawDiv);
+
+        // 如果有 SVG（渲染成功或缓存），则添加
+        if (svg) {
             const mermaidDiv = document.createElement('div');
             mermaidDiv.className = 'mermaid';
             mermaidDiv.innerHTML = svg;
-
-            const rawDiv = document.createElement('div');
-            rawDiv.className = 'mermaid-raw';
-            rawDiv.innerHTML = `<pre><code class="language-mermaid">${mermaidCode}</code></pre>`;
-
-            const container = document.createElement('div');
-            container.className = 'mermaid-container';
-            container.appendChild(mermaidDiv);
-            container.appendChild(rawDiv);
-
-            parentPre.replaceWith(container);
-        } catch (err) {
-            console.error('Mermaid render error:', err);
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'mermaid-error';
-            errorDiv.textContent = 'Failed to render Mermaid diagram';
-            parentPre.replaceWith(errorDiv);
+            container.insertBefore(mermaidDiv, rawDiv);
         }
+
+        // 替换原始 pre 标签
+        parentPre.replaceWith(container);
     }
 }
 
