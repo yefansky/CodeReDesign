@@ -389,8 +389,9 @@
     "release": "standard-version"
   },
   "devDependencies": {
+    "@types/axios": "^0.14.4",
     "@types/cheerio": "^0.22.35",
-    "@types/estree": "^1.0.6",
+    "@types/estree": "^1.0.7",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.70.0",
@@ -411,6 +412,6 @@
     "cheerio": "^1.0.0",
     "iconv-lite": "^0.6.3",
     "jschardet": "^3.1.4",
-    "openai": "^4.87.3"
+    "openai": "^4.95.1"
   }
 }

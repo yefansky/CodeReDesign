@@ -3,6 +3,7 @@
 out/**
 node_modules/**
 src/**
+!src/resources/**
 testdata/**
 .gitignore
 .yarnrc
@@ -13,3 +14,8 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+.CodeReDesignWorkSpace/**
+prompt/**
+llms/**
+*.bat
+*.zip
