@@ -53,6 +53,66 @@ export function GetLastMessageBody() : OpenAI.ChatCompletionMessageParam[] {
     return lastMessageBody;
 }
 
+interface ProcessDeepSeekResponseOptions {
+    streamMode: boolean;
+    response: OpenAI.Chat.Completions.ChatCompletion | AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> | string;
+    abortSignal?: AbortSignal;
+    userStopException: string;
+    infoMessage: string;
+    outputChannel?: { append: (content: string) => void };
+    processingMode?: 'native-tools' | 'simulated-tools';
+    onChunk?: (chunk: OpenAI.Chat.Completions.ChatCompletionChunk) => void;
+}
+
+export async function processDeepSeekResponse(
+    options: ProcessDeepSeekResponseOptions
+): Promise<{
+    chunkResponse: string;
+    finishReason: string | null;
+    nativeToolCalls?: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[];
+    completion?: OpenAI.Chat.Completions.ChatCompletion;
+}> {
+    const { streamMode, processingMode } = options;
+    vscode.window.showInformationMessage(options.infoMessage);
+
+    // 非流式处理
+    if (!streamMode) {
+        const completion = options.response as OpenAI.Chat.Completions.ChatCompletion;
+        return {
+            chunkResponse: completion.choices[0].message.content || "",
+            finishReason: completion.choices[0].finish_reason,
+            ...(processingMode === 'native-tools' ? {
+                nativeToolCalls: completion.choices[0].message.tool_calls
+            } : {}),
+            completion
+        };
+    }
+
+    // 流式处理
+    let chunkResponse = '';
+    let finishReason: string | null = null;
+
+    for await (const chunk of options.response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+        if (options.abortSignal?.aborted) {
+            throw new Error(options.userStopException);
+        }
+
+        const content = chunk.choices[0]?.delta?.content || '';
+        chunkResponse += content;
+        options.outputChannel?.append(content);
+
+        // 执行自定义 chunk 处理
+        if (options.onChunk) {
+            options.onChunk(chunk);
+        }
+
+        finishReason = chunk.choices[0]?.finish_reason || null;
+    }
+
+    return { chunkResponse, finishReason };
+}
+
+
 /**
  * 调用 DeepSeek API，支持 Function Calling
  * @param userContent 用户输入内容，可以是字符串或消息数组
@@ -143,23 +203,24 @@ export async function callDeepSeekApi(
             attempts++;
             let response = null;
 
+            let chunkResponse = '';
+            let finishReason: string | null = null;
+
             // Function Calling 处理
             if (tools) {
                 tools.forEach(tool => apiTools.registerTool(tool)); // 注册工具
 
-                const isNativeSupported = apiTools.isToolsSupported(apiBaseURL); // 检查服务商是否支持 tools
-
-                if (isNativeSupported) {
-                    response = await apiTools.handleNativeFunctionCalling(
-                        openai, modelName, messages_body, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
-                    );
-                } else {
-                    response = await apiTools.handleSimulatedFunctionCalling(
-                        openai, modelName, messages_body, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
-                    );
-                }
+                const isNativeSupported = apiTools.isToolsSupported(apiBaseURL, modelName); // 检查服务商是否支持 tools
+                const toolResponse = await (isNativeSupported 
+                    ? apiTools.handleNativeFunctionCalling(openai, modelName, messages_body, tools, streamMode, maxToken, temperature, outputChannel, abortSignal)
+                    : apiTools.handleSimulatedFunctionCalling(openai, modelName, messages_body, tools, streamMode, maxToken, temperature, outputChannel, abortSignal)
+                );
+                
+                fullResponse += toolResponse || '';
+                finishReason = 'stop'; // 工具调用默认完成
             }
             else {
+                // ================ 普通调用路径 ================
                 response = await openai.chat.completions.create({
                     model: modelName,
                     messages: messages_body,
@@ -167,61 +228,30 @@ export async function callDeepSeekApi(
                     max_tokens: maxToken,
                     temperature: temperature,
                 });
+        
+                if (!response) { throw new Error('API response is empty'); }
+                
+                // 仅非工具调用时处理响应
+                const result = await processDeepSeekResponse({
+                    streamMode,
+                    response,
+                    abortSignal,
+                    userStopException,
+                    infoMessage: 'DeepSeek API 正在处理...',
+                    outputChannel
+                });
+                
+                chunkResponse = result.chunkResponse;
+                finishReason = result.finishReason;
+                fullResponse += chunkResponse;
             }
-            let thinking = false;
-
-            vscode.window.showInformationMessage('DeepSeek API 正在处理...');
-            let chunkResponse = '';
-            let finishReason: string | null = null;
-
-            if (streamMode) {
-                for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
-                    if (abortSignal?.aborted) {
-                        throw new Error(userStopException);
-                    }
-                    const content = chunk.choices[0]?.delta?.content || '';
-                    const delta = chunk.choices[0]?.delta;
-                    const think = ('reasoning_content' in delta! && delta.reasoning_content) as string || "";
-
-                    if (!thinking && chunkResponse.length === 0 && think.length > 0){
-                        if (outputChannel) {
-                            outputChannel.append("<think>");
-                        }
-                        thinking = true;
-                    }
-
-                    chunkResponse += content;
-                    if (outputChannel) {
-                        outputChannel.append(content + think);
-                    }
-
-                    if (thinking && content.length > 0){
-                        thinking = false;
-                        if (outputChannel) {
-                            outputChannel.append("</think>");
-                        }
-                    }
-
-                    finishReason = chunk.choices[0]?.finish_reason || null;
-                }
-            } else {
-                const completion = response as OpenAI.Chat.Completions.ChatCompletion;
-                chunkResponse = completion.choices[0].message.content || "";
-                finishReason = completion.choices[0].finish_reason || null;
-                if (outputChannel) {
-                    outputChannel.append(chunkResponse);
-                }
-            }
-
-            // 累积完整响应
-            fullResponse += chunkResponse;
 
             // 检查终止条件
             const shouldContinue = 
                 finishReason === 'length' || 
                 (endstring && !fullResponse.includes(endstring));
 
-            if (!shouldContinue) {break;};
+            if (!shouldContinue) {break;}
 
             if (abortSignal?.aborted) {
                 throw new Error(userStopException);

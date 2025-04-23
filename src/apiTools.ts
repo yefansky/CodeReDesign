@@ -7,6 +7,7 @@ import {
     DuckDuckGoSearchOptions,
     DuckDuckGoSearchResponse,
   } from '@agent-infra/duckduckgo-search';
+import { processDeepSeekResponse} from './deepseekApi';
 
 /** 定义工具的接口 */
 export interface Tool {
@@ -57,32 +58,27 @@ export async function handleNativeFunctionCalling(
         temperature: temperature,
     });
 
-    if (streamMode) {
-        let fullResponse = '';
-        let toolCalls: Array<Partial<OpenAI.Chat.Completions.ChatCompletionMessageToolCall>> = [];
+    // 工具调用收集器
+    let toolCalls: Array<Partial<OpenAI.Chat.Completions.ChatCompletionMessageToolCall>> = [];
 
-        // 遍历流式响应的每个 chunk
-        for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
-            if (abortSignal?.aborted) {
-                return null;
-            }
+    // 统一处理响应
+    const { chunkResponse, nativeToolCalls, completion } = await processDeepSeekResponse({
+        streamMode,
+        response: response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> | OpenAI.Chat.Completions.ChatCompletion,
+        abortSignal,
+        userStopException: 'operation stopped by user',
+        infoMessage: 'Processing native tool calls...',
+        outputChannel,
+        processingMode: 'native-tools',
+        onChunk: streamMode ? (chunk) => {
+            // 流式工具调用处理
             const delta = chunk.choices[0]?.delta;
-            // 累积文本内容
-            if (delta?.content) {
-                fullResponse += delta.content;
-                if (outputChannel) {
-                    outputChannel.append(delta.content);
-                }
-            }
-            // 累积工具调用信息
             if (delta?.tool_calls) {
                 for (const toolCallDelta of delta.tool_calls) {
                     const index = toolCallDelta.index;
                     if (!toolCalls[index]) {
                         toolCalls[index] = { type: "function", function: { name: "", arguments: "" } };
                     }
-    
-                    // 类型安全地处理 id、name 和 arguments
                     if (toolCallDelta.id && !toolCalls[index].id) {
                         toolCalls[index].id = toolCallDelta.id;
                     }
@@ -97,73 +93,53 @@ export async function handleNativeFunctionCalling(
                     }
                 }
             }
-        }
+        } : undefined
+    });
 
-        // 过滤掉不完整的工具调用
-        const completeToolCalls = toolCalls.filter(tc => tc.id && tc.function?.name);
+    // 统一工具调用处理
+    const resolvedToolCalls = streamMode 
+        ? toolCalls.filter(tc => tc.id && tc.function?.name)
+        : (completion?.choices[0].message.tool_calls || []);
 
-        if (completeToolCalls.length > 0) {
-            // 构造助手消息，包括内容和工具调用
-            const assistantMessage: OpenAI.ChatCompletionMessageParam = {
-                role: "assistant",
-                content: fullResponse,
-                tool_calls: completeToolCalls.map(tc => ({
+    if (resolvedToolCalls.length > 0) {
+        // 构造助手消息
+        const assistantMessage: OpenAI.ChatCompletionMessageParam = {
+            role: "assistant",
+            content: chunkResponse,
+            ...(streamMode ? {
+                tool_calls: resolvedToolCalls.map(tc => ({
                     id: tc.id!,
                     type: tc.type!,
                     function: {
-                        name: tc.function?.name!,
-                        arguments: tc.function?.arguments!,
-                    },
-                })),
-            };
-            messages.push(assistantMessage);
+                        name: tc.function!.name,
+                        arguments: tc.function!.arguments!
+                    }
+                }))
+            } : {})
+        };
+        messages.push(assistantMessage);
 
-            // 处理每个工具调用
-            for (const toolCall of completeToolCalls) {
-                const tool = toolRegistry.get(toolCall.function?.name!);
-                if (tool) {
-                    const args = JSON.parse(toolCall.function?.arguments!);
-                    const result = await tool.function(args);
-                    messages.push({
-                        role: "tool",
-                        tool_call_id: toolCall.id!,
-                        content: result,
-                    });
-                }
+        // 执行工具调用
+        for (const toolCall of resolvedToolCalls) {
+            const tool = toolRegistry.get(toolCall.function!.name);
+            if (tool) {
+                const args = JSON.parse(toolCall.function!.arguments!);
+                const result = await tool.function(args);
+                messages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id!,
+                    content: result,
+                });
             }
-            // 递归调用以继续对话
-            return await handleNativeFunctionCalling(
-                openai, modelName, messages, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
-            );
-        } else {
-            return fullResponse;
         }
-    } else {
-        // 非流式模式的处理保持不变
-        const completion = response as OpenAI.Chat.Completions.ChatCompletion;
-        const message = completion.choices[0].message;
-        const fullResponse = message.content || '';
 
-        if (message.tool_calls) {
-            messages.push(message);
-            for (const toolCall of message.tool_calls) {
-                const tool = toolRegistry.get(toolCall.function.name);
-                if (tool) {
-                    const args = JSON.parse(toolCall.function.arguments);
-                    const result = await tool.function(args);
-                    messages.push({
-                        role: "tool",
-                        tool_call_id: toolCall.id,
-                        content: result,
-                    });
-                }
-            }
-            return await handleNativeFunctionCalling(
-                openai, modelName, messages, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
-            );
-        }
-        return fullResponse;
+        // 递归继续对话
+        return await handleNativeFunctionCalling(
+            openai, modelName, messages, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
+        );
     }
+
+    return chunkResponse;
 }
 
 export async function handleSimulatedFunctionCalling(
@@ -177,8 +153,8 @@ export async function handleSimulatedFunctionCalling(
     outputChannel?: vscode.OutputChannel,
     abortSignal?: AbortSignal
 ): Promise<string | null> {
+    // 添加工具说明到系统提示
     if (!messages[0].content?.toString().includes("To call a tool")) {
-        // 添加工具说明到系统提示
         const toolDescriptions = tools.map(tool =>
             `- ${tool.name}: ${tool.description}. Parameters: ${JSON.stringify(tool.parameters.properties)}`
         ).join('\n');
@@ -194,28 +170,23 @@ export async function handleSimulatedFunctionCalling(
         temperature: temperature,
     });
 
-    let fullResponse = '';
-    if (streamMode) {
-        // 累积流式响应的内容
-        for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
-            if (abortSignal?.aborted) {
-                return null;
-            }
-            const content = chunk.choices[0]?.delta?.content || '';
-            fullResponse += content;
-            if (outputChannel) {
-                outputChannel.append(content);
-            }
-        }
-    } else {
-        fullResponse = (response as OpenAI.Chat.Completions.ChatCompletion).choices[0].message.content || '';
-    }
+    // 统一处理响应
+    const { chunkResponse } = await processDeepSeekResponse({
+        streamMode,
+        response: response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> | OpenAI.Chat.Completions.ChatCompletion,
+        abortSignal,
+        userStopException: 'operation stopped by user',
+        infoMessage: 'Processing simulated tools...',
+        outputChannel,
+        processingMode: 'simulated-tools'
+    });
 
-    // 解析多个工具调用
-    const toolCallMatches = fullResponse.matchAll(/<tool_call>(.*?)<\/tool_call>/gs);
+    // 解析工具调用
+    const toolCallMatches = chunkResponse.matchAll(/<tool_call>(.*?)<\/tool_call>/gs);
     const toolCalls = Array.from(toolCallMatches, match => JSON.parse(match[1]));
 
     if (toolCalls.length > 0) {
+        // 记录工具调用结果
         for (const toolCall of toolCalls) {
             const tool = toolRegistry.get(toolCall.name);
             if (tool) {
@@ -226,18 +197,20 @@ export async function handleSimulatedFunctionCalling(
                 });
             }
         }
-        // 递归调用以继续对话
+
+        // 递归继续对话
         return await handleSimulatedFunctionCalling(
             openai, modelName, messages, tools, streamMode, maxToken, temperature, outputChannel, abortSignal
         );
     }
 
-    return fullResponse;
+    return chunkResponse;
 }
 
-export function isToolsSupported(apiBaseURL: string): boolean {
+
+export function isToolsSupported(apiBaseURL: string, modelName: string): boolean {
     // 示例：假设 DeepSeek 官方 URL 支持 tools
-    return apiBaseURL === "https://api.deepseek.com";
+    return apiBaseURL === "https://api.deepseek.com" && !modelName.includes("r1") && !modelName.includes("reasoner");
 }
 
 // Define a minimal interface for search results (adjust based on actual response structure)
