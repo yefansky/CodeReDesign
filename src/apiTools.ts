@@ -192,6 +192,10 @@ export async function handleSimulatedFunctionCalling(
             if (tool) {
                 const result = await tool.function(toolCall.arguments);
                 messages.push({
+                    role: "assistant",
+                    content: `<tool_call>${JSON.stringify(toolCall)}</tool_call>`
+                });
+                messages.push({
                     role: "user",
                     content: `<tool_result>{"id": "${toolCall.id}", "result": "${result}"}</tool_result>`,
                 });

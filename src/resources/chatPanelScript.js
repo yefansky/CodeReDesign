@@ -163,7 +163,13 @@ async function renderMessage(role, content, index) {
     }
 
     if (role === 'model') {
-        targetDiv.innerHTML = marked.parse(targetDiv.dataset.markdownContent, {
+        let markdownContent = targetDiv.dataset.markdownContent;
+
+        //if (markdownContent.includes('<think>') && !markdownContent.includes('</think>')){
+          //  markdownContent += "</think>";
+        //}
+
+        targetDiv.innerHTML = marked.parse(markdownContent, {
             breaks: false,
             mangle: false,
             headerIds: false,

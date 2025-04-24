@@ -129,6 +129,9 @@ export async function processDeepSeekResponse(
         }
 
         finishReason = chunk.choices[0]?.finish_reason || null;
+        if (finishReason){
+            break;
+        }
     }
 
     return { chunkResponse, finishReason };
