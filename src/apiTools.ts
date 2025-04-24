@@ -8,6 +8,13 @@ import {
     DuckDuckGoSearchResponse,
   } from '@agent-infra/duckduckgo-search';
 import { processDeepSeekResponse} from './deepseekApi';
+import "reflect-metadata";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as mysql from 'mysql2/promise';
+import * as childProcess from 'child_process';
+import { promisify } from 'util';
+
 
 /** 定义工具的接口 */
 export interface Tool {
@@ -278,6 +285,7 @@ async function fetchPageContent(url: string): Promise<string> {
     }
 }
 
+// 1. 搜索网络
 export const searchTool: Tool = {
     name: 'web_search',
     description: '执行网络搜索并返回前5个结果的摘要，用户提供这个工具一般是不信任你自己的判断，先上网搜索总结后再下结论。',
@@ -313,3 +321,223 @@ export const searchTool: Tool = {
         }
     },
 };
+
+// 2. 获取当前日期时间
+export const getCurrentDateTime: Tool = {
+    name: 'get_current_datetime',
+    description: '获取当前的日期和时间。',
+    parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+    },
+    function: async () => {
+        const now = new Date();
+        return now.toLocaleString();
+    },
+};
+
+// 3. 读取指定路径文本
+export const readTextFile: Tool = {
+    name: 'read_text_file',
+    description: '读取指定路径的文本文件内容。',
+    parameters: {
+        type: 'object',
+        properties: {
+            filePath: { 
+                type: 'string', 
+                description: '要读取的文本文件路径。' 
+            },
+        },
+        required: ['filePath'],
+    },
+    function: async (args: { filePath: string }) => {
+        try {
+            const content = await fs.promises.readFile(args.filePath, 'utf-8');
+            return content;
+        } catch (error: any) {
+            return `读取文件失败: ${error.message}`;
+        }
+    },
+};
+
+// 4. 连接 MySQL 查表
+export const queryMySQL: Tool = {
+    name: 'query_mysql',
+    description: '连接 MySQL 数据库并执行查询。',
+    parameters: {
+        type: 'object',
+        properties: {
+            host: { type: 'string', description: 'MySQL 主机地址。' },
+            user: { type: 'string', description: 'MySQL 用户名。' },
+            password: { type: 'string', description: 'MySQL 密码。' },
+            database: { type: 'string', description: '要查询的数据库名称。' },
+            query: { type: 'string', description: '要执行的 SQL 查询。' },
+        },
+        required: ['host', 'user', 'password', 'database', 'query'],
+    },
+    function: async (args: { host: string; user: string; password: string; database: string; query: string }) => {
+        try {
+            const connection = await mysql.createConnection({
+                host: args.host,
+                user: args.user,
+                password: args.password,
+                database: args.database,
+            });
+            const [rows] = await connection.execute(args.query);
+            await connection.end();
+            return JSON.stringify(rows);
+        } catch (error: any) {
+            return `查询失败: ${error.message}`;
+        }
+    },
+};
+
+// 5. 读取 SVN 日志
+export const getSVNLog: Tool = {
+    name: 'get_svn_log',
+    description: '获取 SVN 仓库的日志。',
+    parameters: {
+        type: 'object',
+        properties: {
+            repoPath: { type: 'string', description: 'SVN 仓库的本地路径。' },
+        },
+        required: ['repoPath'],
+    },
+    function: async (args: { repoPath: string }) => {
+        try {
+            const exec = promisify(childProcess.exec);
+            const { stdout } = await exec(`svn log "${args.repoPath}"`);
+            return stdout;
+        } catch (error: any) {
+            return `获取 SVN 日志失败: ${error.message}`;
+        }
+    },
+};
+
+// 6. 比对 SVN 本地差异的 diff
+export const getSVNDiff: Tool = {
+    name: 'get_svn_diff',
+    description: '获取 SVN 仓库的本地差异。',
+    parameters: {
+        type: 'object',
+        properties: {
+            repoPath: { type: 'string', description: 'SVN 仓库的本地路径。' },
+        },
+        required: ['repoPath'],
+    },
+    function: async (args: { repoPath: string }) => {
+        try {
+            const exec = promisify(childProcess.exec);
+            const { stdout } = await exec(`svn diff "${args.repoPath}"`);
+            return stdout;
+        } catch (error: any) {
+            return `获取 SVN diff 失败: ${error.message}`;
+        }
+    },
+};
+
+// 7. 比对 GitHub 本地差异的 diff
+export const getGitDiff: Tool = {
+    name: 'get_git_diff',
+    description: '获取 Git 仓库的本地差异。',
+    parameters: {
+        type: 'object',
+        properties: {
+            repoPath: { type: 'string', description: 'Git 仓库的本地路径。' },
+        },
+        required: ['repoPath'],
+    },
+    function: async (args: { repoPath: string }) => {
+        try {
+            const exec = promisify(childProcess.exec);
+            const { stdout } = await exec(`git -C "${args.repoPath}" diff`);
+            return stdout;
+        } catch (error: any) {
+            return `获取 Git diff 失败: ${error.message}`;
+        }
+    },
+};
+
+// 8. Grep 搜索指定目录文本
+export const grepSearch: Tool = {
+    name: 'grep_search',
+    description: '在指定目录中搜索文本。',
+    parameters: {
+        type: 'object',
+        properties: {
+            directory: { type: 'string', description: '要搜索的目录路径。' },
+            pattern: { type: 'string', description: '要搜索的文本模式。' },
+        },
+        required: ['directory', 'pattern'],
+    },
+    function: async (args: { directory: string; pattern: string }) => {
+        try {
+            const exec = promisify(childProcess.exec);
+            const { stdout } = await exec(`findstr /s /i /m /c:"${args.pattern}" "${args.directory}\\*"`);
+            return stdout;
+        } catch (error: any) {
+            return `搜索失败: ${error.message}`;
+        }
+    },
+};
+
+// 9. 在路径下递归搜索文件
+export const findFiles: Tool = {
+    name: 'find_files',
+    description: '在指定路径下递归搜索文件，支持文件名或正则表达式匹配。',
+    parameters: {
+        type: 'object',
+        properties: {
+            directory: { 
+                type: 'string', 
+                description: '要搜索的根目录路径。' 
+            },
+            pattern: { 
+                type: 'string', 
+                description: '搜索模式，可以是文件名或正则表达式。' 
+            },
+            useRegex: { 
+                type: 'boolean', 
+                description: '是否使用正则表达式进行搜索。true 表示 pattern 是正则表达式，false 表示 pattern 是精确文件名。' 
+            },
+        },
+        required: ['directory', 'pattern', 'useRegex'],
+    },
+    function: async (args: { directory: string; pattern: string; useRegex: boolean }) => {
+        try {
+            const { directory, pattern, useRegex } = args;
+            const results: string[] = [];
+
+            // 递归搜索函数
+            const searchDir = async (currentDir: string) => {
+                const files = await fs.promises.readdir(currentDir);
+                for (const file of files) {
+                    const filePath = path.join(currentDir, file);
+                    const stat = await fs.promises.stat(filePath);
+                    if (stat.isDirectory()) {
+                        await searchDir(filePath); // 递归搜索子目录
+                    } else {
+                        const fileName = path.basename(filePath);
+                        if (useRegex) {
+                            const regex = new RegExp(pattern);
+                            if (regex.test(fileName)) {
+                                results.push(filePath);
+                            }
+                        } else {
+                            if (fileName === pattern) {
+                                results.push(filePath);
+                            }
+                        }
+                    }
+                }
+            };
+
+            await searchDir(directory);
+            return results.join('\n');
+        } catch (error: any) {
+            return `搜索文件失败: ${error.message}`;
+        }
+    },
+};
+
