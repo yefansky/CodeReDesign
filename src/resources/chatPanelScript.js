@@ -169,7 +169,7 @@ async function renderMessage(role, content, index) {
             markdownContent += "</think>";
         }
 
-        markdownContent = markdownContent.replace(/\$\$包裹/g, '\\$ \\$ 包裹');
+        markdownContent = markdownContent.replace(/\$\$包裹/g, '&doller; &doller; 包裹');
 
         targetDiv.innerHTML = marked.parse(markdownContent, {
             breaks: false,
