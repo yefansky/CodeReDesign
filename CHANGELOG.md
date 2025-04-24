@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.133 (2025-04-24)
+
+
+### Bug Fixes
+
+* 初步修复推理输出丢失的问题 ([576d5c9](https://github.com/yefansky/CodeReDesign/commit/576d5c9c2817c0cd3574469684477bbba4062494))
+
 ### 0.0.132 (2025-04-23)
 
 ### 0.0.131 (2025-04-22)
