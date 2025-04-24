@@ -165,9 +165,11 @@ async function renderMessage(role, content, index) {
     if (role === 'model') {
         let markdownContent = targetDiv.dataset.markdownContent;
 
-        //if (markdownContent.includes('<think>') && !markdownContent.includes('</think>')){
-          //  markdownContent += "</think>";
-        //}
+        if (markdownContent.includes('<think>') && !markdownContent.includes('</think>')){
+            markdownContent += "</think>";
+        }
+
+        markdownContent = markdownContent.replace(/\$\$包裹/g, '\\$ \\$ 包裹');
 
         targetDiv.innerHTML = marked.parse(markdownContent, {
             breaks: false,
