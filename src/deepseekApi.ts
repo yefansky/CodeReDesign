@@ -114,7 +114,12 @@ export async function processDeepSeekResponse(
 
         // 同时输出内容和思考内容
         if (options.outputChannel) {
-            options.outputChannel.append(content + thinkContent);
+            if (content) {
+                options.outputChannel.append(content);
+            }
+            if (thinkContent) {
+                options.outputChannel.append(thinkContent);
+            }
         }
 
         // Think 标签结束逻辑
