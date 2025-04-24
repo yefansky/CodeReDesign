@@ -159,3 +159,13 @@ button {
     text-overflow: ellipsis;
     max-width: 200px;
 }
+
+think {
+    color: #9ccc9c;  /* 柔和的绿色 */
+    font-style: italic;
+    opacity: 0.8;
+    border-left: 3px solid #4d9375; /* 左侧装饰线 */
+    padding-left: 0.8em;
+    margin: 0.5em 0;
+    display: block;  /* 确保块级显示 */
+}

@@ -91,15 +91,37 @@ export async function processDeepSeekResponse(
     // 流式处理
     let chunkResponse = '';
     let finishReason: string | null = null;
+    let thinking = false; // 新增 thinking 状态跟踪
 
     for await (const chunk of options.response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
         if (options.abortSignal?.aborted) {
             throw new Error(options.userStopException);
         }
 
-        const content = chunk.choices[0]?.delta?.content || '';
+        const delta = chunk.choices[0]?.delta;
+        const content = delta?.content || '';
+        const thinkContent = (delta && 'reasoning_content' in delta) 
+            ? (delta.reasoning_content as string) 
+            : "";
+
+        // Think 标签开始逻辑
+        if (!thinking && chunkResponse === "" && thinkContent) {
+            options.outputChannel?.append("<think>");
+            thinking = true;
+        }
+
         chunkResponse += content;
-        options.outputChannel?.append(content);
+
+        // 同时输出内容和思考内容
+        if (options.outputChannel) {
+            options.outputChannel.append(content + thinkContent);
+        }
+
+        // Think 标签结束逻辑
+        if (thinking && content) {
+            options.outputChannel?.append("</think>");
+            thinking = false;
+        }
 
         // 执行自定义 chunk 处理
         if (options.onChunk) {
@@ -111,7 +133,6 @@ export async function processDeepSeekResponse(
 
     return { chunkResponse, finishReason };
 }
-
 
 /**
  * 调用 DeepSeek API，支持 Function Calling
@@ -175,13 +196,15 @@ export async function callDeepSeekApi(
         // 构造消息体
         let messages_body: OpenAI.ChatCompletionMessageParam[] = [];
         if (Array.isArray(userContent)) {
-            if (systemPromot.role === 'user') { userContent[0].content = systemPromot.content + "\n\n" + userContent[0].content; }
-            else{ messages_body.push(systemPromot); }
-
-            {
-                const role = (userContent[0].role === 'user') ? 'user' : 'assistant';
-                messages_body.push({ role, content: userContent[0].content });
+            if (systemPromot.role === 'user') { 
+                userContent[0].content = systemPromot.content + "\n\n" + userContent[0].content; 
             }
+            else{ 
+                messages_body.push(systemPromot); 
+            }
+
+            const role = (userContent[0].role === 'user') ? 'user' : 'assistant';
+            messages_body.push({ role, content: userContent[0].content });
 
             // 如果 userContent 是数组，按交替方式生成消息
             for (let i = 1; i < userContent.length; i++) {
