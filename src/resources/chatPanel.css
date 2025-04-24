@@ -34,6 +34,12 @@
     margin: 4px 0;
     border-radius: 4px;
 }
+
+.model pre {
+    position: relative;
+    padding-top: 30px !important;
+}
+
 .model pre code {
     background-color: #040404 !important;
     padding: 1em;
@@ -62,10 +68,7 @@
 .copy-btn:hover {
     background: #757575;
 }
-.model pre {
-    position: relative;
-    padding-top: 30px !important;
-}
+
 .katex {
     color: white !important;
     background-color: transparent !important;
@@ -168,4 +171,5 @@ think {
     padding-left: 0.8em;
     margin: 0.5em 0;
     display: block;  /* 确保块级显示 */
+    white-space: pre-wrap;
 }
