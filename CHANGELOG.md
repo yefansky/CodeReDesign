@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.140 (2025-04-26)
+
+
+### Features
+
+* 增加本地记忆，RAG的python服务 ([c797346](https://github.com/yefansky/CodeReDesign/commit/c7973467de327c981debf6142342344b9149c680))
+
 ### 0.0.139 (2025-04-24)
 
 ### 0.0.138 (2025-04-24)
