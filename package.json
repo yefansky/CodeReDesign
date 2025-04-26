@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.142",
+  "version": "0.0.143",
   "engines": {
     "vscode": "^1.70.0"
   },
