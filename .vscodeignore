@@ -4,6 +4,7 @@ out/**
 node_modules/**
 src/**
 !src/resources/**
+!src/python/**
 testdata/**
 .gitignore
 .yarnrc

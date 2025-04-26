@@ -26,10 +26,6 @@
     "type": "git",
     "url": "https://github.com/yefansky/CodeReDesign"
   },
-  "files": [
-    "dist/**/*",
-    "src/python/**/*"
-  ],
   "contributes": {
     "commands": [
       {
