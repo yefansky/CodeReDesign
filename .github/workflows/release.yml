@@ -6,11 +6,43 @@ on:
   workflow_dispatch:      # 允许手动触发
 
 jobs:
+  build-python-exe:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Install Python dependencies
+        run: pip install -r src/python/requirements.txt
+
+      - name: Build EXE
+        run: pyinstaller --onefile --clean --noconsole --distpath dist src/python/rag.py
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rag.exe
+          path: dist/rag.exe
+
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download EXE artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: rag.exe
+          path: dist  # 下载到 dist 目录
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
