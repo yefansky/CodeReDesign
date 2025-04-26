@@ -27,7 +27,7 @@ jobs:
         run: pyinstaller --onefile --clean --noconsole --distpath dist src/python/rag.py
 
       - name: Upload EXE artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rag.exe
           path: dist/rag.exe
@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download EXE artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: rag.exe
           path: dist  # 下载到 dist 目录
