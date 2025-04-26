@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.143 (2025-04-26)
+
+
+### Bug Fixes
+
+* 增加提示词 ([9a71cd6](https://github.com/yefansky/CodeReDesign/commit/9a71cd6e4f3e8327b417dd7f1169c624cc47d42c))
+
 ### 0.0.142 (2025-04-26)
 
 ### 0.0.141 (2025-04-26)
