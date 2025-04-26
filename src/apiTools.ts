@@ -8,12 +8,12 @@ import {
     DuckDuckGoSearchResponse,
   } from '@agent-infra/duckduckgo-search';
 import { processDeepSeekResponse} from './deepseekApi';
-import "reflect-metadata";
 import * as fs from 'fs';
 import * as path from 'path';
 import * as mysql from 'mysql2/promise';
 import * as childProcess from 'child_process';
 import { promisify } from 'util';
+import { ragService, CONFIG as RAG_CONFIG } from './ragService';
 
 
 /** 定义工具的接口 */
@@ -540,4 +540,86 @@ export const findFiles: Tool = {
         }
     },
 };
+
+// 修改后的writeMemory工具（移除本地嵌入生成和存储）
+export const writeMemory: Tool = {
+    name: 'write_memory',
+    description: 'Save knowledge or insights to memory.',
+    parameters: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'The knowledge or insight content to save.' },
+      },
+      required: ['content'],
+    },
+    function: async (args: { content: string }) => {
+      try {
+        // 调用FastAPI的/add_knowledge端点
+        const response = await fetch(`http://localhost:${RAG_CONFIG.PORT}/add_knowledge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([args.content]),
+        });
+  
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API request failed: ${response.status} - ${errorText}`);
+        }
+  
+        const result = await response.json() as { status: string };
+        return result.status === 'added' 
+          ? `Memory saved: ${args.content.slice(0, 50)}...`
+          : "Failed to save memory";
+      } catch (error: any) {
+        return `保存记忆失败: ${error.message}`;
+      }
+    },
+};
+  
+  // 修改后的readMemory工具（移除本地相似度计算）
+export const readMemory: Tool = {
+    name: 'read_memory',
+    description: 'Retrieve relevant knowledge from memory.',
+    parameters: {
+        type: 'object',
+        properties: {
+            query: { type: 'string', description: 'The query text to search memory.' },
+        },
+        required: ['query'],
+    },
+    function: async (args: { query: string }) => {
+        try {
+        // 调用FastAPI的/query端点
+        const response = await fetch(`http://localhost:${RAG_CONFIG.PORT}/query?query_text=${encodeURIComponent(args.query)}`, {
+            method: 'GET'
+        });
+
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+
+        const data = await response.json() as { results: string[] };
+        const results = data.results;
+
+        return results.length > 0 
+            ? results.map((text: string, index: number) => 
+                `结果 ${index + 1}:\n${text.slice(0, 200)}...`
+            ).join('\n\n')
+            : '未找到相关记忆';
+        } catch (error: any) {
+            return `检索记忆失败: ${error.message}`;
+        }
+    },
+};
+
+// Register tools
+registerTool(writeMemory);
+registerTool(readMemory);
+/**
+ * Retrieves an array of all registered tools from the tool registry.
+ * @returns An array of Tool objects.
+ */
+export function getAllTools(): Tool[] {
+  return Array.from(toolRegistry.values());
+}
 

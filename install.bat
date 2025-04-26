@@ -12,5 +12,6 @@ call npm install --save-dev ^
 call npm install openai axios cheerio
 REM global install vsce
 call npm install -g vsce
+call npm cli
 
 echo Environment setup completed!

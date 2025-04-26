@@ -10,6 +10,7 @@ import { showInputMultiLineBox } from './UIComponents';
 import { activateGuide } from './guide';
 import {ChatPanel} from './chatPanel';
 import { isUnderTokenLimit, initTokenizer } from './deepseekTokenizer';
+import * as ragService from './ragService';
 
 let currentOperationController: AbortController | null = null;
 
@@ -170,6 +171,8 @@ export function activate(context: vscode.ExtensionContext) {
     
     activateGuide(context);
     initTokenizer(context);
+
+    ragService.activate(context);
 
     hideWorkspaceFolder();
 

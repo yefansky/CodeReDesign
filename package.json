@@ -26,6 +26,10 @@
     "type": "git",
     "url": "https://github.com/yefansky/CodeReDesign"
   },
+  "files": [
+    "dist/**/*",
+    "src/python/**/*"
+  ],
   "contributes": {
     "commands": [
       {
@@ -408,11 +412,14 @@
   },
   "dependencies": {
     "@agent-infra/duckduckgo-search": "^0.0.1",
-    "axios": "^1.8.4",
+    "axios": "^1.9.0",
     "cheerio": "^1.0.0",
+    "execa": "^9.5.2",
     "iconv-lite": "^0.6.3",
     "jschardet": "^3.1.4",
     "mysql2": "^3.14.0",
-    "openai": "^4.95.1"
+    "openai": "^4.96.0",
+    "pidusage": "^4.0.0",
+    "proper-lockfile": "^4.1.2"
   }
 }
