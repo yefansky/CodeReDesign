@@ -12,8 +12,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as mysql from 'mysql2/promise';
 import * as childProcess from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ragService, CONFIG as RAG_CONFIG } from './ragService';
+import { parseString } from 'xml2js';
 
 
 /** 定义工具的接口 */
@@ -321,6 +323,7 @@ export const searchTool: Tool = {
         }
     },
 };
+registerTool(searchTool);
 
 // 2. 获取当前日期时间
 export const getCurrentDateTime: Tool = {
@@ -336,6 +339,7 @@ export const getCurrentDateTime: Tool = {
         return now.toLocaleString();
     },
 };
+registerTool(getCurrentDateTime);
 
 // 3. 读取指定路径文本
 export const readTextFile: Tool = {
@@ -360,6 +364,7 @@ export const readTextFile: Tool = {
         }
     },
 };
+registerTool(readTextFile);
 
 // 4. 连接 MySQL 查表
 export const queryMySQL: Tool = {
@@ -392,28 +397,170 @@ export const queryMySQL: Tool = {
         }
     },
 };
+registerTool(queryMySQL);
 
-// 5. 读取 SVN 日志
+// SVN 日志条目类型
+type LogEntry = {
+    revision: string;
+    author?: string;
+    date?: string;
+    message?: string;
+    paths?: Array<{ action: string; path: string }>;
+};
+  
+// 增强错误类型
+type SVNError = Error & { stderr?: string };
+const execAsync = promisify(exec);
 export const getSVNLog: Tool = {
     name: 'get_svn_log',
-    description: '获取 SVN 仓库的日志。',
+    description: '获取SVN日志，支持多种查询条件',
     parameters: {
         type: 'object',
         properties: {
-            repoPath: { type: 'string', description: 'SVN 仓库的本地路径。' },
+            path: {
+                type: 'string',
+                description: `仓库路径，支持以下格式：
+- 本地工作副本路径：'/projects/myapp'
+- 仓库URL：'http://svn.example.com/repo'
+- 仓库子目录：'http://svn.example.com/repo/trunk/src'`
+            },
+            author: {
+                type: 'string',
+                description: '提交者名称筛选（支持模糊匹配）'
+            },
+            keyword: {
+                type: 'string',
+                description: '提交信息关键词筛选（支持模糊匹配）'
+            },
+            startDate: {
+                type: 'string',
+                description: `开始时间，支持格式：
+- 绝对时间：'2024-03-01'
+- 相对时间：'1h'(最近1小时)/'24h'(最近1天)/'7d'(最近7天)/'30d'(最近30天)`
+            },
+            endDate: {
+                type: 'string',
+                description: `结束时间，支持格式：
+- 绝对时间：'2024-03-15'
+- 相对时间：'1h'(1小时前)`
+            },
+            revisionStart: {
+                type: 'number',
+                description: '起始版本号（包含）'
+            },
+            revisionEnd: {
+                type: 'number',
+                description: '结束版本号（包含）'
+            },
+            limit: {
+                type: 'number',
+                description: '返回结果最大数量'
+            }
         },
-        required: ['repoPath'],
+        required: ['path'],
     },
-    function: async (args: { repoPath: string }) => {
-        try {
-            const exec = promisify(childProcess.exec);
-            const { stdout } = await exec(`svn log "${args.repoPath}"`);
-            return stdout;
-        } catch (error: any) {
-            return `获取 SVN 日志失败: ${error.message}`;
+    function: async (args): Promise<string> => {
+      try {
+        const params: string[] = [];
+        let repoPath = args.path;
+  
+        // 时间处理函数
+        const parseTime = (timeStr?: string, isEndTime = false): string => {
+          if (!timeStr) { return isEndTime ? 'HEAD' : '1'; }
+          
+          const relativeMatch = timeStr.match(/^(\d+)([hd])$/);
+          if (relativeMatch) {
+            const now = new Date();
+            const [, value, unit] = relativeMatch;
+            const ms = parseInt(value) * (unit === 'h' ? 3600 : 86400) * 1000;
+            return `{${new Date(now.getTime() - ms).toISOString().slice(0, 19)}}`;
+          }
+  
+          if (/^\d{4}-\d{2}-\d{2}$/.test(timeStr)) {
+            return isEndTime 
+              ? `{${timeStr} 23:59:59}` 
+              : `{${timeStr} 00:00:00}`;
+          }
+  
+          throw new Error(`Invalid time format: ${timeStr}`);
+        };
+  
+        // 构建查询参数
+        if (args.author) { params.push(`--search "author:${args.author}"`); }
+        if (args.keyword) { params.push(`--search "message:${args.keyword}"`); }
+        
+        const startRev = parseTime(args.startDate);
+        const endRev = parseTime(args.endDate, true);
+        if (startRev !== '1' || endRev !== 'HEAD') {
+          params.push(`--revision ${startRev}:${endRev}`);
         }
-    },
+  
+        if (args.revisionStart || args.revisionEnd) {
+          const start = args.revisionStart ?? 1;
+          const end = args.revisionEnd ?? 'HEAD';
+          params.push(`--revision ${start}:${end}`);
+        }
+  
+        if (args.limit) { params.push(`-l ${args.limit}`); }
+  
+        // 获取仓库根地址
+        if (!/^(http|https|svn):\/\//.test(repoPath)) {
+          const { stdout } = await execAsync(
+            `svn info "${repoPath}" --show-item repos-root-url`,
+            { encoding: 'utf8' }
+          );
+          repoPath = stdout.trim();
+        }
+  
+        // 执行命令
+        const { stdout } = await execAsync(
+          `svn log "${repoPath}" --xml ${params.join(' ')}`,
+          { encoding: 'gbk' as BufferEncoding, maxBuffer: 1024 * 1024 * 10 }
+        );
+  
+        // 解析XML
+        const parsed = await new Promise<any>((resolve, reject) => {
+          parseString(stdout, (err, result) => {
+            err ? reject(err) : resolve(result);
+          });
+        });
+  
+        // 转换为LogEntry数组
+        const entries: LogEntry[] = (parsed.log.logentry || []).map(
+          (entry: any) => ({
+            revision: entry.$.revision,
+            author: entry.author?.[0],
+            date: entry.date?.[0],
+            message: entry.msg?.[0]?.trim(),
+            paths: (entry.paths?.[0]?.path || []).map((p: any) => ({
+              action: p.$.action,
+              path: p._
+            }))
+          })
+        );
+  
+        return JSON.stringify(entries, null, 2);
+  
+      } catch (error) {
+        const err = error as SVNError;
+        const errorMapping: Record<string, string> = {
+          '175002': '认证失败',
+          '160013': '路径不存在',
+          '200009': '无效时间格式',
+          '205000': '无效版本号'
+        };
+  
+        const errorCode = err.stderr?.match(/svn: E(\d+):/)?.[1] || '';
+        const message = errorCode in errorMapping
+          ? `SVN错误 [E${errorCode}]: ${errorMapping[errorCode]}`
+          : `操作失败: ${err.message?.replace(/^svn: E\d+: /, '') || '未知错误'}`;
+  
+        return message;
+      }
+    }
 };
+  
+registerTool(getSVNLog);
 
 // 6. 比对 SVN 本地差异的 diff
 export const getSVNDiff: Tool = {
@@ -436,6 +583,7 @@ export const getSVNDiff: Tool = {
         }
     },
 };
+registerTool(getSVNDiff);
 
 // 7. 比对 GitHub 本地差异的 diff
 export const getGitDiff: Tool = {
@@ -458,6 +606,7 @@ export const getGitDiff: Tool = {
         }
     },
 };
+registerTool(getGitDiff);
 
 // 8. Grep 搜索指定目录文本
 export const grepSearch: Tool = {
@@ -481,6 +630,7 @@ export const grepSearch: Tool = {
         }
     },
 };
+registerTool(grepSearch);
 
 // 9. 在路径下递归搜索文件
 export const findFiles: Tool = {
@@ -507,39 +657,50 @@ export const findFiles: Tool = {
     function: async (args: { directory: string; pattern: string; useRegex: boolean }) => {
         try {
             const { directory, pattern, useRegex } = args;
-            const results: string[] = [];
-
-            // 递归搜索函数
-            const searchDir = async (currentDir: string) => {
-                const files = await fs.promises.readdir(currentDir);
+            const queue: string[] = [directory];
+            const results: string[] = []; // 声明结果数组 <--- 修复点
+    
+            while (queue.length > 0) {
+                const currentDir = queue.shift()!;
+                const files = await fs.promises.readdir(currentDir, { withFileTypes: true });
+    
                 for (const file of files) {
-                    const filePath = path.join(currentDir, file);
-                    const stat = await fs.promises.stat(filePath);
-                    if (stat.isDirectory()) {
-                        await searchDir(filePath); // 递归搜索子目录
-                    } else {
-                        const fileName = path.basename(filePath);
-                        if (useRegex) {
-                            const regex = new RegExp(pattern);
-                            if (regex.test(fileName)) {
-                                results.push(filePath);
-                            }
+                    try {
+                        const filePath = path.join(currentDir, file.name);
+                        
+                        if (file.isDirectory()) {
+                            queue.push(filePath);
                         } else {
-                            if (fileName === pattern) {
-                                results.push(filePath);
+                            // 严格匹配模式
+                            if (!useRegex) {
+                                if (file.name === pattern) {
+                                    return filePath; // 直接返回首个匹配项
+                                }
+                            } 
+                            // 正则表达式模式
+                            else {
+                                const regex = new RegExp(pattern);
+                                if (regex.test(file.name)) {
+                                    results.push(filePath); // 收集所有匹配项
+                                }
                             }
                         }
+                    } catch (error) {
+                        continue;
                     }
                 }
-            };
-
-            await searchDir(directory);
-            return results.join('\n');
+            }
+    
+            // 根据模式返回不同结果
+            return useRegex 
+                ? results.join('\n')  // 正则模式返回所有结果
+                : '';               // 严格模式未找到返回空
         } catch (error: any) {
-            return `搜索文件失败: ${error.message}`;
+            return `搜索失败: ${error.message}`;
         }
     },
 };
+registerTool(findFiles);
 
 // 修改后的writeMemory工具（移除本地嵌入生成和存储）
 export const writeMemory: Tool = {

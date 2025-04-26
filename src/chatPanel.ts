@@ -263,7 +263,12 @@ export class ChatPanel {
         const tools = message.webSearch ? apiTools.getAllTools() : null;
         const normalSystemPrompt = "用markdown输出。如果有数学公式要用$$包裹，每条一行不要换行。如果有流程图(Mermaid)里的每个字符串都要用引号包裹。";
         const systemPrompt = message.webSearch 
-            ? "每次回答问题前,不要太过自信,先用tool收集一下信息,比如可以上网搜索或者查询记忆。" + normalSystemPrompt 
+            ? `每次回答问题前,不要太过自信, 先用tool收集一下信息,比如可以上网搜索或者查询记忆。
+            第一步一定是先用读取记忆的tool检查以往的记忆里有没有相关信息。然后再看是否需要上网搜索。最后再看是否需要调用其他工具。一个tool没有返回就别急着推理下一步。
+            每次只调用一个工具，然后结束输出等返回。然后再调用下一个工具。
+            你要先理解任务，搞清楚哪些信息你是不知道的， 用记忆结构查询记忆，如果能查到就采用，
+            然后指定任务计划，规划好分几个步骤，用tool去逐步去推进。
+            等你觉得信息获得足够了再开始决策和输出结论。` + normalSystemPrompt 
             : normalSystemPrompt;
 
         return await callDeepSeekApi(
