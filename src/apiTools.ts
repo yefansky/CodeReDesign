@@ -302,6 +302,7 @@ export const searchTool: Tool = {
         required: ['query'],
     },
     function: async (args: { query: string }) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在搜索网络');
         try {
             const links = await getLinksWithBrowser(args.query);
             if (!links.length) {
@@ -335,6 +336,7 @@ export const getCurrentDateTime: Tool = {
         required: [],
     },
     function: async () => {
+        vscode.window.showInformationMessage('CodeReDesign 正在获取当前日期');
         const now = new Date();
         return now.toLocaleString();
     },
@@ -382,6 +384,7 @@ export const queryMySQL: Tool = {
         required: ['host', 'user', 'password', 'database', 'query'],
     },
     function: async (args: { host: string; user: string; password: string; database: string; query: string }) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在连接MySQL');
         try {
             const connection = await mysql.createConnection({
                 host: args.host,
@@ -460,103 +463,104 @@ export const getSVNLog: Tool = {
         required: ['path'],
     },
     function: async (args): Promise<string> => {
-      try {
-        const params: string[] = [];
-        let repoPath = args.path;
-  
-        // 时间处理函数
-        const parseTime = (timeStr?: string, isEndTime = false): string => {
-          if (!timeStr) { return isEndTime ? 'HEAD' : '1'; }
-          
-          const relativeMatch = timeStr.match(/^(\d+)([hd])$/);
-          if (relativeMatch) {
-            const now = new Date();
-            const [, value, unit] = relativeMatch;
-            const ms = parseInt(value) * (unit === 'h' ? 3600 : 86400) * 1000;
-            return `{${new Date(now.getTime() - ms).toISOString().slice(0, 19)}}`;
-          }
-  
-          if (/^\d{4}-\d{2}-\d{2}$/.test(timeStr)) {
-            return isEndTime 
-              ? `{${timeStr} 23:59:59}` 
-              : `{${timeStr} 00:00:00}`;
-          }
-  
-          throw new Error(`Invalid time format: ${timeStr}`);
-        };
-  
-        // 构建查询参数
-        if (args.author) { params.push(`--search "author:${args.author}"`); }
-        if (args.keyword) { params.push(`--search "message:${args.keyword}"`); }
-        
-        const startRev = parseTime(args.startDate);
-        const endRev = parseTime(args.endDate, true);
-        if (startRev !== '1' || endRev !== 'HEAD') {
-          params.push(`--revision ${startRev}:${endRev}`);
+        vscode.window.showInformationMessage('CodeReDesign 正在查询svn提交日志');
+        try {
+            const params: string[] = [];
+            let repoPath = args.path;
+    
+            // 时间处理函数
+            const parseTime = (timeStr?: string, isEndTime = false): string => {
+            if (!timeStr) { return isEndTime ? 'HEAD' : '1'; }
+            
+            const relativeMatch = timeStr.match(/^(\d+)([hd])$/);
+            if (relativeMatch) {
+                const now = new Date();
+                const [, value, unit] = relativeMatch;
+                const ms = parseInt(value) * (unit === 'h' ? 3600 : 86400) * 1000;
+                return `{${new Date(now.getTime() - ms).toISOString().slice(0, 19)}}`;
+            }
+    
+            if (/^\d{4}-\d{2}-\d{2}$/.test(timeStr)) {
+                return isEndTime 
+                ? `{${timeStr} 23:59:59}` 
+                : `{${timeStr} 00:00:00}`;
+            }
+    
+            throw new Error(`Invalid time format: ${timeStr}`);
+            };
+    
+            // 构建查询参数
+            if (args.author) { params.push(`--search "author:${args.author}"`); }
+            if (args.keyword) { params.push(`--search "message:${args.keyword}"`); }
+            
+            const startRev = parseTime(args.startDate);
+            const endRev = parseTime(args.endDate, true);
+            if (startRev !== '1' || endRev !== 'HEAD') {
+            params.push(`--revision ${startRev}:${endRev}`);
+            }
+    
+            if (args.revisionStart || args.revisionEnd) {
+            const start = args.revisionStart ?? 1;
+            const end = args.revisionEnd ?? 'HEAD';
+            params.push(`--revision ${start}:${end}`);
+            }
+    
+            if (args.limit) { params.push(`-l ${args.limit}`); }
+    
+            // 获取仓库根地址
+            if (!/^(http|https|svn):\/\//.test(repoPath)) {
+            const { stdout } = await execAsync(
+                `svn info "${repoPath}" --show-item repos-root-url`,
+                { encoding: 'utf8' }
+            );
+            repoPath = stdout.trim();
+            }
+    
+            // 执行命令
+            const { stdout } = await execAsync(
+            `svn log "${repoPath}" --xml ${params.join(' ')}`,
+            { encoding: 'gbk' as BufferEncoding, maxBuffer: 1024 * 1024 * 10 }
+            );
+    
+            // 解析XML
+            const parsed = await new Promise<any>((resolve, reject) => {
+            parseString(stdout, (err, result) => {
+                err ? reject(err) : resolve(result);
+            });
+            });
+    
+            // 转换为LogEntry数组
+            const entries: LogEntry[] = (parsed.log.logentry || []).map(
+            (entry: any) => ({
+                revision: entry.$.revision,
+                author: entry.author?.[0],
+                date: entry.date?.[0],
+                message: entry.msg?.[0]?.trim(),
+                paths: (entry.paths?.[0]?.path || []).map((p: any) => ({
+                action: p.$.action,
+                path: p._
+                }))
+            })
+            );
+    
+            return JSON.stringify(entries, null, 2);
+    
+        } catch (error) {
+            const err = error as SVNError;
+            const errorMapping: Record<string, string> = {
+            '175002': '认证失败',
+            '160013': '路径不存在',
+            '200009': '无效时间格式',
+            '205000': '无效版本号'
+            };
+    
+            const errorCode = err.stderr?.match(/svn: E(\d+):/)?.[1] || '';
+            const message = errorCode in errorMapping
+            ? `SVN错误 [E${errorCode}]: ${errorMapping[errorCode]}`
+            : `操作失败: ${err.message?.replace(/^svn: E\d+: /, '') || '未知错误'}`;
+    
+            return message;
         }
-  
-        if (args.revisionStart || args.revisionEnd) {
-          const start = args.revisionStart ?? 1;
-          const end = args.revisionEnd ?? 'HEAD';
-          params.push(`--revision ${start}:${end}`);
-        }
-  
-        if (args.limit) { params.push(`-l ${args.limit}`); }
-  
-        // 获取仓库根地址
-        if (!/^(http|https|svn):\/\//.test(repoPath)) {
-          const { stdout } = await execAsync(
-            `svn info "${repoPath}" --show-item repos-root-url`,
-            { encoding: 'utf8' }
-          );
-          repoPath = stdout.trim();
-        }
-  
-        // 执行命令
-        const { stdout } = await execAsync(
-          `svn log "${repoPath}" --xml ${params.join(' ')}`,
-          { encoding: 'gbk' as BufferEncoding, maxBuffer: 1024 * 1024 * 10 }
-        );
-  
-        // 解析XML
-        const parsed = await new Promise<any>((resolve, reject) => {
-          parseString(stdout, (err, result) => {
-            err ? reject(err) : resolve(result);
-          });
-        });
-  
-        // 转换为LogEntry数组
-        const entries: LogEntry[] = (parsed.log.logentry || []).map(
-          (entry: any) => ({
-            revision: entry.$.revision,
-            author: entry.author?.[0],
-            date: entry.date?.[0],
-            message: entry.msg?.[0]?.trim(),
-            paths: (entry.paths?.[0]?.path || []).map((p: any) => ({
-              action: p.$.action,
-              path: p._
-            }))
-          })
-        );
-  
-        return JSON.stringify(entries, null, 2);
-  
-      } catch (error) {
-        const err = error as SVNError;
-        const errorMapping: Record<string, string> = {
-          '175002': '认证失败',
-          '160013': '路径不存在',
-          '200009': '无效时间格式',
-          '205000': '无效版本号'
-        };
-  
-        const errorCode = err.stderr?.match(/svn: E(\d+):/)?.[1] || '';
-        const message = errorCode in errorMapping
-          ? `SVN错误 [E${errorCode}]: ${errorMapping[errorCode]}`
-          : `操作失败: ${err.message?.replace(/^svn: E\d+: /, '') || '未知错误'}`;
-  
-        return message;
-      }
     }
 };
   
@@ -574,6 +578,7 @@ export const getSVNDiff: Tool = {
         required: ['repoPath'],
     },
     function: async (args: { repoPath: string }) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在获取svn本地差异');
         try {
             const exec = promisify(childProcess.exec);
             const { stdout } = await exec(`svn diff "${args.repoPath}"`);
@@ -597,6 +602,7 @@ export const getGitDiff: Tool = {
         required: ['repoPath'],
     },
     function: async (args: { repoPath: string }) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在查询git本地差异');
         try {
             const exec = promisify(childProcess.exec);
             const { stdout } = await exec(`git -C "${args.repoPath}" diff`);
@@ -621,6 +627,7 @@ export const grepSearch: Tool = {
         required: ['directory', 'pattern'],
     },
     function: async (args: { directory: string; pattern: string }) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在使用grep搜索');
         try {
             const exec = promisify(childProcess.exec);
             const { stdout } = await exec(`findstr /s /i /m /c:"${args.pattern}" "${args.directory}\\*"`);
@@ -655,6 +662,7 @@ export const findFiles: Tool = {
         required: ['directory', 'pattern', 'useRegex'],
     },
     function: async (args: { directory: string; pattern: string; useRegex: boolean }) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在查找文件');
         try {
             const { directory, pattern, useRegex } = args;
             const queue: string[] = [directory];
@@ -714,26 +722,27 @@ export const writeMemory: Tool = {
       required: ['content'],
     },
     function: async (args: { content: string }) => {
-      try {
-        // 调用FastAPI的/add_knowledge端点
-        const response = await fetch(`http://localhost:${RAG_CONFIG.PORT}/add_knowledge`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify([args.content]),
-        });
-  
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API request failed: ${response.status} - ${errorText}`);
+        vscode.window.showInformationMessage('CodeReDesign 正在写入记忆');
+        try {
+            // 调用FastAPI的/add_knowledge端点
+            const response = await fetch(`http://localhost:${RAG_CONFIG.PORT}/add_knowledge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([args.content]),
+            });
+    
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API request failed: ${response.status} - ${errorText}`);
+            }
+    
+            const result = await response.json() as { status: string };
+            return result.status === 'added' 
+            ? `Memory saved: ${args.content.slice(0, 50)}...`
+            : "Failed to save memory";
+        } catch (error: any) {
+            return `保存记忆失败: ${error.message}`;
         }
-  
-        const result = await response.json() as { status: string };
-        return result.status === 'added' 
-          ? `Memory saved: ${args.content.slice(0, 50)}...`
-          : "Failed to save memory";
-      } catch (error: any) {
-        return `保存记忆失败: ${error.message}`;
-      }
     },
 };
   
@@ -749,6 +758,7 @@ export const readMemory: Tool = {
         required: ['query'],
     },
     function: async (args: { query: string }) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在读取记忆');
         try {
         // 调用FastAPI的/query端点
         const response = await fetch(`http://localhost:${RAG_CONFIG.PORT}/query?query_text=${encodeURIComponent(args.query)}`, {
