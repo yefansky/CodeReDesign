@@ -24,7 +24,7 @@ jobs:
         run: pip install -r src/python/requirements.txt
 
       - name: Build EXE
-        run: pyinstaller --onefile --clean --noconsole --distpath dist src/python/rag.py
+        run: pyinstaller --onefile --clean --distpath dist src/python/rag.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
