@@ -146,7 +146,7 @@ export class ChatPanel {
                         <button id="stop" style="display:none;">Stop</button>
                         <div class="web-search">
                             <input type="checkbox" id="web-search">
-                            <label for="web-search">联网搜索</label>
+                            <label for="web-search">Agent模式(可联网)</label>
                         </div>
                     </div>
                 </div>
