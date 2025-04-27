@@ -14,7 +14,7 @@ import * as mysql from 'mysql2/promise';
 import * as childProcess from 'child_process';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { ragService, CONFIG as RAG_CONFIG } from './ragService';
+import { CONFIG as RAG_CONFIG } from './ragService';
 import { parseString } from 'xml2js';
 
 
@@ -290,7 +290,23 @@ async function fetchPageContent(url: string): Promise<string> {
 // 1. 搜索网络
 export const searchTool: Tool = {
     name: 'web_search',
-    description: '执行网络搜索并返回前5个结果的摘要，用户提供这个工具一般是不信任你自己的判断，先上网搜索总结后再下结论。',
+    description: `执行网络搜索并返回前5个结果的摘要。适用于需要获取外部信息、验证数据或了解最新动态的情况。
+用户提供这个工具通常是对你的知识储备或判断持怀疑态度，希望通过网络搜索获取更权威或更新的信息。
+你可以用它来补充自己的回答，确保回答准确且有据可依。
+当问到你依稀技术名词的时候，你没有把握就不要乱说，先联网搜索。因为大模型很容易产生幻觉，以为自己什么都懂。
+
+使用场景:
+- 获取最新信息: 例如，用户询问“2023年最好的编程语言是什么？”
+- 验证事实: 例如，确认“Python的最新版本是什么？”
+- 收集多种观点: 例如，了解“AI在医疗领域的应用有哪些？”
+
+具体示例:
+用户问：“最新的AI编程工具是什么？”
+你可以使用 web_search，输入参数 query: "latest AI programming tools 2023"，然后回答：
+“根据网络搜索结果，当前流行的AI编程工具包括：1. GitHub Copilot（代码自动补全），2. Tabnine（多语言支持），...”。
+
+如何使用:
+- 参数 query: 输入搜索关键词，支持英文双引号精确匹配。例如 "AI tools site:github.com" 会限定搜索范围到 GitHub。`,
     parameters: {
         type: 'object',
         properties: {
@@ -329,7 +345,21 @@ registerTool(searchTool);
 // 2. 获取当前日期时间
 export const getCurrentDateTime: Tool = {
     name: 'get_current_datetime',
-    description: '获取当前的日期和时间。',
+    description: `获取当前的日期和时间。适用于任何需要实时时间信息的情况。
+它简单高效，没有参数，直接返回本地时间。可以用它来回答时间相关的问题，或在任务中提供时间上下文。
+
+使用场景:
+- 回答时间问题: 例如，用户直接问“现在几点了？”或“今天是星期几？”
+- 任务安排: 例如，用户说“请在明天上午10点提醒我开会”，你可以用它确认当前时间并计算提醒时间。
+- 记录时间戳: 例如，在日志或事件记录中添加当前时间。
+
+具体示例:
+用户问：“现在是几点？”
+你调用 get_current_datetime，返回：
+“当前时间是 2023年10月15日 14:30（本地时间）。”
+
+如何使用:
+- 无参数，直接调用即可，返回格式为本地时间的字符串。`,
     parameters: {
         type: 'object',
         properties: {},
@@ -346,7 +376,24 @@ registerTool(getCurrentDateTime);
 // 3. 读取指定路径文本
 export const readTextFile: Tool = {
     name: 'read_text_file',
-    description: '读取指定路径的文本文件内容。',
+    description: `读取指定路径的文本文件内容。适用于需要访问本地文件信息的情况。
+它可以帮助你提取文件中的数据、配置或日志，适合处理静态文本内容。
+比如我让你解析一个代码里的内容，找出里面的某个引用函数，你就可以用这个工具加载文件文本内容然后再进行分析。
+有些时候我会让你解释代码。或者问你代码里的某一段内容的意思，或者查找相关代码，你就应该重新加载最可能的那个代码文件，然后重新回答我的问题。
+我让你解释代码的时候你一定要用这个工具去读取，而不是凭文件名猜测他的内容，切记！
+
+使用场景:
+- 读取文件内容: 例如，用户说“请告诉我 C:\\notes.txt 里写了什么”。
+- 处理配置: 例如，在调试时读取配置文件“读取 config.txt 的设置”。
+- 分析日志: 例如，查看日志文件中的错误信息“读取 error.log 的最后一行”。
+
+具体示例:
+用户说：“请读取 C:\\data.py 的内容。”
+你调用 read_text_file，参数 filePath: "C:\\data.tpy"，返回：
+“文件内容是：'这是一个测试文件，包含重要信息。'”
+
+如何使用:
+- 参数 filePath: 输入完整的文件路径（如 "C:\\data.py"），支持 UTF-8 编码的文本文件。`,
     parameters: {
         type: 'object',
         properties: {
@@ -371,7 +418,17 @@ registerTool(readTextFile);
 // 4. 连接 MySQL 查表
 export const queryMySQL: Tool = {
     name: 'query_mysql',
-    description: '连接 MySQL 数据库并执行查询。',
+    description: `连接 MySQL 数据库并执行 SQL 查询，返回 JSON 格式结果。适合数据查询或管理。
+
+使用场景:
+
+数据查询：用户问“用户表里有多少人？”
+生成报告：统计“所有订单的总金额”。
+数据管理：更新“用户 ID 为 1 的状态”。
+具体示例:
+用户说：“查询用户表中的所有用户。”
+调用 query_mysql，参数：host: "localhost", user: "root", password: "123456", database: "mydb", query: "SELECT * FROM users"，返回：
+“结果：[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]`,
     parameters: {
         type: 'object',
         properties: {
@@ -416,14 +473,24 @@ type SVNError = Error & { stderr?: string };
 const execAsync = promisify(exec);
 export const getSVNLog: Tool = {
     name: 'get_svn_log',
-    description: '获取SVN日志，支持多种查询条件',
+    description: `获取 SVN 仓库的提交日志，支持筛选路径、作者或时间范围，适合版本管理。
+
+使用场景:
+
+查看历史：用户问“SVN 仓库最近5次提交是什么？”
+代码审查：查找“Alice 的所有提交”。
+项目跟踪：查看“过去一周的提交”。
+具体示例:
+用户说：“获取 SVN 仓库最近10条提交记录。”
+调用 get_svn_log，参数 path: "http://svn.example.com/repo", limit: 10，返回：
+“结果：[{'revision': '100', 'author': 'Alice', 'date': '2023-10-01', 'message': '修复bug'}]`,
     parameters: {
         type: 'object',
         properties: {
             path: {
                 type: 'string',
                 description: `仓库路径，支持以下格式：
-- 本地工作副本路径：'/projects/myapp'
+- 本地工作副本路径：'k:\\projects\\myapp'
 - 仓库URL：'http://svn.example.com/repo'
 - 仓库子目录：'http://svn.example.com/repo/trunk/src'`
             },
@@ -569,7 +636,19 @@ registerTool(getSVNLog);
 // 6. 比对 SVN 本地差异的 diff
 export const getSVNDiff: Tool = {
     name: 'get_svn_diff',
-    description: '获取 SVN 仓库的本地差异。',
+    description: `显示 SVN 本地工作副本与远程仓库的差异，适合提交前检查。
+
+使用场景:
+
+检查改动：用户问“我对 SVN 做了什么改动？”
+提交审查：确认“本地差异”。
+调试：对比本地和远程代码。
+具体示例:
+用户说：“显示 SVN 仓库的本地差异。”
+调用 get_svn_diff，参数 repoPath: "C:\\svn_repo"，返回：
+“差异：'+ 新增一行\n- 删除一行'”
+参数说明:
+repoPath: 本地仓库路径`,
     parameters: {
         type: 'object',
         properties: {
@@ -593,7 +672,17 @@ registerTool(getSVNDiff);
 // 7. 比对 GitHub 本地差异的 diff
 export const getGitDiff: Tool = {
     name: 'get_git_diff',
-    description: '获取 Git 仓库的本地差异。',
+    description: `显示 Git 本地工作目录与已提交内容的差异，适合代码审查或调试。
+
+使用场景:
+
+检查更改：用户问“Git 仓库的本地改动是什么？”
+提交确认：查看“Git diff”。
+错误排查：对比改动。
+具体示例:
+用户说：“显示 Git 仓库的本地差异。”
+调用 get_git_diff，参数 repoPath: "C:\\git_repo"，返回：
+“差异：'+ 添加新功能\n- 删除旧代码'`,
     parameters: {
         type: 'object',
         properties: {
@@ -617,7 +706,17 @@ registerTool(getGitDiff);
 // 8. Grep 搜索指定目录文本
 export const grepSearch: Tool = {
     name: 'grep_search',
-    description: '在指定目录中搜索文本。',
+    description: `在指定目录中搜索包含特定文本的文件，适合日志分析或代码搜索。
+
+使用场景:
+
+搜索关键词：用户说“在 C:\\logs 里找 'error'”。
+代码审查：查找“userId”的使用。
+日志分析：定位“timeout”。
+具体示例:
+用户说：“在 C:\\projects 里搜索 'error'。”
+调用 grep_search，参数 directory: "C:\\projects", pattern: "error"，返回：
+“结果：C:\\projects\\log.txt, C:\\projects\\test.py`,
     parameters: {
         type: 'object',
         properties: {
@@ -642,7 +741,17 @@ registerTool(grepSearch);
 // 9. 在路径下递归搜索文件
 export const findFiles: Tool = {
     name: 'find_files',
-    description: '在指定路径下递归搜索文件，支持文件名或正则表达式匹配。',
+    description: `递归搜索指定路径下的文件，支持文件名或正则表达式，适合文件管理。
+
+使用场景:
+
+查找文件：用户说“找 C:\projects 里的 config.json”。
+批量搜索：列出“.py 文件”。
+项目管理：搜索“test 开头的文件”。
+具体示例:
+用户说：“找 C:\projects 里所有的 .py 文件。”
+调用 find_files，参数 directory: "C:\projects", pattern: ".+\.py", useRegex: true，返回：
+“结果：C:\projects\main.py, C:\projects\test.py”`,
     parameters: {
         type: 'object',
         properties: {
@@ -713,7 +822,25 @@ registerTool(findFiles);
 // 修改后的writeMemory工具（移除本地嵌入生成和存储）
 export const writeMemory: Tool = {
     name: 'write_memory',
-    description: 'Save knowledge or insights to memory.',
+    description: `将重要信息或见解保存到记忆中，供将来检索。
+它适合记录对话中的关键点或学习成果，类似于一个知识库。
+一些我要求你记住的东西，或者是联网搜索到的知识，你自己总结出来的感悟。你都可以总结起来存入本地记忆。
+一些我们一起讨论得出的结论你也可以存起来。你要做个虚心好学的学生，学到的东西都要做好笔记。
+如果一个任务你做了好几个步骤才完成，可以总结一下，写明任务目标，注意事项，一些积累经验，快速执行的方法，存入记忆，下次类似任务可以根据这个经验快速处理。
+
+使用场景:
+- 记录新信息: 例如，用户说“我发现了一个新工具叫 X”，你可以保存它。
+- 学习过程: 例如，保存一个技巧“Python 的 lambda 函数用法”。
+- 任务跟踪: 例如，记录项目更新“项目 A 的截止日期是明天”。
+
+具体示例:
+用户说：“我发现了一个新工具叫 CodeAI。”
+你调用 write_memory，参数 content: "新工具：CodeAI"，
+返回：
+“记忆已保存：新工具：CodeAI。”
+
+如何使用:
+- 参数 content: 输入要保存的内容。`,
     parameters: {
       type: 'object',
       properties: {
@@ -749,7 +876,22 @@ export const writeMemory: Tool = {
   // 修改后的readMemory工具（移除本地相似度计算）
 export const readMemory: Tool = {
     name: 'read_memory',
-    description: 'Retrieve relevant knowledge from memory.',
+    description: `从记忆中检索信息，适合回顾保存的内容。
+    有时候我要你回忆一下，就是要你从这里调取记忆。我们以前进行的对话，我纠正过你的记忆，或者你自己总结的感悟都会在本地记忆里。
+    你要勤于调取本地记忆，看看是否有和当前任务相关的记忆，帮助你更好的执行任务。
+    有一些复杂任务你可以预先调取记忆，看以前有没有遇到过类似任务，有没有总结过的经验可以参考，从而高效的完成。
+
+使用场景:
+
+回忆信息：用户问“之前提到的工具是什么？”
+引用知识：使用保存的内容。
+任务回顾：查看“截止日期”。
+具体示例:
+用户说：“之前提到的工具是什么？”
+调用 read_memory，参数 query: "工具"，返回：
+“结果：新工具：CodeAI”
+参数说明:
+query: 搜索关键词。`,
     parameters: {
         type: 'object',
         properties: {

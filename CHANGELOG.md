@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.144 (2025-04-26)
+
+
+### Bug Fixes
+
+* 修正打包编译python的流程 ([90641be](https://github.com/yefansky/CodeReDesign/commit/90641be5e585d803a158d1a00565c2bb969da686))
+
+### 0.0.143 (2025-04-26)
+
+
+### Bug Fixes
+
+* 增加提示词 ([9a71cd6](https://github.com/yefansky/CodeReDesign/commit/9a71cd6e4f3e8327b417dd7f1169c624cc47d42c))
+
+### 0.0.142 (2025-04-26)
+
 ### 0.0.141 (2025-04-26)
 
 ### 0.0.140 (2025-04-26)

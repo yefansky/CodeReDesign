@@ -10,16 +10,21 @@ import * as os from 'os';
 let EXTENSION_PATH: string = '';
 
 const isDevMode = __dirname.includes('dist');
-const pythonScriptPath = isDevMode
-  ? path.join(__dirname, '..', 'src', 'python', 'rag.py') // Navigate from dist to src in dev
-  : path.join(EXTENSION_PATH, 'src', 'python', 'rag.py');
+// 动态设置 Python 脚本或 EXE 路径
+const getPythonScriptPath = (extensionPath: string) => {
+  if (isDevMode) {
+    return path.join(extensionPath, 'src', 'python', 'rag.py'); // 开发模式：直接运行 Python 脚本
+  } else {
+    return path.join(extensionPath, 'dist', 'rag.exe'); // 发布模式：运行 EXE
+  }
+};
 
 // 配置常量 (use a function to resolve paths dynamically)
 export const CONFIG = {
     STORAGE_PATH: path.join(os.homedir(), 'CodeReDesignMemory', 'rag_storage'),
     PORT: 7111,
     LOCK_FILE: 'rag.lock',
-    PYTHON_SCRIPT: pythonScriptPath
+    PYTHON_SCRIPT: getPythonScriptPath(EXTENSION_PATH)
   };
 
 // 类型定义
@@ -175,22 +180,39 @@ class RagService {
   }
   
   private startPythonProcess(): ChildProcess {
-    const pythonPath = process.platform === 'win32' 
-      ? this.findWindowsPython()
-      : this.findUnixPython();
+    const scriptPath = CONFIG.PYTHON_SCRIPT;
+    const isExe = scriptPath.endsWith('.exe');
 
-    // 通过命令行参数传递配置
-    const pythonArgs = [
-        CONFIG.PYTHON_SCRIPT,
-        `--port=${CONFIG.PORT}`,               // 传递端口参数
-        `--storage_path=${CONFIG.STORAGE_PATH}` // 可选：传递其他参数
-    ];
+    if (!fs.access(scriptPath)) {
+      throw new Error(`未找到脚本或可执行文件: ${scriptPath}`);
+    }
   
-    return spawn(pythonPath, pythonArgs, {
-      env: { ...process.env, PORT: CONFIG.PORT.toString() },
-      stdio: 'pipe',
-      shell: true  // 启用shell解析路径
-    });
+    if (isExe) {
+      // 直接运行 EXE
+      return spawn(scriptPath, [
+        `--port=${CONFIG.PORT}`,
+        `--storage_path=${CONFIG.STORAGE_PATH}`
+      ], {
+        env: { ...process.env, PORT: CONFIG.PORT.toString() },
+        stdio: 'pipe',
+        shell: true
+      });
+    } else {
+      // 运行 Python 脚本
+      const pythonPath = process.platform === 'win32' 
+        ? this.findWindowsPython()
+        : this.findUnixPython();
+  
+      return spawn(pythonPath, [
+        scriptPath,
+        `--port=${CONFIG.PORT}`,
+        `--storage_path=${CONFIG.STORAGE_PATH}`
+      ], {
+        env: { ...process.env, PORT: CONFIG.PORT.toString() },
+        stdio: 'pipe',
+        shell: true
+      });
+    }
   }
   
   private findUnixPython(): string {
@@ -263,6 +285,7 @@ class RagService {
 export const ragService = RagService.getInstance();
 
 export async function activate(context: vscode.ExtensionContext) {
+  EXTENSION_PATH = context.extensionPath;
   await ragService.start();
   context.subscriptions.push({
     dispose: () => ragService.stop()
