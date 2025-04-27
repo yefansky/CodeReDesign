@@ -1,10 +1,11 @@
-﻿// src/ragService.ts
-import { ChildProcess, execSync, exec, spawn } from 'child_process';
+﻿import { ChildProcess, execSync, exec, spawn } from 'child_process';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as net from 'net';
 import * as os from 'os';
+import * as https from 'https';
+import * as crypto from 'crypto';
 
 // Define a variable to store the extension path
 let EXTENSION_PATH: string = '';
@@ -60,6 +61,53 @@ class RagService {
     if (this.state.status !== 'stopped') { return; }
 
     try {
+      if (!isDevMode) {
+        const exePath = getPythonScriptPath(EXTENSION_PATH);
+        const distPath = path.dirname(exePath);
+        await fs.mkdir(distPath, { recursive: true });
+
+        let shouldDownload = false;
+
+        // Check if rag.exe exists
+        try {
+          await fs.access(exePath, fs.constants.F_OK);
+          
+          // Download MD5 from GitHub
+          const remoteMd5 = await this.downloadText('https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt');
+          
+          // Calculate local rag.exe MD5
+          const localMd5 = await this.calculateFileMd5(exePath);
+          
+          // Compare MD5s
+          if (remoteMd5.trim().toLowerCase() !== localMd5.toLowerCase()) {
+            shouldDownload = true;
+            vscode.window.showInformationMessage('rag.exe MD5 mismatch, downloading new version...');
+          }
+        } catch (err) {
+          // rag.exe doesn't exist
+          shouldDownload = true;
+          vscode.window.showInformationMessage('rag.exe not found, downloading...');
+        }
+
+        if (shouldDownload) {
+          // Kill any running rag.exe process
+          await this.killRagExeProcess();
+          
+          // Download new rag.exe
+          await this.downloadFile(
+            'https://github.com/yefansky/CodeReDesign/releases/download/latest/rag.exe',
+            exePath
+          );
+          
+          // Verify downloaded file's MD5
+          const newMd5 = await this.calculateFileMd5(exePath);
+          const remoteMd5 = await this.downloadText('https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt');
+          if (newMd5.toLowerCase() !== remoteMd5.trim().toLowerCase()) {
+            throw new Error('Downloaded rag.exe MD5 verification failed');
+          }
+        }
+      }
+
       //await this.acquireLock();
       await this.ensurePortAvailable();
       
@@ -72,6 +120,94 @@ class RagService {
     } catch (err) {
       await this.cleanup(`Startup failed: ${err}`);
     }
+  }
+
+  private async downloadText(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`Failed to download text from ${url}: Status ${res.statusCode}`));
+          } else {
+            resolve(data);
+          }
+        });
+      }).on('error', (err) => {
+        reject(new Error(`Failed to download text from ${url}: ${err.message}`));
+      });
+    });
+  }
+
+  private async downloadFile(url: string, dest: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const file = require('fs').createWriteStream(dest);
+      https.get(url, (res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`Failed to download file from ${url}: Status ${res.statusCode}`));
+          return;
+        }
+        res.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          resolve();
+        });
+      }).on('error', (err) => {
+        require('fs').unlink(dest, () => {}); // Clean up partial download
+        reject(new Error(`Failed to download file from ${url}: ${err.message}`));
+      });
+    });
+  }
+
+  private async calculateFileMd5(filePath: string): Promise<string> {
+    const fileBuffer = await fs.readFile(filePath);
+    return crypto.createHash('md5').update(fileBuffer).digest('hex');
+  }
+
+  private async killRagExeProcess(): Promise<void> {
+    if (process.platform !== 'win32') {
+      return; // Only implemented for Windows as rag.exe is Windows-specific
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        const command = `tasklist | findstr "rag.exe"`;
+        exec(command, { shell: 'cmd.exe', encoding: 'utf8' }, (error, stdout) => {
+          if (error && !stdout) {
+            console.log('No rag.exe process found');
+            return resolve();
+          }
+
+          const pids = stdout
+            .trim()
+            .split('\n')
+            .map(line => {
+              const parts = line.trim().split(/\s+/);
+              return parts[1]; // PID is in the second column
+            })
+            .filter(pid => pid && /^\d+$/.test(pid));
+
+          if (pids.length === 0) {
+            console.log('No valid rag.exe PIDs found');
+            return resolve();
+          }
+
+          console.log(`Terminating rag.exe PIDs: ${pids.join(', ')}`);
+          const killCommand = `taskkill /F /PID ${pids.join(' ')}`;
+          exec(killCommand, { shell: 'cmd.exe' }, (killError) => {
+            if (killError) {
+              console.error(`Failed to terminate rag.exe processes: ${killError.message}`);
+              return reject(new Error(`Failed to terminate rag.exe processes: ${killError.message}`));
+            }
+            resolve();
+          });
+        });
+      } catch (err) {
+        console.error(`Error killing rag.exe process: ${(err as Error).message}`);
+        reject(new Error(`Failed to kill rag.exe process: ${(err as Error).message}`));
+      }
+    });
   }
 
   public async stop(): Promise<void> {
@@ -284,8 +420,10 @@ class RagService {
     const scriptPath = getPythonScriptPath(EXTENSION_PATH);
     const isExe = scriptPath.endsWith('.exe');
 
-    if (!fs.access(scriptPath)) {
-      throw new Error(`Script or executable not found: ${scriptPath}`);
+    try {
+      fs.access(scriptPath, fs.constants.X_OK);
+    } catch (err) {
+      throw new Error(`Script or executable not found or not executable: ${scriptPath}`);
     }
   
     if (isExe) {

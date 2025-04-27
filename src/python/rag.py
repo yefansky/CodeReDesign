@@ -43,7 +43,7 @@ def initialize_storage(storage_path: str):
         print(f"已从 {kb_file} 加载知识库，共 {len(knowledge_base)} 条记录")
     else:
         knowledge_base = []
-        print(f"创建新的知识库，将保存到 {kb_file}")
+        print(f"创建新的记忆库，将保存到 {kb_file}")
     
     storage_initialized = True
 
@@ -138,4 +138,4 @@ if __name__ == "__main__":
     finally:
         # 确保程序退出前保存数据
         save_to_storage(args.storage_path)
-        print("服务关闭，数据已保存")
+        print("记忆服务关闭，数据已保存")
