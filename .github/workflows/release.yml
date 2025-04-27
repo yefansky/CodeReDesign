@@ -86,17 +86,16 @@ jobs:
 
       - name: Delete old Release
         run: |
-          $releaseExists = $false
-          try {
-            gh release view latest --json url 2>$null
-            $releaseExists = $true
-          } catch {
-            Write-Host "Release 'latest' does not exist, skipping deletion."
-          }
+          gh release view latest --json url 2>$null
+          $releaseExists = ($LASTEXITCODE -eq 0)
 
           if ($releaseExists) {
             gh release delete latest --yes
+          } else {
+            Write-Host "Release 'latest' does not exist, skipping deletion."
           }
+
+          exit 0
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
