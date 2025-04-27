@@ -70,10 +70,44 @@ jobs:
 
       - name: Push changes and tags
         run: |
-          git push --follow-tags  # 推送修改的 version 和 Git 标签到远程仓库
+          git push --follow-tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get metadata from package.json
+        id: metadata
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          echo "NAME=$NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Package Extension
-        run: vsce package  # 生成 .vsix 文件
+        run: vsce package # 使用默认文件名 CodeReDesign-<version>.vsix
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.VERSION }}
+          release_name: Release v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          body: |
+            Auto-generated release for version ${{ env.VERSION }}.
+            Download the VSIX file below to install the extension.
+
+      - name: Upload VSIX to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.NAME }}-${{ env.VERSION }}.vsix
+          asset_name: ${{ env.NAME }}-${{ env.VERSION }}.vsix
+          asset_content_type: application/zip
 
       - name: Publish to Marketplace
         uses: HaaLeo/publish-vscode-extension@v1.6.2  # 第三方 Action 简化发布
