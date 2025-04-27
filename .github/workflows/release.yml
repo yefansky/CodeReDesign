@@ -25,7 +25,8 @@ jobs:
             $previous_sha256 = "${{ github.event.before }}"
             if ($previous_sha256 -and $previous_sha256 -ne "0000000000000000000000000000000000000000") {
               $previous_content = git show $previous_sha256:src/python/rag.py 2>$null
-              if ($? -and $previous_content) {
+              $LASTEXITCODE = 0  # Reset exit code to avoid propagating git show failure
+              if ($previous_content) {
                 echo $previous_content | Out-File temp_rag.py -Encoding utf8
                 if (Test-Path temp_rag.py) {
                   $previous_hash = (Get-FileHash -Path temp_rag.py -Algorithm SHA256).Hash
