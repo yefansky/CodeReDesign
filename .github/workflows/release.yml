@@ -77,27 +77,32 @@ jobs:
             temp_dist/rag.exe
           args: -fq --best
 
-      # Create GitHub Release
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      # Generate MD5 checksum
+      - name: Generate MD5 checksum
+        run: |
+          $md5 = (Get-FileHash -Path temp_dist/rag.exe -Algorithm MD5).Hash
+          echo $md5.ToLower() > temp_dist/md5.txt
+        shell: pwsh
+
+      - name: Delete old Release
+        run: |
+          gh release delete latest --yes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             temp_dist/rag.exe
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
+            temp_dist/md5.txt
+          tag_name: latest
+          name: Latest RAG Executable
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Delete old releases
-      - name: Delete old releases
-        uses: dev-drprasad/delete-older-releases@v0.2.0
-        with:
-          keep_latest: 5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          
       # Clean up temporary directory
       - name: Clean up temporary directory
         if: always()
