@@ -80,7 +80,7 @@ jobs:
       # Generate MD5 checksum
       - name: Generate MD5 checksum
         run: |
-          $md5 = (Get-FileHash -Path src/python/rag.py -Algorithm MD5).Hash
+          $md5 = (Get-FileHash -Path temp_dist/rag.exe -Algorithm MD5).Hash
           echo $md5.ToLower() > temp_dist/md5.txt
         shell: pwsh
 
@@ -135,6 +135,12 @@ jobs:
           dos2unix src/python/rag.py
           md5sum src/python/rag.py | awk '{print $1}' > dist/md5.txt
           echo "Generated MD5: $(cat dist/md5.txt)"
+        shell: bash
+
+      - name: Download md5.txt from GitHub Release
+        run: |
+          curl -L -o dist/md5.txt https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt
+          echo "Downloaded md5.txt from release"
         shell: bash
 
       - name: Setup Node.js
