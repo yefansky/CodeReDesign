@@ -80,7 +80,7 @@ jobs:
       # Generate MD5 checksum
       - name: Generate MD5 checksum
         run: |
-          $md5 = (Get-FileHash -Path temp_dist/rag.exe -Algorithm MD5).Hash
+          $md5 = (Get-FileHash -Path src/python/rag.py -Algorithm MD5).Hash
           echo $md5.ToLower() > temp_dist/md5.txt
         shell: pwsh
 
@@ -102,7 +102,7 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       # Clean up temporary directory
       - name: Clean up temporary directory
         if: always()
@@ -118,11 +118,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download EXE artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: rag.exe
-          path: dist  # 下载到 dist 目录
+      - name: Generate MD5 for rag.py
+        run: |
+          mkdir -p dist
+          sudo apt-get install dos2unix -y
+          dos2unix src/python/rag.py
+          md5sum src/python/rag.py | awk '{print $1}' > dist/md5.txt
+          echo "Generated MD5: $(cat dist/md5.txt)"
+        shell: bash
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
