@@ -128,15 +128,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Generate MD5 for rag.py
-        run: |
-          mkdir -p dist
-          sudo apt-get install dos2unix -y
-          dos2unix src/python/rag.py
-          md5sum src/python/rag.py | awk '{print $1}' > dist/md5.txt
-          echo "Generated MD5: $(cat dist/md5.txt)"
-        shell: bash
-
       - name: Download md5.txt from GitHub Release
         run: |
           curl -L -o dist/md5.txt https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt
