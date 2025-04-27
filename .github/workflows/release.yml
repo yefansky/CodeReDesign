@@ -18,23 +18,31 @@ jobs:
       - name: Check if build is needed
         id: sha256
         run: |
-          $sha256 = (Get-FileHash -Path src/python/rag.py -Algorithm SHA256).Hash
-          echo "Current SHA256: $sha256"
-          $previous_sha256 = "${{ github.event.before }}"
-          if ($previous_sha256 -and $previous_sha256 -ne "0000000000000000000000000000000000000000") {
-            $previous_content = git show $previous_sha256:src/python/rag.py 2>$null
-            if ($?) {
-              echo $previous_content | Out-File temp_rag.py -Encoding utf8
-              $previous_hash = (Get-FileHash -Path temp_rag.py -Algorithm SHA256).Hash
-              if ($previous_hash -eq $sha256) {
-                echo "No changes detected in rag.py, skipping build and release."
-                Remove-Item -Path temp_rag.py -Force -ErrorAction SilentlyContinue
-                exit 0
+          Set-PSDebug -Trace 1  # Enable verbose output for debugging
+          try {
+            $sha256 = (Get-FileHash -Path src/python/rag.py -Algorithm SHA256).Hash
+            echo "Current SHA256: $sha256"
+            $previous_sha256 = "${{ github.event.before }}"
+            if ($previous_sha256 -and $previous_sha256 -ne "0000000000000000000000000000000000000000") {
+              $previous_content = git show $previous_sha256:src/python/rag.py 2>$null
+              if ($? -and $previous_content) {
+                echo $previous_content | Out-File temp_rag.py -Encoding utf8
+                if (Test-Path temp_rag.py) {
+                  $previous_hash = (Get-FileHash -Path temp_rag.py -Algorithm SHA256).Hash
+                  if ($previous_hash -eq $sha256) {
+                    echo "No changes detected in rag.py, skipping build and release."
+                    exit 0
+                  }
+                }
               }
             }
+            echo "Building new rag.exe due to changes or no previous commit."
+          } catch {
+            echo "Error in hash comparison: $_"
+            exit 1
+          } finally {
+            Remove-Item -Path temp_rag.py -Force -ErrorAction SilentlyContinue
           }
-          Remove-Item -Path temp_rag.py -Force -ErrorAction SilentlyContinue
-          echo "Building new rag.exe due to changes or no previous commit."
         shell: pwsh
 
       # Set up Python
