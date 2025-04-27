@@ -130,6 +130,7 @@ jobs:
 
       - name: Download md5.txt from GitHub Release
         run: |
+          mkdir -p dist
           curl -L -o dist/md5.txt https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt
           echo "Downloaded md5.txt from release"
         shell: bash
