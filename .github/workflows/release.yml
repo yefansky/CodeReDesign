@@ -32,6 +32,7 @@ jobs:
           version: latest
           files: |
             dist/rag.exe
+          args: -fq
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
