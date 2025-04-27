@@ -11,34 +11,84 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch previous commit for hash comparison
 
+      # Calculate SHA256 and check if build is needed
+      - name: Check if build is needed
+        id: sha256
+        run: |
+          $sha256 = (Get-FileHash -Path src/python/rag.py -Algorithm SHA256).Hash
+          echo "Current SHA256: $sha256"
+          $previous_sha256 = "${{ github.event.before }}"
+          if ($previous_sha256) {
+            $previous_content = git show $previous_sha256:src/python/rag.py 2>$null
+            if ($?) {
+              echo $previous_content | Out-File temp_rag.py
+              $previous_hash = (Get-FileHash -Path temp_rag.py -Algorithm SHA256).Hash
+              if ($previous_hash -eq $sha256) {
+                echo "No changes detected in rag.py, skipping build and release."
+                exit 0
+              }
+            }
+          }
+          echo "Building new rag.exe due to changes or no previous commit."
+
+      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
+      # Install PyInstaller
       - name: Install PyInstaller
         run: pip install pyinstaller
 
+      # Install Python dependencies
       - name: Install Python dependencies
         run: pip install -r src/python/requirements.txt
 
+      # Build EXE to a temporary directory
       - name: Build EXE
-        run: pyinstaller --onefile --clean --distpath dist src/python/rag.py
+        run: |
+          mkdir temp_dist
+          pyinstaller --onefile --clean --distpath temp_dist src/python/rag.py
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
+      # Compress EXE with UPX
       - name: Compress EXE with UPX
         uses: crazy-max/ghaction-upx@v3
         with:
           version: latest
           files: |
-            dist/rag.exe
+            temp_dist/rag.exe
           args: -fq --best
 
-      - name: Upload EXE artifact
-        uses: actions/upload-artifact@v4
+      # Create GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: rag.exe
-          path: dist/rag.exe
+          files: |
+            temp_dist/rag.exe
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Delete old releases
+      - name: Delete old releases
+        uses: dev-drprasad/delete-older-releases@v0.2.0
+        with:
+          keep_latest: 5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Clean up temporary directory
+      - name: Clean up temporary directory
+        if: always()
+        run: Remove-Item -Path temp_dist -Recurse -Force -ErrorAction SilentlyContinue
 
   build-and-publish:
     runs-on: ubuntu-latest
