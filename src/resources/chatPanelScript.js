@@ -202,21 +202,28 @@ function processMathBlocks(input) {
 }
 
 function separateThinkContent(input) {
-    // Initialize outputs
-    let thinkStr = '';
-    let answerStr = input;
+    const segments = [];
+    
+    // 使用split捕获think块和非think内容
+    const parts = input.split(/(<think>[\s\S]*?<\/think>)/g);
+    
+    parts.forEach(part => {
+        if (!part) return;
+        
+        if (part.startsWith('<think>') && part.endsWith('</think>')) {
+            segments.push({
+                type: 'think',
+                content: part
+            });
+        } else {
+            segments.push({
+                type: 'answer',
+                content: part
+            });
+        }
+    });
 
-    // Regex to match <think>...</think> (non-greedy)
-    const thinkRegex = /<think>([\s\S]*?)<\/think>/;
-
-    // Find the first <think>...</think> match
-    const match = input.match(thinkRegex);
-    if (match) {
-        thinkStr = match[0]; // Full <think>...</think> content
-        answerStr = input.replace(thinkRegex, ''); // Remove <think>...</think>
-    }
-
-    return { thinkStr, answerStr };
+    return segments;
 }
 
 // 渲染消息
@@ -242,16 +249,28 @@ async function renderMessage(role, content, index) {
 
         markdownContent = processMathBlocks(markdownContent);
 
-        const { thinkStr, answerStr } = separateThinkContent(markdownContent);
-        markdownContent = answerStr;
-
-        targetDiv.innerHTML = thinkStr + marked.parse(markdownContent, {
-            breaks: false,
-            mangle: false,
-            headerIds: false,
-            highlight: (code, lang) => hljs.highlight(hljs.getLanguage(lang) ? lang : 'plaintext', code).value
+        const segments = separateThinkContent(markdownContent);
+        let htmlContent = '';
+        
+        segments.forEach(segment => {
+            if (segment.type === 'think') {
+                // Think内容直接显示原始标签
+                htmlContent += `<think>${segment.content}</think>`;
+            } else {
+                // Answer内容用marked解析
+                htmlContent += marked.parse(segment.content, {
+                    breaks: false,
+                    mangle: false,
+                    headerIds: false,
+                    highlight: (code, lang) => hljs.highlight(
+                        hljs.getLanguage(lang) ? lang : 'plaintext', 
+                        code
+                    ).value
+                });
+            }
         });
-
+        
+        targetDiv.innerHTML = htmlContent;
         fnRenderDisplayMath(targetDiv);
         await renderMermaid(targetDiv);
 
