@@ -18,24 +18,40 @@ jobs:
       - name: Check if build is needed
         id: sha256
         run: |
-          Set-PSDebug -Trace 1  # Enable verbose output for debugging
+          Set-PSDebug -Trace 1
           try {
             $sha256 = (Get-FileHash -Path src/python/rag.py -Algorithm SHA256).Hash
             echo "Current SHA256: $sha256"
             $previous_sha256 = "${{ github.event.before }}"
+            echo "Previous SHA256: $previous_sha256"
+            
             if ($previous_sha256 -and $previous_sha256 -ne "0000000000000000000000000000000000000000") {
-              $previous_content = git show $previous_sha256:src/python/rag.py 2>$null
-              $LASTEXITCODE = 0  # Reset exit code to avoid propagating git show failure
-              if ($previous_content) {
-                echo $previous_content | Out-File temp_rag.py -Encoding utf8
-                if (Test-Path temp_rag.py) {
-                  $previous_hash = (Get-FileHash -Path temp_rag.py -Algorithm SHA256).Hash
+              $previous_content = git show $previous_sha256:src/python/rag.py 2>&1
+              $git_exit_code = $LASTEXITCODE
+              $LASTEXITCODE = 0
+              echo "Git show exit code: $git_exit_code"
+              echo "Git show output: $previous_content"
+              
+              if ($previous_content -and $git_exit_code -eq 0) {
+                $tempFile = Join-Path $PWD "temp_rag.py"
+                echo $previous_content | Out-File $tempFile -Encoding utf8NoBOM
+                if (Test-Path $tempFile) {
+                  $previous_hash = (Get-FileHash -Path $tempFile -Algorithm SHA256).Hash
+                  echo "Previous SHA256: $previous_hash"
                   if ($previous_hash -eq $sha256) {
                     echo "No changes detected in rag.py, skipping build and release."
                     exit 0
+                  } else {
+                    echo "Hash mismatch, proceeding with build."
                   }
+                } else {
+                  echo "Failed to create temp_rag.py"
                 }
+              } else {
+                echo "No previous content available, proceeding with build."
               }
+            } else {
+              echo "No valid previous SHA, proceeding with build."
             }
             echo "Building new rag.exe due to changes or no previous commit."
           } catch {
