@@ -17,6 +17,8 @@ jobs:
       # Calculate SHA256 and check if build is needed
       - name: Check if build is needed
         id: check_build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $sourceFile = "src/python/rag.py"
           $md5File = "src.md5"
@@ -36,7 +38,7 @@ jobs:
               $storedMD5 = Get-Content $md5File -ErrorAction Stop
               echo "Stored MD5: $storedMD5"
       
-              if ($currentMD5 -eq $storedMD5) {
+              if ($currentMD5.ToLower() -eq $storedMD5.ToLower()) {
                 echo "::notice::Source file unchanged - skipping build"
                 echo "build_needed=false" >> $env:GITHUB_OUTPUT
                 exit 0
