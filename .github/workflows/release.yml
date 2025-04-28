@@ -26,29 +26,38 @@ jobs:
             echo "Previous SHA256: $previous_sha256"
             
             if ($previous_sha256 -and $previous_sha256 -ne "0000000000000000000000000000000000000000") {
-              $previous_content = git show $previous_sha256:src/python/rag.py 2>&1
-              $git_exit_code = $LASTEXITCODE
-              $LASTEXITCODE = 0
-              echo "Git show exit code: $git_exit_code"
-              echo "Git show output: $previous_content"
+              $rag_path = "src/python/rag.py" -replace '\\', '/'
+              echo "Checking if $rag_path exists in $previous_sha256"
+              $file_exists = git cat-file -e "$previous_sha256:$rag_path" 2>$null
+              $check_exit_code = $LASTEXITCODE
               
-              if ($previous_content -and $git_exit_code -eq 0) {
-                $tempFile = Join-Path $PWD "temp_rag.py"
-                echo $previous_content | Out-File $tempFile -Encoding utf8NoBOM
-                if (Test-Path $tempFile) {
-                  $previous_hash = (Get-FileHash -Path $tempFile -Algorithm SHA256).Hash
-                  echo "Previous SHA256: $previous_hash"
-                  if ($previous_hash -eq $sha256) {
-                    echo "No changes detected in rag.py, skipping build and release."
-                    exit 0
+              if ($check_exit_code -eq 0) {
+                $previous_content = git show "$previous_sha256:$rag_path" -- 2>&1
+                $git_exit_code = $LASTEXITCODE
+                $LASTEXITCODE = 0
+                echo "Git show exit code: $git_exit_code"
+                echo "Git show output: $previous_content"
+                
+                if ($previous_content -and $git_exit_code -eq 0) {
+                  $tempFile = Join-Path $PWD "temp_rag.py"
+                  echo $previous_content | Out-File $tempFile -Encoding utf8NoBOM
+                  if (Test-Path $tempFile) {
+                    $previous_hash = (Get-FileHash -Path $tempFile -Algorithm SHA256).Hash
+                    echo "Previous SHA256: $previous_hash"
+                    if ($previous_hash -eq $sha256) {
+                      echo "No changes detected in rag.py, skipping build and release."
+                      exit 0
+                    } else {
+                      echo "Hash mismatch, proceeding with build."
+                    }
                   } else {
-                    echo "Hash mismatch, proceeding with build."
+                    echo "Failed to create temp_rag.py"
                   }
                 } else {
-                  echo "Failed to create temp_rag.py"
+                  echo "Failed to retrieve previous content, proceeding with build."
                 }
               } else {
-                echo "No previous content available, proceeding with build."
+                echo "src/python/rag.py does not exist in commit $previous_sha256, proceeding with build."
               }
             } else {
               echo "No valid previous SHA, proceeding with build."
