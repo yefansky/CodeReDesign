@@ -10,7 +10,8 @@ import * as crypto from 'crypto';
 // Define a variable to store the extension path
 let EXTENSION_PATH: string = '';
 
-const isDevMode = !__dirname.includes('dist');
+const isDevMode = process.env.NODE_ENV === 'development';
+
 // Dynamically set Python script or EXE path
 const getPythonScriptPath = (extensionPath: string) => {
   if (isDevMode) {
