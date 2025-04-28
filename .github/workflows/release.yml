@@ -28,11 +28,11 @@ jobs:
             if ($previous_sha256 -and $previous_sha256 -ne "0000000000000000000000000000000000000000") {
               $rag_path = "src/python/rag.py" -replace '\\', '/'
               echo "Checking if $rag_path exists in $previous_sha256"
-              $file_exists = git cat-file -e "$previous_sha256:$rag_path" 2>$null
+              $file_exists = git cat-file -e "${previous_sha256}:$rag_path" 2>$null
               $check_exit_code = $LASTEXITCODE
               
               if ($check_exit_code -eq 0) {
-                $previous_content = git show "$previous_sha256:$rag_path" -- 2>&1
+                $previous_content = git show "${previous_sha256}:$rag_path" -- 2>&1
                 $git_exit_code = $LASTEXITCODE
                 $LASTEXITCODE = 0
                 echo "Git show exit code: $git_exit_code"
