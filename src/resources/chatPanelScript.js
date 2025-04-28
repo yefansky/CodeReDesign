@@ -147,6 +147,78 @@ function ensureCopyButtons() {
     });
 }
 
+function ensureTagPreProcess(content) {
+    let processedContent = content;
+
+    // Handle unclosed <think> tags
+    if (processedContent.includes('<think>') && !processedContent.includes('</think>')) {
+        processedContent += '</think>';
+    }
+
+    // Handle <tool_call> tags
+    const lastToolCallIndex = processedContent.lastIndexOf('<tool_call>');
+    if (lastToolCallIndex !== -1) {
+        // Check if there's a </tool_call> after the last <tool_call>
+        const contentAfterLastToolCall = processedContent.slice(lastToolCallIndex);
+        if (!contentAfterLastToolCall.includes('</tool_call>')) {
+            processedContent += '</tool_call>';
+        }
+    }
+
+    return processedContent;
+}
+
+function processMathBlocks(input) {
+    // Regex to match %%...%% blocks
+    const percentPairRegex = /%%([\s\S]*?)%%/g;
+    
+    // Process the input string
+    return input.replace(percentPairRegex, (percentMatch, percentContent) => {
+        // Regex to match $$...$$ blocks within %% content
+        const mathBlockRegex = /\$\$([\s\S]*?)\$\$/g;
+        
+        // Process $$...$$ blocks within the %% content
+        const processedContent = percentContent.replace(mathBlockRegex, (mathMatch, mathContent) => {
+            // Trim and check if the math content has newlines
+            const trimmedContent = mathContent.trim();
+            if (!trimmedContent.includes('\n')) {
+                // No newlines, return unchanged
+                return `$$${trimmedContent}$$`;
+            }
+            
+            // Replace newlines with \\ and wrap in aligned
+            const singleLineContent = trimmedContent
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .join(' \\\\ ');
+                
+            return `$$ \\begin{aligned} ${singleLineContent} \\end{aligned} $$`;
+        });
+        
+        // Return the processed %% block
+        return `%%${processedContent}%%`;
+    });
+}
+
+function separateThinkContent(input) {
+    // Initialize outputs
+    let thinkStr = '';
+    let answerStr = input;
+
+    // Regex to match <think>...</think> (non-greedy)
+    const thinkRegex = /<think>([\s\S]*?)<\/think>/;
+
+    // Find the first <think>...</think> match
+    const match = input.match(thinkRegex);
+    if (match) {
+        thinkStr = match[0]; // Full <think>...</think> content
+        answerStr = input.replace(thinkRegex, ''); // Remove <think>...</think>
+    }
+
+    return { thinkStr, answerStr };
+}
+
 // 渲染消息
 async function renderMessage(role, content, index) {
     const lastChild = chat.lastElementChild;
@@ -164,14 +236,16 @@ async function renderMessage(role, content, index) {
 
     if (role === 'model') {
         let markdownContent = targetDiv.dataset.markdownContent;
-
-        if (markdownContent.includes('<think>') && !markdownContent.includes('</think>')){
-            markdownContent += "</think>";
-        }
+        markdownContent = ensureTagPreProcess(markdownContent);
 
         markdownContent = markdownContent.replace(/\$\$包裹/g, '&doller; &doller; 包裹');
 
-        targetDiv.innerHTML = marked.parse(markdownContent, {
+        markdownContent = processMathBlocks(markdownContent);
+
+        const { thinkStr, answerStr } = separateThinkContent(markdownContent);
+        markdownContent = answerStr;
+
+        targetDiv.innerHTML = thinkStr + marked.parse(markdownContent, {
             breaks: false,
             mangle: false,
             headerIds: false,
