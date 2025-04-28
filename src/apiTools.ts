@@ -1317,17 +1317,18 @@ registerTool(diagnosticTop5Errors);
 // 12. 沙盒执行 Lua/Python 代码
 export const sandboxRun: Tool = {
     name: 'sandbox_run',
-    description: `在沙盒环境中执行 Lua 或 Python 代码，并返回标准输出、标准错误。禁止访问文件系统。`,
+    description: `在沙盒环境中执行 Lua、Python、Node.js、TypeScript 或 WSL Bash 代码，并返回标准输出、标准错误。禁止访问文件系统。`,
     parameters: {
         type: 'object',
         properties: {
-            language: { type: 'string', description: '执行语言（lua 或 python）' },
+            language: { type: 'string', description: '执行语言（lua、python、nodejs、typescript、bash）' },
             code: { type: 'string', description: '要执行的代码内容。' },
             input: { type: 'string', description: '可选的标准输入内容（stdin）。' }
         },
         required: ['language', 'code'],
     },
-    function: async (args: { language: 'lua' | 'python'; code: string; input?: string }) => {
+    function: async (args: { language: 'lua' | 'python' | 'nodejs' | 'typescript' | 'bash'; code: string; input?: string }) =>
+    {
         const strLanguage: string = args.language;
         const strCode: string = args.code;
         const strInput: string = args.input ?? '';
@@ -1335,12 +1336,15 @@ export const sandboxRun: Tool = {
         try
         {
             // 简单敏感词检测
-            const arrForbidden: string[] = ['os.', 'io.', 'open(', 'require(', 'import os', 'import shutil']
+            const arrForbidden: string[] = [
+                'os.', 'io.', 'open(', 'require(', 'import os', 'import shutil',
+                'fs.', 'child_process', 'process.', 'import fs', 'import child_process', 'import process'
+            ];
             for (const strBad of arrForbidden)
             {
                 if (strCode.includes(strBad))
                 {
-                    return `安全警告：代码中包含禁止的调用 (${strBad})`
+                    return `安全警告：代码中包含禁止的调用 (${strBad})`;
                 }
             }
 
@@ -1357,9 +1361,24 @@ export const sandboxRun: Tool = {
                 strCommand = 'python';
                 arrArgs = ['-c', strCode];
             }
+            else if (strLanguage === 'nodejs')
+            {
+                strCommand = 'node';
+                arrArgs = ['-e', strCode];
+            }
+            else if (strLanguage === 'typescript')
+            {
+                strCommand = 'ts-node';
+                arrArgs = ['-e', strCode];
+            }
+            else if (strLanguage === 'bash')
+            {
+                strCommand = 'wsl';
+                arrArgs = ['bash', '-c', strCode];
+            }
             else
             {
-                return `不支持的语言类型: ${strLanguage}`
+                return `不支持的语言类型: ${strLanguage}`;
             }
 
             return await new Promise<string>((resolve, reject) =>
@@ -1392,7 +1411,7 @@ export const sandboxRun: Tool = {
                 // 写入标准输入
                 if (strInput.length > 0)
                 {
-                    objChild.stdin.write(strInput)
+                    objChild.stdin.write(strInput);
                 }
                 objChild.stdin.end();
 
@@ -1407,9 +1426,9 @@ export const sandboxRun: Tool = {
             return `沙盒执行失败: ${error.message}`;
         }
     },
-}
+};
 
-registerTool(sandboxRun)
+registerTool(sandboxRun);
 
 
 
