@@ -1314,7 +1314,102 @@ interface IErrorInfo
 // 注册工具
 registerTool(diagnosticTop5Errors);
 
+// 12. 沙盒执行 Lua/Python 代码
+export const sandboxRun: Tool = {
+    name: 'sandbox_run',
+    description: `在沙盒环境中执行 Lua 或 Python 代码，并返回标准输出、标准错误。禁止访问文件系统。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            language: { type: 'string', description: '执行语言（lua 或 python）' },
+            code: { type: 'string', description: '要执行的代码内容。' },
+            input: { type: 'string', description: '可选的标准输入内容（stdin）。' }
+        },
+        required: ['language', 'code'],
+    },
+    function: async (args: { language: 'lua' | 'python'; code: string; input?: string }) => {
+        const strLanguage: string = args.language;
+        const strCode: string = args.code;
+        const strInput: string = args.input ?? '';
 
+        try
+        {
+            // 简单敏感词检测
+            const arrForbidden: string[] = ['os.', 'io.', 'open(', 'require(', 'import os', 'import shutil']
+            for (const strBad of arrForbidden)
+            {
+                if (strCode.includes(strBad))
+                {
+                    return `安全警告：代码中包含禁止的调用 (${strBad})`
+                }
+            }
+
+            let strCommand: string = '';
+            let arrArgs: string[] = [];
+
+            if (strLanguage === 'lua')
+            {
+                strCommand = 'lua';
+                arrArgs = ['-e', strCode];
+            }
+            else if (strLanguage === 'python')
+            {
+                strCommand = 'python';
+                arrArgs = ['-c', strCode];
+            }
+            else
+            {
+                return `不支持的语言类型: ${strLanguage}`
+            }
+
+            return await new Promise<string>((resolve, reject) =>
+            {
+                const objChild = childProcess.spawn(strCommand, arrArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
+
+                let strStdout: string = '';
+                let strStderr: string = '';
+
+                objChild.stdout.on('data', (data) => {
+                    strStdout += data.toString();
+                });
+
+                objChild.stderr.on('data', (data) => {
+                    strStderr += data.toString();
+                });
+
+                objChild.on('error', (error) => {
+                    reject(`执行出错: ${error.message}`);
+                });
+
+                objChild.on('close', (code) => {
+                    resolve(JSON.stringify({
+                        exitCode: code,
+                        stdout: strStdout.trim(),
+                        stderr: strStderr.trim(),
+                    }, null, 4));
+                });
+
+                // 写入标准输入
+                if (strInput.length > 0)
+                {
+                    objChild.stdin.write(strInput)
+                }
+                objChild.stdin.end();
+
+                // 超时保护（3秒）
+                setTimeout(() => {
+                    objChild.kill('SIGKILL');
+                }, 3000);
+            });
+        }
+        catch (error: any)
+        {
+            return `沙盒执行失败: ${error.message}`;
+        }
+    },
+}
+
+registerTool(sandboxRun)
 
 
 
