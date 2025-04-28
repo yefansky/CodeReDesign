@@ -29,11 +29,10 @@ jobs:
       
           # 尝试从最新release下载src.md5
           try {
-            $latestRelease = gh api repos/${{ github.repository }}/releases/latest --jq '.assets[] | select(.name == "src.md5")'
-            if ($latestRelease) {
-              $downloadUrl = $latestRelease.browser_download_url
-              echo "Downloading src.md5 from latest release: $downloadUrl"
-              Invoke-WebRequest -Uri $downloadUrl -OutFile $md5File -ErrorAction Stop
+            $lastSrcMD5Url = "https://github.com/yefansky/CodeReDesign/releases/download/latest/src.md5"
+            if ($lastSrcMD5Url) {
+              echo "Downloading src.md5 from latest release: $lastSrcMD5Url"
+              Invoke-WebRequest -Uri $lastSrcMD5Url -OutFile $md5File -ErrorAction Stop
               
               $storedMD5 = Get-Content $md5File -ErrorAction Stop
               echo "Stored MD5: $storedMD5"
