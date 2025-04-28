@@ -57,20 +57,24 @@ jobs:
 
       # Set up Python
       - name: Set up Python
+        if: steps.check_build.outputs.build_needed == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
       # Install PyInstaller
       - name: Install PyInstaller
+        if: steps.check_build.outputs.build_needed == 'true'
         run: pip install pyinstaller
 
       # Install Python dependencies
       - name: Install Python dependencies
+        if: steps.check_build.outputs.build_needed == 'true'
         run: pip install -r src/python/requirements.txt
 
       # Build EXE to a temporary directory
       - name: Build EXE
+        if: steps.check_build.outputs.build_needed == 'true'
         run: |
           mkdir temp_dist
           pyinstaller --onefile --clean --distpath temp_dist src/python/rag.py
@@ -79,6 +83,7 @@ jobs:
 
       # Compress EXE with UPX
       - name: Compress EXE with UPX
+        if: steps.check_build.outputs.build_needed == 'true'
         uses: crazy-max/ghaction-upx@v3
         with:
           version: latest
@@ -88,12 +93,14 @@ jobs:
 
       # Generate MD5 checksum
       - name: Generate MD5 checksum
+        if: steps.check_build.outputs.build_needed == 'true'
         run: |
           $md5 = (Get-FileHash -Path temp_dist/rag.exe -Algorithm MD5).Hash
           echo $md5.ToLower() > temp_dist/md5.txt
         shell: pwsh
 
       - name: Delete old Release
+        if: steps.check_build.outputs.build_needed == 'true'
         run: |
           gh release view latest --json url 2>$null
           $releaseExists = ($LASTEXITCODE -eq 0)
@@ -110,6 +117,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Create Release
+        if: steps.check_build.outputs.build_needed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: |
