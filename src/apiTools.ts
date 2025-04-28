@@ -1178,6 +1178,7 @@ export const excelToCsv: Tool = {
 
 registerTool(excelToCsv);
 
+/*
 // 读取 PDF 文件并提取文本内容的工具
 export const readPdf: Tool = {
     name: 'read_pdf',
@@ -1238,6 +1239,7 @@ export const readPdf: Tool = {
 };
 
 registerTool(readPdf);
+*/
 
 // 9. 提取前5个Error信息
 export const diagnosticTop5Errors: Tool = {
@@ -1317,7 +1319,8 @@ registerTool(diagnosticTop5Errors);
 // 12. 沙盒执行 Lua/Python 代码
 export const sandboxRun: Tool = {
     name: 'sandbox_run',
-    description: `在沙盒环境中执行 Lua、Python、Node.js、TypeScript 或 WSL Bash 代码，并返回标准输出、标准错误。禁止访问文件系统。`,
+    description: `在沙盒环境中执行 Lua、Python、Node.js、TypeScript 或 WSL Bash 代码，并返回标准输出、标准错误。禁止访问文件系统。
+    让你在沙盒里执行主要是要验证语法错误和执行结果。如果出错或者有输出，你应该先把这些信息提供给我，然后再做分析。方便我观察你做的怎么样`,
     parameters: {
         type: 'object',
         properties: {
