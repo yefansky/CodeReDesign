@@ -8,7 +8,7 @@ import {
     DuckDuckGoSearchResponse,
   } from '@agent-infra/duckduckgo-search';
 import { processDeepSeekResponse} from './deepseekApi';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as mysql from 'mysql2/promise';
 import * as childProcess from 'child_process';
@@ -16,7 +16,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { CONFIG as RAG_CONFIG } from './ragService';
 import { parseString } from 'xml2js';
-
+import ExcelJS from 'exceljs';
+import pdfParse from 'pdf-parse';
 
 /** 定义工具的接口 */
 export interface Tool {
@@ -38,6 +39,14 @@ export const toolRegistry: Map<string, Tool> = new Map();
  */
 export function registerTool(tool: Tool) {
     toolRegistry.set(tool.name, tool);
+}
+
+/**
+ * Retrieves an array of all registered tools from the tool registry.
+ * @returns An array of Tool objects.
+ */
+export function getAllTools(): Tool[] {
+    return Array.from(toolRegistry.values());
 }
 
 export async function handleNativeFunctionCalling(
@@ -342,6 +351,158 @@ export const searchTool: Tool = {
 };
 registerTool(searchTool);
 
+// 获取网页正文内容的工具
+export const getWebpageContent: Tool = {
+    name: 'get_webpage_content',
+    description: `通过输入的URL获取网页的正文内容，自动过滤广告、脚本等无关信息，提取纯文本有用信息。
+适用于需要快速提取网页核心内容的场景，例如信息检索、内容分析或总结网页信息。
+
+使用场景:
+- 信息提取: 用户提供URL，想获取网页的主要文本内容（如文章、新闻）。
+- 内容分析: 需要分析网页核心信息，排除广告、导航等干扰。
+- 自动化总结: 提取网页正文后进一步处理或总结。
+
+具体示例:
+用户输入: “https://deepwiki.com/RVC-Boss/GPT-SoVITS”
+工具返回: 该网页的正文内容（纯文本，例如GPT-SoVITS的介绍、功能描述等）。
+
+如何使用:
+- 参数: 一个包含URL的字符串（必须有效）。
+- 返回: 网页正文内容的纯文本字符串。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            url: {
+                type: 'string',
+                description: '需要提取正文内容的网页URL',
+            },
+        },
+        required: ['url'],
+    },
+    function: async ({ url }: { url: string }) => {
+        try {
+            // 显示正在处理的提示
+            vscode.window.showInformationMessage(`正在提取 ${url} 的正文内容`);
+
+            // 获取网页内容
+            const response = await axios.get(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                },
+            });
+
+            // 使用 cheerio 解析 HTML
+            const $ = cheerio.load(response.data);
+
+            // 移除无关元素
+            $('script, style, iframe, noscript, header, footer, nav, aside, .ad, [class*="ad"], [id*="ad"]').remove();
+
+            // 针对 deepwiki.com 优化提取逻辑
+            let content = $('main, .content, .article, [role="main"]').text().trim();
+
+            // 如果没有找到特定容器，尝试提取所有段落
+            if (!content) {
+                content = $('p, h1, h2, h3, h4, h5, h6')
+                    .map((_, el) => $(el).text().trim())
+                    .get()
+                    .filter(text => text.length > 0)
+                    .join('\n');
+            }
+
+            // 清理多余的空白和换行
+            content = content.replace(/\s+/g, ' ').trim();
+
+            // 如果没有提取到有效内容，返回提示
+            if (!content) {
+                return '无法提取有效的正文内容，可能是网页结构不标准或内容为空。';
+            }
+
+            return content;
+        } catch (error) {
+            vscode.window.showErrorMessage(`提取网页内容失败: ${(error as Error).message}`);
+            return `错误: 无法获取 ${url} 的内容，请检查URL或网络连接。`;
+        }
+    },
+};
+
+registerTool(getWebpageContent);
+
+// 列举指定路径下文件和目录的工具
+export const listDirectory: Tool = {
+    name: 'list_directory',
+    description: `列举指定路径下的文件和目录。适用于需要查看文件夹内容或文件列表的场景。
+它会返回路径下的文件和目录名称列表，区分文件和目录类型。路径可以是相对路径或绝对路径。
+
+使用场景:
+- 文件管理: 用户想查看某个文件夹里有哪些文件或子文件夹。
+- 自动化脚本: 需要获取目录内容以进行进一步处理（如批量操作文件）。
+- 调试: 检查项目目录结构或确认文件是否存在。
+
+具体示例:
+用户输入: “./docs”
+工具返回: “文件: readme.md, config.json；目录: images, templates”
+
+如何使用:
+- 参数: 一个包含路径的字符串（可以是相对或绝对路径）。
+- 返回: 包含文件和目录列表的字符串，格式清晰易读。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            dirPath: {
+                type: 'string',
+                description: '要列举的目录路径（相对或绝对路径）',
+            },
+        },
+        required: ['dirPath'],
+    },
+    function: async ({ dirPath }: { dirPath: string }) => {
+        try {
+            // 显示正在处理的提示
+            vscode.window.showInformationMessage(`正在列举 ${dirPath} 下的内容`);
+
+            // 解析路径，处理相对路径
+            const resolvedPath = path.resolve(dirPath);
+
+            // 读取目录内容
+            const dirItems = await fs.readdir(resolvedPath, { withFileTypes: true });
+
+            // 分离文件和目录
+            const files: string[] = [];
+            const directories: string[] = [];
+
+            for (const item of dirItems) {
+                if (item.isFile()) {
+                    files.push(item.name);
+                } else if (item.isDirectory()) {
+                    directories.push(item.name);
+                }
+            }
+
+            // 格式化输出
+            let result = '';
+            if (files.length > 0) {
+                result += `文件: ${files.join(', ')}`;
+            }
+            if (directories.length > 0) {
+                result += `${files.length > 0 ? '; ' : ''}目录: ${directories.join(', ')}`;
+            }
+
+            // 处理空目录
+            if (!result) {
+                return `目录 ${dirPath} 为空`;
+            }
+
+            return result;
+        } catch (error) {
+            vscode.window.showErrorMessage(`列举目录失败: ${(error as Error).message}`);
+            return `错误: 无法列举 ${dirPath} 的内容，请检查路径是否正确或是否有权限。`;
+        }
+    },
+};
+
+registerTool(listDirectory);
+
+
 // 2. 获取当前日期时间
 export const getCurrentDateTime: Tool = {
     name: 'get_current_datetime',
@@ -406,7 +567,7 @@ export const readTextFile: Tool = {
     },
     function: async (args: { filePath: string }) => {
         try {
-            const content = await fs.promises.readFile(args.filePath, 'utf-8');
+            const content = await fs.readFile(args.filePath, 'utf-8');
             return content;
         } catch (error: any) {
             return `读取文件失败: ${error.message}`;
@@ -779,7 +940,7 @@ export const findFiles: Tool = {
     
             while (queue.length > 0) {
                 const currentDir = queue.shift()!;
-                const files = await fs.promises.readdir(currentDir, { withFileTypes: true });
+                const files = await fs.readdir(currentDir, { withFileTypes: true });
     
                 for (const file of files) {
                     try {
@@ -928,11 +1089,159 @@ query: 搜索关键词。`,
 // Register tools
 registerTool(writeMemory);
 registerTool(readMemory);
-/**
- * Retrieves an array of all registered tools from the tool registry.
- * @returns An array of Tool objects.
- */
-export function getAllTools(): Tool[] {
-  return Array.from(toolRegistry.values());
-}
+
+// 读取 Excel 文件并转换为 tab 分隔 CSV 文本的工具
+export const excelToCsv: Tool = {
+    name: 'excel_to_csv',
+    description: `读取指定路径的 Excel 文件（.xlsx）并将其转换为 tab 分隔的 CSV 文本输出。
+输出格式使用 \\t 分隔列，\\n 分隔行。适用于需要将 Excel 数据转换为纯文本格式的场景。
+
+使用场景:
+- 数据转换: 将 Excel 文件转换为 tab 分隔的文本，用于其他工具或系统处理。
+- 数据提取: 快速提取 Excel 表格内容为纯文本，便于分析或共享。
+- 自动化处理: 在脚本中将 Excel 数据转换为标准格式以进行进一步操作。
+
+具体示例:
+用户输入: “./data/sample.xlsx”
+工具返回: “Name\tAge\tCity\nJohn\t30\tNew York\nAlice\t25\tLondon”
+
+如何使用:
+- 参数: 一个包含 Excel 文件路径的字符串（相对或绝对路径）。
+- 返回: tab 分隔的 CSV 文本字符串，包含 Excel 表格内容。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            filePath: {
+                type: 'string',
+                description: 'Excel 文件的路径（.xlsx，相对或绝对路径）',
+            },
+        },
+        required: ['filePath'],
+    },
+    function: async ({ filePath }: { filePath: string }) => {
+        try {
+            // 显示正在处理的提示
+            vscode.window.showInformationMessage(`正在读取 Excel 文件 ${filePath}`);
+
+            // 解析路径，处理相对路径
+            const resolvedPath = path.resolve(filePath);
+
+            // 使用 exceljs 读取 Excel 文件
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.readFile(resolvedPath);
+
+            // 默认使用第一个工作表，并检查是否存在
+            const worksheet = workbook.worksheets[0];
+            if (!worksheet) {
+                return `Excel 文件 ${filePath} 没有工作表或内容为空。`;
+            }
+
+            // 转换为 tab 分隔的 CSV 文本
+            const jsonData: string[][] = [];
+            worksheet.eachRow({ includeEmpty: true }, (row) => {
+                // 检查 row.values 是否存在且是数组
+                const values = row.values;
+                if (!values || !Array.isArray(values)) {
+                    jsonData.push([]); // 空行添加空数组
+                    return;
+                }
+
+                const rowData = values.slice(1).map((cell: ExcelJS.CellValue) => {
+                    if (cell === null || cell === undefined) {
+                        return '';
+                    }
+                    const cellStr = String(cell).replace(/\t/g, ' ').replace(/\n/g, ' ');
+                    return cellStr;
+                });
+                jsonData.push(rowData);
+            });
+
+            // 转换为 tab 分隔的 CSV 文本
+            const csvText = jsonData
+                .map(row => row.join('\t'))
+                .join('\n');
+
+            // 检查是否生成了有效内容
+            if (!csvText) {
+                return `Excel 文件 ${filePath} 为空或无有效数据。`;
+            }
+
+            return csvText;
+        } catch (error) {
+            // 显式声明 error 类型
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`读取 Excel 文件失败: ${errorMessage}`);
+            return `错误: 无法读取 ${filePath}，请检查文件路径、格式或权限。`;
+        }
+    },
+};
+
+registerTool(excelToCsv);
+
+// 读取 PDF 文件并提取文本内容的工具
+export const readPdf: Tool = {
+    name: 'read_pdf',
+    description: `读取指定路径的 PDF 文件并提取其文本内容，输出为纯文本字符串。
+适用于需要从 PDF 文档中提取信息的场景，例如文档分析、内容搜索或文本处理。
+
+使用场景:
+- 文档提取: 用户提供 PDF 文件路径，想获取其中的文本内容（如文章、报告）。
+- 内容分析: 提取 PDF 文本以进行关键词搜索或总结。
+- 自动化处理: 将 PDF 内容转换为纯文本以供其他工具或系统使用。
+
+具体示例:
+用户输入: “./docs/report.pdf”
+工具返回: “报告标题\n第一段内容...\n第二段内容...”
+
+如何使用:
+- 参数: 一个包含 PDF 文件路径的字符串（相对或绝对路径）。
+- 返回: PDF 文件的文本内容，格式为纯文本字符串。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            filePath: {
+                type: 'string',
+                description: 'PDF 文件的路径（.pdf，相对或绝对路径）',
+            },
+        },
+        required: ['filePath'],
+    },
+    function: ({ filePath }: { filePath: string }) => {
+        // 显示正在处理的提示
+        vscode.window.showInformationMessage(`正在读取 PDF 文件 ${filePath}`);
+    
+        // 解析路径，处理相对路径
+        const resolvedPath = path.resolve(filePath);
+    
+        // 使用 Promise 链式调用
+        return fs.readFile(resolvedPath)
+            .then(fileBuffer => pdfParse(fileBuffer))
+            .then(pdfData => {
+                // 获取文本内容
+                let textContent = pdfData.text.trim();
+    
+                // 清理多余的空白和换行
+                textContent = textContent.replace(/\s+/g, ' ').replace(/\n+/g, '\n').trim();
+    
+                // 检查是否提取到有效内容
+                if (!textContent) {
+                    return `PDF 文件 ${filePath} 为空或无有效文本内容。`;
+                }
+    
+                return textContent;
+            })
+            .catch(error => {
+                vscode.window.showErrorMessage(`读取 PDF 文件失败: ${error.message}`);
+                return `错误: 无法读取 ${filePath}，请检查文件路径、格式或权限。`;
+            });
+    },
+};
+
+registerTool(readPdf);
+
+
+
+
+
+
 
