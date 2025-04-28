@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.154 (2025-04-28)
+
+
+### Bug Fixes
+
+* 修正启动下载rag的流程 ([2392962](https://github.com/yefansky/CodeReDesign/commit/2392962da69c1e90730338443fcf7f35834af12b))
+
 ### 0.0.153 (2025-04-27)
 
 
