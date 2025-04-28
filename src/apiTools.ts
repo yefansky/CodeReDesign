@@ -1431,5 +1431,136 @@ export const sandboxRun: Tool = {
 registerTool(sandboxRun);
 
 
+/** Ping 工具 */
+export const ping: Tool = {
+    name: 'ping',
+    description: `在 Windows 系统中使用 ping 命令测试网络连通性。适用于需要确认目标主机是否可达的场景。
+
+使用场景:
+- 网络诊断: 测试网络连通性，确保目标主机在线。
+- 自动化脚本: 在脚本中进行网络健康检查。
+
+如何使用:
+- 参数: 一个字符串，表示目标主机名或 IP 地址。
+- 返回: ping 的结果，包含每个响应的 RTT 时间。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            target: {
+                type: 'string',
+                description: '目标主机名或 IP 地址。',
+            },
+        },
+        required: ['target'],
+    },
+    function: async ({ target }: { target: string }) => {
+        try {
+            // 执行 ping 命令
+            const { stdout, stderr } = await execPromise(`ping -n 4 ${target}`);
+
+            // 处理并返回结果
+            if (stderr) {
+                return `错误: ${stderr}`;
+            }
+            return `Ping 结果: \n${stdout}`;
+        } catch (error) {
+            return `Ping 执行失败: ${(error as Error).message}`;
+        }
+    },
+};
+
+/** Telnet 工具 (通过 PowerShell Test-NetConnection) */
+export const telnet: Tool = {
+    name: 'telnet',
+    description: `在 Windows 中测试 TCP 端口连通性（使用 PowerShell）。适用于确认目标端口是否可用。
+
+使用场景:
+- 网络诊断: 确认目标主机上的服务是否在指定端口上运行。
+- 自动化脚本: 在脚本中进行端口健康检查。
+
+如何使用:
+- 参数: 主机名或 IP 地址，以及端口号。
+- 返回: 端口连接的测试结果。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            host: {
+                type: 'string',
+                description: '目标主机名或 IP 地址。',
+            },
+            port: {
+                type: 'string',
+                description: '目标端口号。',
+            },
+        },
+        required: ['host', 'port'],
+    },
+    function: async ({ host, port }: { host: string; port: string }) => {
+        try {
+            // 执行 Telnet 命令（通过 PowerShell）
+            const script = `Test-NetConnection -ComputerName "${host}" -Port ${port} | Format-List`;
+            const { stdout, stderr } = await execPromise(`powershell -Command "${script}"`);
+
+            // 处理并返回结果
+            if (stderr) {
+                return `错误: ${stderr}`;
+            }
+            return `Telnet 结果: \n${stdout}`;
+        } catch (error) {
+            return `Telnet 执行失败: ${(error as Error).message}`;
+        }
+    },
+};
+
+/** Nslookup 工具 */
+export const nslookup: Tool = {
+    name: 'nslookup',
+    description: `在 Windows 中查询域名解析记录。适用于获取 DNS 解析信息。
+
+使用场景:
+- 网络诊断: 查询某个域名的 DNS 记录。
+- 自动化脚本: 在脚本中获取域名的解析记录，判断域名是否有效。
+
+如何使用:
+- 参数: 需要查询的域名。
+- 返回: 查询的 DNS 记录信息。`,
+    parameters: {
+        type: 'object',
+        properties: {
+            domain: {
+                type: 'string',
+                description: '要查询的域名。',
+            },
+        },
+        required: ['domain'],
+    },
+    function: async ({ domain }: { domain: string }) => {
+        try {
+            // 执行 Nslookup 命令
+            const { stdout, stderr } = await execPromise(`nslookup ${domain}`);
+
+            // 处理并返回结果
+            if (stderr) {
+                return `错误: ${stderr}`;
+            }
+            return `Nslookup 结果: \n${stdout}`;
+        } catch (error) {
+            return `Nslookup 执行失败: ${(error as Error).message}`;
+        }
+    },
+};
+
+/** 执行命令并返回 Promise */
+function execPromise(command: string): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(error);
+            } else {
+                resolve({ stdout, stderr });
+            }
+        });
+    });
+}
 
 
