@@ -4,13 +4,13 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as net from 'net';
 import * as os from 'os';
-import * as https from 'https';
+import axios from 'axios';
 import * as crypto from 'crypto';
 
 // Define a variable to store the extension path
 let EXTENSION_PATH: string = '';
 
-const isDevMode = __dirname.includes('dist');
+const isDevMode = !__dirname.includes('dist');
 // Dynamically set Python script or EXE path
 const getPythonScriptPath = (extensionPath: string) => {
   if (isDevMode) {
@@ -67,13 +67,14 @@ class RagService {
         await fs.mkdir(distPath, { recursive: true });
 
         let shouldDownload = false;
+        let remoteMd5 = '';
 
         // Check if rag.exe exists
         try {
           await fs.access(exePath, fs.constants.F_OK);
           
           // Download MD5 from GitHub
-          const remoteMd5 = await this.downloadText('https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt');
+          remoteMd5 = await this.downloadText('https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt');
           
           // Calculate local rag.exe MD5
           const localMd5 = await this.calculateFileMd5(exePath);
@@ -101,7 +102,6 @@ class RagService {
           
           // Verify downloaded file's MD5
           const newMd5 = await this.calculateFileMd5(exePath);
-          const remoteMd5 = await this.downloadText('https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt');
           if (newMd5.toLowerCase() !== remoteMd5.trim().toLowerCase()) {
             throw new Error('Downloaded rag.exe MD5 verification failed');
           }
@@ -123,41 +123,44 @@ class RagService {
   }
 
   private async downloadText(url: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      https.get(url, (res) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`Failed to download text from ${url}: Status ${res.statusCode}`));
-          } else {
-            resolve(data);
-          }
-        });
-      }).on('error', (err) => {
-        reject(new Error(`Failed to download text from ${url}: ${err.message}`));
+    try {
+      const response = await axios.get(url, {
+        responseType: 'text',
+        maxRedirects: 5 // Default, can increase if needed
       });
-    });
+      console.log(`Downloaded ${url}, status: ${response.status}, redirects: ${response.request._redirectable._redirectCount}`);
+      if (response.status !== 200) {
+        throw new Error(`Failed to download text from ${url}: Status ${response.status}`);
+      }
+      return response.data.trim();
+    } catch (err ) {
+      throw new Error(`Failed to download text from ${url}: ${(err as Error).message}`);
+    }
   }
-
+  
   private async downloadFile(url: string, dest: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const file = require('fs').createWriteStream(dest);
-      https.get(url, (res) => {
-        if (res.statusCode !== 200) {
-          reject(new Error(`Failed to download file from ${url}: Status ${res.statusCode}`));
-          return;
-        }
-        res.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          resolve();
-        });
-      }).on('error', (err) => {
-        require('fs').unlink(dest, () => {}); // Clean up partial download
-        reject(new Error(`Failed to download file from ${url}: ${err.message}`));
+    try {
+      const response = await axios.get(url, {
+        responseType: 'stream',
+        maxRedirects: 5 // Default, can increase if needed
       });
-    });
+      console.log(`Downloaded ${url}, status: ${response.status}, redirects: ${response.request._redirectable._redirectCount}`);
+      if (response.status !== 200) {
+        throw new Error(`Failed to download file from ${url}: Status ${response.status}`);
+      }
+      const writer = require('fs').createWriteStream(dest);
+      response.data.pipe(writer);
+      return new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', (err: Error) => {
+          require('fs').unlink(dest, () => {}); // Clean up partial download
+          reject(new Error(`Failed to write file to ${dest}: ${err.message}`));
+        });
+      });
+    } catch (err) {
+      require('fs').unlink(dest, () => {}); // Clean up partial download
+      throw new Error(`Failed to download file from ${url}: ${(err as Error).message}`);
+    }
   }
 
   private async calculateFileMd5(filePath: string): Promise<string> {
