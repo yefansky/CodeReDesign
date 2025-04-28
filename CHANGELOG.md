@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.157 (2025-04-28)
+
+
+### Bug Fixes
+
+* 尝试修复重复构建rag.exe, 加快构建速度 ([f87c077](https://github.com/yefansky/CodeReDesign/commit/f87c0775f6c19149c829cf01969ad45dfc7d97a2))
+
 ### 0.0.156 (2025-04-28)
 
 
