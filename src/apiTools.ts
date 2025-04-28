@@ -1239,6 +1239,80 @@ export const readPdf: Tool = {
 
 registerTool(readPdf);
 
+// 9. 提取前5个Error信息
+export const diagnosticTop5Errors: Tool = {
+    name: 'diagnostic_top5_errors',
+    description: `从 VSCode Problems 面板中提取当前工程前5条错误信息，并组织成 JSON 返回。
+
+使用场景:
+
+代码检查：快速收集当前最重要的编译/类型错误。
+问题分析：在提交代码前，了解主要报错内容。
+
+具体示例:
+用户说：“列出我项目里最严重的前几个错误。”
+调用 diagnostic_top5_errors，无需额外参数，返回：
+[
+    { "file": "xxx.ts", "line": 10, "character": 5, "message": "xxx" },
+    ...
+]`,
+    parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+    },
+    function: async (_args: {}) => {
+        vscode.window.showInformationMessage('CodeReDesign 正在提取Problems中的错误信息');
+
+        try
+        {
+            const arrResult: IErrorInfo[] = [];
+            const arrDiagnostics: [vscode.Uri, vscode.Diagnostic[]][] = vscode.languages.getDiagnostics();
+
+            for (const [objUri, arrDiagList] of arrDiagnostics)
+            {
+                for (const objDiagnostic of arrDiagList)
+                {
+                    if (objDiagnostic.severity === vscode.DiagnosticSeverity.Error)
+                    {
+                        const objErrorInfo: IErrorInfo =
+                        {
+                            strFilePath: objUri.fsPath,
+                            nLine: objDiagnostic.range.start.line + 1,
+                            nCharacter: objDiagnostic.range.start.character + 1,
+                            strMessage: objDiagnostic.message
+                        };
+
+                        arrResult.push(objErrorInfo);
+
+                        if (arrResult.length >= 5)
+                        {
+                            return JSON.stringify(arrResult, null, 4);
+                        }
+                    }
+                }
+            }
+
+            return JSON.stringify(arrResult, null, 4);
+        }
+        catch (error: any)
+        {
+            return `提取失败: ${error.message}`;
+        }
+    },
+};
+
+// 定义接口，供上面使用
+interface IErrorInfo
+{
+    strFilePath: string
+    nLine: number
+    nCharacter: number
+    strMessage: string
+}
+
+// 注册工具
+registerTool(diagnosticTop5Errors);
 
 
 
