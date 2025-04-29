@@ -147,6 +147,85 @@ function ensureCopyButtons() {
     });
 }
 
+function ensureTagPreProcess(content) {
+    let processedContent = content;
+
+    // Handle unclosed <think> tags
+    if (processedContent.includes('<think>') && !processedContent.includes('</think>')) {
+        processedContent += '</think>';
+    }
+
+    // Handle <tool_call> tags
+    const lastToolCallIndex = processedContent.lastIndexOf('<tool_call>');
+    if (lastToolCallIndex !== -1) {
+        // Check if there's a </tool_call> after the last <tool_call>
+        const contentAfterLastToolCall = processedContent.slice(lastToolCallIndex);
+        if (!contentAfterLastToolCall.includes('</tool_call>')) {
+            processedContent += '</tool_call>';
+        }
+    }
+
+    return processedContent;
+}
+
+function processMathBlocks(input) {
+    // Regex to match %%...%% blocks
+    const percentPairRegex = /%%([\s\S]*?)%%/g;
+    
+    // Process the input string
+    return input.replace(percentPairRegex, (percentMatch, percentContent) => {
+        // Regex to match $$...$$ blocks within %% content
+        const mathBlockRegex = /\$\$([\s\S]*?)\$\$/g;
+        
+        // Process $$...$$ blocks within the %% content
+        const processedContent = percentContent.replace(mathBlockRegex, (mathMatch, mathContent) => {
+            // Trim and check if the math content has newlines
+            const trimmedContent = mathContent.trim();
+            if (!trimmedContent.includes('\n')) {
+                // No newlines, return unchanged
+                return `$$${trimmedContent}$$`;
+            }
+            
+            // Replace newlines with \\ and wrap in aligned
+            const singleLineContent = trimmedContent
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .join(' \\\\ ');
+                
+            return `$$ \\begin{aligned} ${singleLineContent} \\end{aligned} $$`;
+        });
+        
+        // Return the processed %% block
+        return `%%${processedContent}%%`;
+    });
+}
+
+function separateThinkContent(input) {
+    const segments = [];
+    
+    // 使用split捕获think块和非think内容
+    const parts = input.split(/(<think>[\s\S]*?<\/think>)/g);
+    
+    parts.forEach(part => {
+        if (!part) return;
+        
+        if (part.startsWith('<think>') && part.endsWith('</think>')) {
+            segments.push({
+                type: 'think',
+                content: part
+            });
+        } else {
+            segments.push({
+                type: 'answer',
+                content: part
+            });
+        }
+    });
+
+    return segments;
+}
+
 // 渲染消息
 async function renderMessage(role, content, index) {
     const lastChild = chat.lastElementChild;
@@ -164,20 +243,34 @@ async function renderMessage(role, content, index) {
 
     if (role === 'model') {
         let markdownContent = targetDiv.dataset.markdownContent;
-
-        if (markdownContent.includes('<think>') && !markdownContent.includes('</think>')){
-            markdownContent += "</think>";
-        }
+        markdownContent = ensureTagPreProcess(markdownContent);
 
         markdownContent = markdownContent.replace(/\$\$包裹/g, '&doller; &doller; 包裹');
 
-        targetDiv.innerHTML = marked.parse(markdownContent, {
-            breaks: false,
-            mangle: false,
-            headerIds: false,
-            highlight: (code, lang) => hljs.highlight(hljs.getLanguage(lang) ? lang : 'plaintext', code).value
-        });
+        markdownContent = processMathBlocks(markdownContent);
 
+        const segments = separateThinkContent(markdownContent);
+        let htmlContent = '';
+        
+        segments.forEach(segment => {
+            if (segment.type === 'think') {
+                // Think内容直接显示原始标签
+                htmlContent += `<think>${segment.content}</think>`;
+            } else {
+                // Answer内容用marked解析
+                htmlContent += marked.parse(segment.content, {
+                    breaks: false,
+                    mangle: false,
+                    headerIds: false,
+                    highlight: (code, lang) => hljs.highlight(
+                        hljs.getLanguage(lang) ? lang : 'plaintext', 
+                        code
+                    ).value
+                });
+            }
+        });
+        
+        targetDiv.innerHTML = htmlContent;
         fnRenderDisplayMath(targetDiv);
         await renderMermaid(targetDiv);
 

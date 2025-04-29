@@ -110,6 +110,12 @@ export async function processDeepSeekResponse(
             thinking = true;
         }
 
+        // Think 标签结束逻辑
+        if (thinking && content) {
+            options.outputChannel?.append("</think>");
+            thinking = false;
+        }
+
         chunkResponse += content;
 
         // 同时输出内容和思考内容
@@ -120,12 +126,6 @@ export async function processDeepSeekResponse(
             if (thinkContent) {
                 options.outputChannel.append(thinkContent);
             }
-        }
-
-        // Think 标签结束逻辑
-        if (thinking && content) {
-            options.outputChannel?.append("</think>");
-            thinking = false;
         }
 
         // 执行自定义 chunk 处理

@@ -327,7 +327,7 @@ export const searchTool: Tool = {
         required: ['query'],
     },
     function: async (args: { query: string }) => {
-        vscode.window.showInformationMessage('CodeReDesign 正在搜索网络');
+        vscode.window.showInformationMessage(`CodeReDesign 正在搜索网络 ${args.query}`);
         try {
             const links = await getLinksWithBrowser(args.query);
             if (!links.length) {
