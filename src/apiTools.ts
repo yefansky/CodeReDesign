@@ -1568,4 +1568,66 @@ function execPromise(command: string): Promise<{ stdout: string; stderr: string 
     });
 }
 
+// 获取VSCode工作区路径工具
+export const getVsCodeWorkspacePath: Tool = {
+    name: 'get_vscode_workspace_path',
+    description: `获取当前VSCode工作区根目录的绝对路径。支持单工作区和多工作区模式。
+当工作区包含多个根目录时，返回所有路径的列表。适用于需要定位项目根目录或验证工作区配置的场景。
+
+使用场景:
+- 需要确定当前项目的绝对路径
+- 处理多工作区项目时需要所有根路径
+- 自动化脚本需要基于工作区路径进行文件操作
+- 调试时验证环境路径是否正确
+
+示例:
+1. 单工作区 -> "/User/projects/web-app"
+2. 多工作区 -> "/User/projects/frontend; /User/projects/backend"
+3. 未打开工作区 -> "当前未打开任何工作区目录"`,
+
+    // 不需要输入参数
+    parameters: {
+        type: 'object',
+        properties: {},
+        required: []
+    },
+
+    function: async () => {
+        try {
+            // 获取工作区文件夹配置
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+
+            // 处理未打开工作区的情况
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                return "当前未打开任何工作区目录";
+            }
+
+            // 处理多工作区路径格式化
+            const pathList = workspaceFolders.map(folder => {
+                // 确保返回绝对路径
+                const rawPath = folder.uri.fsPath;
+                
+                // 处理Windows路径的反斜杠问题
+                return process.platform === 'win32' 
+                    ? rawPath.replace(/\\/g, '/')  // 统一转换为正斜杠
+                    : path.resolve(rawPath);       // Linux/macOS直接解析
+            });
+
+            // 去重处理（防止异常配置）
+            const uniquePaths = Array.from(new Set(pathList));
+
+            return uniquePaths.join('; ');
+        } catch (error) {
+            // 错误处理流程
+            const errorMessage = (error as Error).message;
+            vscode.window.showErrorMessage(`路径获取失败: ${errorMessage}`);
+            
+            // 返回结构化的错误信息
+            return `ERROR: 无法获取工作区路径 (${errorMessage})`;
+        }
+    }
+};
+
+registerTool(getVsCodeWorkspacePath);
+
 
