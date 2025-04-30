@@ -32,6 +32,7 @@ export interface Tool {
 }
 
 export const toolRegistry: Map<string, Tool> = new Map();
+export const webSearchRegistry : Map<string, Tool> = new Map();
 
 /**
  * 注册一个工具到全局工具表
@@ -41,12 +42,20 @@ export function registerTool(tool: Tool) {
     toolRegistry.set(tool.name, tool);
 }
 
+export function registerWebSearchTool(tool: Tool) {
+    webSearchRegistry.set(tool.name, tool);
+}
+
 /**
  * Retrieves an array of all registered tools from the tool registry.
  * @returns An array of Tool objects.
  */
 export function getAllTools(): Tool[] {
     return Array.from(toolRegistry.values());
+}
+
+export function getWebSearchTools(): Tool[] {
+    return Array.from(webSearchRegistry.values());
 }
 
 export async function handleNativeFunctionCalling(
@@ -297,7 +306,7 @@ async function fetchPageContent(url: string): Promise<string> {
 }
 
 // 1. 搜索网络
-export const searchTool: Tool = {
+export const webSearchTool: Tool = {
     name: 'web_search',
     description: `执行网络搜索并返回前5个结果的摘要。适用于需要获取外部信息、验证数据或了解最新动态的情况。
 用户提供这个工具通常是对你的知识储备或判断持怀疑态度，希望通过网络搜索获取更权威或更新的信息。
@@ -349,7 +358,8 @@ export const searchTool: Tool = {
         }
     },
 };
-registerTool(searchTool);
+registerTool(webSearchTool);
+registerWebSearchTool(webSearchTool);
 
 // 获取网页正文内容的工具
 export const getWebpageContent: Tool = {
@@ -426,6 +436,7 @@ export const getWebpageContent: Tool = {
 };
 
 registerTool(getWebpageContent);
+registerWebSearchTool(getWebpageContent);
 
 // 列举指定路径下文件和目录的工具
 export const listDirectory: Tool = {

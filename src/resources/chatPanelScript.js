@@ -208,7 +208,7 @@ function separateThinkContent(input) {
     const parts = input.split(/(<think>[\s\S]*?<\/think>)/g);
     
     parts.forEach(part => {
-        if (!part) return;
+        if (!part) {return; }
         
         if (part.startsWith('<think>') && part.endsWith('</think>')) {
             segments.push({
@@ -345,7 +345,7 @@ function setupInputHandlers() {
 function sendMessage() {
     const text = input.value.trim();
     if (text) {
-        vscode.postMessage({ command: 'sendMessage', text, webSearch: webSearchCheckbox.checked });
+        vscode.postMessage({ command: 'sendMessage', text, webSearch: webSearchCheckbox.checked, agentMode: agentModeCheckbox.checked });
         input.value = '';
     }
 }

@@ -146,7 +146,11 @@ export class ChatPanel {
                         <button id="stop" style="display:none;">Stop</button>
                         <div class="web-search">
                             <input type="checkbox" id="web-search">
-                            <label for="web-search">Agent模式(可联网)</label>
+                            <label for="web-search">联网搜索</label>
+                        </div>
+                        <div class="agent-mode">
+                            <input type="checkbox" id="agent-mode">
+                            <label for="agent-mode">Agent模式</label>
                         </div>
                     </div>
                 </div>
@@ -179,6 +183,7 @@ export class ChatPanel {
             const stopButton = document.getElementById('stop');
             const newSessionButton = document.getElementById('new-session');
             const webSearchCheckbox = document.getElementById('web-search');
+            const agentModeCheckbox = document.getElementById('agent-mode');
             const mermaidToggle = document.getElementById('mermaid-toggle');
     
             // 加载外部脚本
@@ -272,11 +277,18 @@ export class ChatPanel {
     }
 
     private async callModelApi(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<string | null> {
-        const tools = message.webSearch ? apiTools.getAllTools() : null;
+        let tools = null;
         const normalSystemPrompt = "用markdown输出。如果有数学公式要用$$包裹，每条一行不要换行。如果有流程图(Mermaid)里的每个字符串都要用引号包裹。";
-        const systemPrompt = message.webSearch 
-            ?  this.loadAgentPrompt() + normalSystemPrompt 
-            : normalSystemPrompt;
+        let systemPrompt = normalSystemPrompt;
+
+        if (message.webSearch) {
+            tools = apiTools.getWebSearchTools();
+            systemPrompt += "每次回答问题前,先观察信息是否足够, 如果不够，先用tool_call进行网络搜索。不要盲目自信， 不要臆测不确定的信息。";
+        }
+        if (message.agentMode) {
+            tools = apiTools.getAllTools();
+            systemPrompt += this.loadAgentPrompt();
+        }
 
         return await callDeepSeekApi(
             this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
