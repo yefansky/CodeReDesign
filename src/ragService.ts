@@ -72,10 +72,10 @@ class RagService {
 
         // Check if rag.exe exists
         try {
-          await fs.access(exePath, fs.constants.F_OK);
-          
           // Download MD5 from GitHub
           remoteMd5 = await this.downloadText('https://github.com/yefansky/CodeReDesign/releases/download/latest/md5.txt');
+
+          await fs.access(exePath, fs.constants.F_OK);
           
           // Calculate local rag.exe MD5
           const localMd5 = await this.calculateFileMd5(exePath);
