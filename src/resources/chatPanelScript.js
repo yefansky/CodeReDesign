@@ -291,6 +291,10 @@ async function renderMessage(role, content, index) {
         setupEditButtons();
     }
     //chat.scrollTop = chat.scrollHeight;
+
+    if (autoScrollEnabled) {
+        smartScroll();
+    }
 }
 
 // 消息处理
@@ -367,6 +371,65 @@ function handleKeyDown(e) {
     }
 }
 
+
+// 优化版智能滚动控制
+// 配置常量
+const SCROLL_THRESHOLD = 50; // 距离底部50px视为触底
+let autoScrollEnabled = false;
+let lastScrollTop = 0;
+
+// 精准的滚轮方向检测
+function handleWheel(e) {
+    const isScrollingDown = e.deltaY > 0;
+    checkScrollIntent(isScrollingDown);
+}
+
+// 滚动意图检测
+function checkScrollIntent(isScrollingDown) {
+    const currentPos = chat.scrollTop + chat.clientHeight;
+    const maxPos = chat.scrollHeight;
+    const distanceToBottom = maxPos - currentPos;
+
+    // 判断条件
+    if (isScrollingDown) {
+        // 向下滚动时：距离底部小于阈值则开启自动滚动
+        autoScrollEnabled = distanceToBottom <= SCROLL_THRESHOLD;
+    } else {
+        // 任何向上滚动动作立即关闭自动滚动
+        autoScrollEnabled = false;
+    }
+
+    // 调试输出
+    console.log(`方向: ${isScrollingDown ? '↓' : '↑'} | 距底部: ${distanceToBottom}px | 自动: ${autoScrollEnabled}`);
+}
+
+// 智能滚动执行
+function smartScroll() {
+    if (autoScrollEnabled) {
+        chat.scrollTop = chat.scrollHeight;
+    }
+}
+
+// 初始化
+function setupScroll() {
+    // 监听滚轮事件
+    chat.addEventListener('wheel', handleWheel, { passive: true });
+    
+    // 实时滚动检测（使用requestAnimationFrame优化性能）
+    let lastRender = 0;
+    const checkScroll = (timestamp) => {
+        if (timestamp - lastRender > 100) { // 每100ms检查一次
+            if (autoScrollEnabled) {
+                smartScroll();
+            }
+            lastRender = timestamp;
+        }
+        requestAnimationFrame(checkScroll);
+    };
+    requestAnimationFrame(checkScroll);
+}
+
+
 // 主初始化函数
 function initializeWebview() {
     // 初始化库和事件监听
@@ -375,7 +438,8 @@ function initializeWebview() {
     setupInputHandlers();
     setupEditButtons();
     setupCopyButtonDelegation();
+
+    setupScroll();
 }
 
 initializeWebview();
-
