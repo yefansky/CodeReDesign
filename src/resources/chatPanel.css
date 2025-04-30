@@ -214,3 +214,11 @@ tool_call code {
     border-radius: 3px;
     color: #00b7b7;
 }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* 禁用最外层滚动 */
+}
+

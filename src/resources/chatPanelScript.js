@@ -290,7 +290,7 @@ async function renderMessage(role, content, index) {
         targetDiv.dataset.index = index;
         setupEditButtons();
     }
-    chat.scrollTop = chat.scrollHeight;
+    //chat.scrollTop = chat.scrollHeight;
 }
 
 // 消息处理
