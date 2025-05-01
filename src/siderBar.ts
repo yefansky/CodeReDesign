@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { applyCvbToWorkspace, compressCvb, Cvb} from './cvbManager';
+import { applyCvbToWorkspace, compressCvb, Cvb, generateCvb} from './cvbManager';
 import { analyzeCode } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand, saveAnalyzeCodeResult} from './extension';
 import { showInputMultiLineBox } from './UIComponents';
@@ -77,6 +77,20 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
     await compressThisCvb(filePath);
   });
   context.subscriptions.push(compressCvbCommand);
+
+  const analyzeSingleFileCommand = vscode.commands.registerCommand('codeReDesign.analyzeSingleFile', async (uri: vscode.Uri) => {
+    const filePath = uri.fsPath || "";
+    const cvbFile = await generateCvb([filePath], "分析单个文件：" + filePath);
+    await analyzeThisCvb(cvbFile);
+  });
+  context.subscriptions.push(analyzeSingleFileCommand);
+
+  const uploadSingleFileCommand = vscode.commands.registerCommand('codeReDesign.uploadSingleFile', async (uri: vscode.Uri) => {
+    const filePath = uri.fsPath || "";
+    const cvbFile = await generateCvb([filePath], "重构单个文件：" + filePath);
+    await uploadThisCvb(cvbFile);
+  });
+  context.subscriptions.push(uploadSingleFileCommand);
 
   // 注册 TreeDataProvider
   const cvbViewProvider = new CvbViewProvider();

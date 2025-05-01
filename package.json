@@ -20,7 +20,10 @@
     "onCommand:codeReDesign.analyzeCode",
     "onCommand:codeReDesign.uploadThisCvb",
     "onCommand:codeReDesign.analyzeThisCvb",
-    "onCommand:codeReDesign.compressThisCvb"
+    "onCommand:codeReDesign.compressThisCvb",
+
+    "onCommand:codeReDesign.analyzeSingleFile",
+    "onCommand:codeReDesign.uploadSingleFile"
   ],
   "repository": {
     "type": "git",
@@ -97,6 +100,21 @@
         "title": "Show Guide",
         "category": "CodeReDesign",
         "icon": "${question}"
+      },
+
+      {
+        "command": "codeReDesign.analyzeSingleFile",
+        "title": "CodeReDesign:Analyze single File",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${bug}"
+      },
+      {
+        "command": "codeReDesign.uploadSingleFile",
+        "title": "CodeReDesign:Upload single File",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${bug}"
       }
     ],
     "viewsContainers": {
@@ -148,6 +166,18 @@
           "group": "navigation",
           "when": "panelFocus && activePanel == 'workbench.panel.output'"
         }
+      ],
+      "explorer/context": [
+        {
+          "command": "codeReDesign.analyzeSingleFile",
+          "group": "cvb@1",
+          "when": "resourceExtname == .py || resourceExtname == .cpp || resourceExtname == .h || resourceExtname == .c || resourceExtname == .lua || resourceExtname == .js|| resourceExtname == .css"
+        },
+        {
+          "command": "codeReDesign.uploadSingleFile",
+          "group": "cvb@1",
+          "when": "resourceExtname == .py || resourceExtname == .cpp || resourceExtname == .h || resourceExtname == .c || resourceExtname == .lua || resourceExtname == .js|| resourceExtname == .css"
+        }   
       ]
     },
     "configuration": {
