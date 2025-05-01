@@ -1,4 +1,4 @@
-import * as vscode from 'vscode';
+ï»¿import * as vscode from 'vscode';
 
 interface InputMultiLineBoxOptions {
     prompt: string;
@@ -6,49 +6,49 @@ interface InputMultiLineBoxOptions {
     title?: string;
 }
 
-let currentPanel: vscode.WebviewPanel | undefined = undefined; // µ±Ç°´ò¿ªµÄ Webview Ãæ°å
+let currentPanel: vscode.WebviewPanel | undefined = undefined; // å½“å‰æ‰“å¼€çš„ Webview é¢æ¿
 
 export async function showInputMultiLineBox(options: InputMultiLineBoxOptions): Promise<string | undefined> {
     return new Promise((resolve) => {
-        // Èç¹ûÒÑÓĞÃæ°å£¬ÏÈ¹Ø±Õ
+        // å¦‚æœå·²æœ‰é¢æ¿ï¼Œå…ˆå…³é—­
         if (currentPanel) {
             currentPanel.dispose();
         }
 
-        // ´´½¨ĞÂµÄ Webview Ãæ°å
+        // åˆ›å»ºæ–°çš„ Webview é¢æ¿
         currentPanel = vscode.window.createWebviewPanel(
             'multiLineInput',
             options.title || 'Multi-line Input',
             vscode.ViewColumn.One,
-            { enableScripts: true, localResourceRoots: [] } // ÔÊĞí JavaScript
+            { enableScripts: true, localResourceRoots: [] } // å…è®¸ JavaScript
         );
 
-        // ÉèÖÃ Webview ÄÚÈİ
+        // è®¾ç½® Webview å†…å®¹
         currentPanel.webview.html = getWebviewContent(options.prompt, options.placeHolder || "");
 
-        // ¼àÌı Webview ÏûÏ¢
+        // ç›‘å¬ Webview æ¶ˆæ¯
         currentPanel.webview.onDidReceiveMessage(
             (message) => {
                 if (message.command === 'submit') {
-                    resolve(message.text); // ·µ»ØÓÃ»§ÊäÈëµÄÎÄ±¾
+                    resolve(message.text); // è¿”å›ç”¨æˆ·è¾“å…¥çš„æ–‡æœ¬
                     if (currentPanel) {
-                        currentPanel.dispose(); // ¹Ø±Õ Webview
-                        currentPanel = undefined; // Çå¿Õµ±Ç°Ãæ°åÒıÓÃ
+                        currentPanel.dispose(); // å…³é—­ Webview
+                        currentPanel = undefined; // æ¸…ç©ºå½“å‰é¢æ¿å¼•ç”¨
                     }
                 }
             },
             undefined
         );
 
-        // ¼àÌı Webview ¹Ø±Õ£¬±ÜÃâÎŞÏŞµÈ´ı
+        // ç›‘å¬ Webview å…³é—­ï¼Œé¿å…æ— é™ç­‰å¾…
         currentPanel.onDidDispose(() => {
-            currentPanel = undefined; // Çå¿ÕÃæ°åÒıÓÃ
+            currentPanel = undefined; // æ¸…ç©ºé¢æ¿å¼•ç”¨
             resolve(undefined);
         });
     });
 }
 
-// Webview HTML ÄÚÈİ£¬Ê¹ÓÃ Monaco Editor
+// Webview HTML å†…å®¹ï¼Œä½¿ç”¨ Monaco Editor
 function getWebviewContent(prompt: string, placeHolder: string): string {
     return `
     <!DOCTYPE html>
@@ -66,7 +66,7 @@ function getWebviewContent(prompt: string, placeHolder: string): string {
             }
             textarea {
                 width: 100%;
-                height: 50vh; /* Ê¹ÊäÈë¿ò¸ß¶ÈÎªÊÓ¿ÚµÄÒ»°ë */
+                height: 50vh; /* ä½¿è¾“å…¥æ¡†é«˜åº¦ä¸ºè§†å£çš„ä¸€åŠ */
                 background-color: #252526;
                 color: white;
                 border: 1px solid #444;
@@ -95,12 +95,24 @@ function getWebviewContent(prompt: string, placeHolder: string): string {
         <button id="submitButton">Submit</button>
         <script>
             const vscode = acquireVsCodeApi();
-            document.getElementById('submitButton').addEventListener('click', () => {
-                const inputText = document.getElementById('inputField').value;
+            const inputField = document.getElementById('inputField');
+            const submitButton = document.getElementById('submitButton');
+
+            function submitInput() {
+                const inputText = inputField.value;
                 vscode.postMessage({
                     command: 'submit',
                     text: inputText
                 });
+            }
+
+            submitButton.addEventListener('click', submitInput);
+
+            inputField.addEventListener('keydown', (event) => {
+                if (event.ctrlKey && event.key === 'Enter') {
+                    event.preventDefault();
+                    submitInput();
+                }
             });
         </script>
     </body>
