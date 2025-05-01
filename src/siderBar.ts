@@ -6,6 +6,7 @@ import { analyzeCode } from './deepseekApi';
 import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doRedesignCommand, saveAnalyzeCodeResult} from './extension';
 import { showInputMultiLineBox } from './UIComponents';
 import {getOutputChannel} from './extension';
+import {SOURCE_FILE_EXTENSIONS_WITH_DOT} from './languageMapping';
 
 class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
   private content: Uint8Array = new Uint8Array();
@@ -53,6 +54,8 @@ class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
 }
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
+
+  vscode.commands.executeCommand('setContext', 'codeReDesign.supportedSourceFileTypeExt', SOURCE_FILE_EXTENSIONS_WITH_DOT);
 
   const applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyThisCvb', (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
@@ -420,5 +423,3 @@ async function summaryThisCvb(filePath: string) {
   fs.writeFileSync(filePath, newCvb.toString(), 'utf-8');
   vscode.window.showInformationMessage(`Conversation log saved as: ${filePath}`);
 }
-
-export function deactivate() {}

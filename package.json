@@ -128,14 +128,16 @@
       "explorer": [
         {
           "id": "codeReDesign.cvbView",
-          "name": "CodeReDesign Actions"
+          "name": "CodeReDesign Actions",
+          "icon": "images/icon.svg"
         }
       ],
       "guide-bar": [
         {
           "type": "webview",
           "id": "guideView",
-          "name": "User Guide"
+          "name": "User Guide",
+          "icon": "images/icon.svg"
         }
       ]
     },
@@ -143,19 +145,23 @@
       "view/item/context": [
         {
           "command": "codeReDesign.applyThisCvb",
-          "group": "cvb@1"
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile "
         },
         {
           "command": "codeReDesign.redesignThisCvb",
-          "group": "cvb@1"
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile "
         },
         {
           "command": "codeReDesign.analyzeThisCvb",
-          "group": "cvb@1"
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile "
         },
         {
           "command": "codeReDesign.summaryThisCvb",
-          "group": "cvb@1"
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile "
         }
       ],
       "editor/context": [
@@ -169,12 +175,12 @@
         {
           "command": "codeReDesign.analyzeSingleFile",
           "group": "cvb@1",
-          "when": "resourceExtname == .py || resourceExtname == .cpp || resourceExtname == .h || resourceExtname == .c || resourceExtname == .lua || resourceExtname == .js|| resourceExtname == .css"
+          "when": "resourceExtname in codeReDesign.supportedSourceFileTypeExt"
         },
         {
           "command": "codeReDesign.redesignSingleFile",
           "group": "cvb@1",
-          "when": "resourceExtname == .py || resourceExtname == .cpp || resourceExtname == .h || resourceExtname == .c || resourceExtname == .lua || resourceExtname == .js|| resourceExtname == .css"
+          "when": "resourceExtname in codeReDesign.supportedSourceFileTypeExt"
         }
       ]
     },
