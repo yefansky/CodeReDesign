@@ -17,7 +17,10 @@ const getPythonScriptPath = (extensionPath: string) => {
   if (isDevMode) {
     return path.join(extensionPath, 'src', 'python', 'rag.py'); // Development mode: run Python script directly
   } else {
-    return path.join(extensionPath, 'dist', 'rag.exe'); // Production mode: run EXE
+    const userHomeDir = os.homedir(); // 获取用户目录（如 C:\Users\aa）
+    const targetDir = path.join(userHomeDir, 'CodeReDesignMemory');
+    const exePath = path.join(targetDir, 'rag.exe');
+    return exePath;
   }
 };
 
