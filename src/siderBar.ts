@@ -54,34 +54,29 @@ class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
-  // 注册右键菜单命令
   const applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyThisCvb', (cvb: CvbFile) => {
-    // 获取文件路径
     const filePath = cvb.resourceUri?.fsPath || "";
-    // 调用处理函数
     applyThisCvb(filePath);
   });
+  context.subscriptions.push(applyCvbCommand);
 
-  // 注册上传 CVB 命令
   const uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
     await uploadThisCvb(filePath);
   });
+  context.subscriptions.push(uploadCvbCommand);
 
-  // 注册分析 CVB 命令
   const analyzeCvbCommand = vscode.commands.registerCommand('codeReDesign.analyzeThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
     await analyzeThisCvb(filePath);
   });
+  context.subscriptions.push(analyzeCvbCommand);
 
-  // 注册分析 CVB 命令
   const compressCvbCommand = vscode.commands.registerCommand('codeReDesign.compressThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
     await compressThisCvb(filePath);
   });
-
-  // 将命令添加到订阅中
-  context.subscriptions.push(applyCvbCommand, uploadCvbCommand, analyzeCvbCommand);
+  context.subscriptions.push(compressCvbCommand);
 
   // 注册 TreeDataProvider
   const cvbViewProvider = new CvbViewProvider();
@@ -117,9 +112,9 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
   const previewUri = vscode.Uri.parse(`${scheme}:/chat-preview.md`);
 
+  // markdown 自定义渲染显示
   context.subscriptions.push(
     vscode.commands.registerCommand('codeReDesign.showFile', async (uri: vscode.Uri) => {
-      // 读取文件内容
       const content = await vscode.workspace.fs.readFile(uri);
       const rawText = Buffer.from(content).toString('utf-8');
       
