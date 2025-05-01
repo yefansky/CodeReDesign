@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.185 (2025-05-01)
+
+
+### Bug Fixes
+
+* 代码重构，变量名修改， upload改为redesign, compress 改为 summary ([db3dcf2](https://github.com/yefansky/CodeReDesign/commit/db3dcf26db0d1c0278bfed1e0580e64db62d98bf))
+
 ### 0.0.184 (2025-05-01)
 
 ### 0.0.183 (2025-05-01)
