@@ -12,6 +12,11 @@
 - **多语言支持**：支持 C++、Python、Lua、TypeScript 等多种编程语言。
 - **右键菜单支持**：在资源管理器中，右键点击 `.cvb` 文件时，会显示一个上下文菜单，包含 `applyThisCvb`、`redesignThisCvb` 和 `analyzeThisCvb` 三个选项。
 - **CVB 文件视图**：在 VSCode 的侧边栏中，新增了一个 `CVB Actions` 视图，用于显示当前工作区中的所有 `.cvb` 文件，并支持通过点击文件来打开或操作它们。
+- **交互式聊天**：内置聊天界面，可直接与 DeepSeek 模型进行对话交流。
+- **文件预览**：支持 CVB/MD/聊天文件的格式化预览，自动美化显示效果。
+- **高级模型配置**：支持多达10个自定义模型配置，可灵活切换不同API端点。
+- **文件摘要**：可对CVB文件进行智能摘要，提取关键信息生成精简版本。
+- **单文件操作**：支持直接对单个文件进行分析和重构，无需打包成CVB格式。
 
 除了直接通过指令操作，
 
@@ -105,6 +110,11 @@ File -> Preferences -> Settings（文件 -> 首选项 -> 设置）
 - **Multi-language Support**: Supports multiple programming languages like C++, Python, Lua, TypeScript, etc.
 - **Right-click Menu Support**: Right-click on a `.cvb` file in the explorer to show a context menu with options to `Apply This CVB`, `redesign This CVB`, and `Analyze This CVB`.
 - **CVB File View**: A new `CVB Actions` view in the sidebar displays all `.cvb` files in the current workspace and allows you to open or operate on them by clicking.
+- **Interactive Chat**: Built-in chat interface for direct conversation with DeepSeek models.
+- **File Preview**: Supports formatted preview for CVB/MD/chat files with automatic beautification.
+- **Advanced Model Configuration**: Supports up to 10 custom model configurations for flexible API endpoint switching.
+- **File Summary**: Generates intelligent summaries of CVB files to extract key information.
+- **Single File Operations**: Supports direct analysis and redesign of single files without CVB packaging.
 
 ## How to Use
 
