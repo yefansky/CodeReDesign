@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.189 (2025-05-01)
+
+
+### Features
+
+* 增加历史聊天续聊的功能 ([6cd946d](https://github.com/yefansky/CodeReDesign/commit/6cd946d57167b59f15145a6dac136ecec6ce57a2))
+
 ### 0.0.188 (2025-05-01)
 
 ### 0.0.187 (2025-05-01)
