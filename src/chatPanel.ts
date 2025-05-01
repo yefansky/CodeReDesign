@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { callDeepSeekApi } from './deepseekApi';
+import { callDeepSeekApi, generateFilenameFromRequest } from './deepseekApi';
 import { getCurrentOperationController, resetCurrentOperationController } from './extension';
 import path from 'path';
 import * as fs from "fs";
@@ -54,6 +54,7 @@ export class ChatPanel {
     private chatFilePath: string | null = null;
     private lastSaveTime: number = Date.now();
     private readonly context: vscode.ExtensionContext;
+    private isFilenameCustomized: boolean = false;
 
     private constructor(panel: vscode.WebviewPanel, context: vscode.ExtensionContext) {
         this.panel = panel;
@@ -221,6 +222,10 @@ export class ChatPanel {
         }
 
         this.prepareChatFilePath();
+
+        if (this.conversation.length === 0) { // 只有第一次消息时处理
+            await this.tryGenerateCustomFilename(message.text);
+        }
         
         this.conversation.push({ role: 'user', content: message.text });
         this.panel.webview.postMessage({ 
@@ -251,6 +256,38 @@ export class ChatPanel {
                 const filename = `${timestamp}_chat.chat`;
                 this.chatFilePath = path.join(tmpDir, filename);
             }
+        }
+    }
+
+    private async tryGenerateCustomFilename(userMessage: string): Promise<void> {
+        if (this.isFilenameCustomized) { return; }
+    
+        const originalPath = this.chatFilePath;
+        if (!originalPath || !originalPath.endsWith('_chat.chat')) {
+            return;
+        }
+    
+        try {
+            // 截取前30个字符
+            const requestSnippet = userMessage.slice(0, 30).replace(/[\n\r]/g, ' ');
+            const summary = await generateFilenameFromRequest(requestSnippet);
+            
+            // 生成新路径
+            const newFilename = `${path.basename(originalPath, '_chat.chat')}_${summary}.chat`;
+            const newPath = path.join(path.dirname(originalPath), newFilename);
+    
+            // 更新状态
+            this.chatFilePath = newPath;
+            this.isFilenameCustomized = true;
+
+            // 重命名文件
+            if (fs.existsSync(originalPath)) {
+                await fs.promises.rename(originalPath, newPath);
+            }
+        } catch (error) {
+            console.error('Failed to rename chat file:', error);
+            // 失败时保持原文件名
+            this.chatFilePath = originalPath;
         }
     }
 
@@ -311,6 +348,7 @@ export class ChatPanel {
 
     private handleNewSession(): void {
         this.chatFilePath = null;
+        this.isFilenameCustomized = false;
         this.conversation = [];
         this.userMessageIndex = 0;
         resetCurrentOperationController();
@@ -354,6 +392,7 @@ export class ChatPanel {
         
         this.createOrShow(context);
 
+        ChatPanel.currentPanel!.isFilenameCustomized = true;
         ChatPanel.currentPanel!.chatFilePath = filePath;
         ChatPanel.currentPanel!.conversation = conversation;
         ChatPanel.currentPanel!.userMessageIndex = conversation.filter(m => m.role === 'user').length;
