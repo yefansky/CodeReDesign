@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.183",
+  "version": "0.0.184",
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -21,7 +21,6 @@
     "onCommand:codeReDesign.uploadThisCvb",
     "onCommand:codeReDesign.analyzeThisCvb",
     "onCommand:codeReDesign.compressThisCvb",
-
     "onCommand:codeReDesign.analyzeSingleFile",
     "onCommand:codeReDesign.uploadSingleFile"
   ],
@@ -101,7 +100,6 @@
         "category": "CodeReDesign",
         "icon": "${question}"
       },
-
       {
         "command": "codeReDesign.analyzeSingleFile",
         "title": "CodeReDesign:Analyze single File",
@@ -177,7 +175,7 @@
           "command": "codeReDesign.uploadSingleFile",
           "group": "cvb@1",
           "when": "resourceExtname == .py || resourceExtname == .cpp || resourceExtname == .h || resourceExtname == .c || resourceExtname == .lua || resourceExtname == .js|| resourceExtname == .css"
-        }   
+        }
       ]
     },
     "configuration": {
