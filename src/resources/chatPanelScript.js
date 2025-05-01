@@ -374,8 +374,8 @@ function handleKeyDown(e) {
 
 // 优化版智能滚动控制
 // 配置常量
-const SCROLL_THRESHOLD = 50; // 距离底部50px视为触底
-let autoScrollEnabled = false;
+const SCROLL_THRESHOLD = 200; // 距离底部?px视为触底
+let autoScrollEnabled = true;
 let lastScrollTop = 0;
 
 // 精准的滚轮方向检测
