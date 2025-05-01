@@ -607,8 +607,8 @@ TCVB 格式规范：
 
 export function mergeCvb(baseCvb: Cvb, tcvb: TCVB): Cvb {
 
-  if (baseCvb.getMetaData("compressFrom")) {
-    const orignalPath = baseCvb.getMetaData("compressFrom") || "";
+  if (baseCvb.getMetaData("summaryFrom")) {
+    const orignalPath = baseCvb.getMetaData("summaryFrom") || "";
     const cvbContent = fs.readFileSync(orignalPath, 'utf-8');
     baseCvb = new Cvb(cvbContent);
   }
@@ -887,11 +887,11 @@ function rebuildCvb(baseCvb: Cvb, mapFiles: Map<string, string>): Cvb {
   return cvb;
 }
 
-export async function compressCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
+export async function summaryCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
   // 获取元数据和文件内容
   const metadata = cvb.getMetadata();
   const files = cvb.getFiles();
-  const compressedFiles: Record<string, string> = {};
+  const summaryedFiles: Record<string, string> = {};
   const MAX_CONCURRENT = 5; // 设置最大并行数量为5
 
   const outputChannel = getOutputChannel();
@@ -903,7 +903,7 @@ export async function compressCvb(cvb: Cvb, userRequest: string): Promise<Cvb> {
 
   const signal = getCurrentOperationController().signal;
 
-  outputChannel.appendLine("compress task start");
+  outputChannel.appendLine("summary task start");
 
   // 将文件处理任务放入队列
   const fileEntries = Object.entries(files);
@@ -967,19 +967,19 @@ function func2() {
 
     const systemContent = "你是一个代码分析助手。给定一个文件的内容和用户的请求，识别并提取出对理解代码在请求上下文中的有价值的代码片段。注意输出的时候不要有 \`\`\`";
 
-    outputChannel.appendLine(`compress processing .. ${filePath} [🚀start]`);
+    outputChannel.appendLine(`summary processing .. ${filePath} [🚀start]`);
     try {
       const response = await callDeepSeekApi(requestContent, systemContent, undefined, true, undefined, signal, true);
       if (response) {
         const segments = response.split("===SEGMENT===").map(segment => segment.trim());
-        const compressedContent = segments.join("\n//...CCVB\n");
-        compressedFiles[filePath] = compressedContent;
-        outputChannel.appendLine(`compress processing .. ${filePath} [✅success]`);
+        const summaryedContent = segments.join("\n//...CCVB\n");
+        summaryedFiles[filePath] = summaryedContent;
+        outputChannel.appendLine(`summary processing .. ${filePath} [✅success]`);
       } else {
-        outputChannel.appendLine(`compress processing .. ${filePath} [❌failed]`);
+        outputChannel.appendLine(`summary processing .. ${filePath} [❌failed]`);
       }
     } catch (error) {
-      outputChannel.appendLine(`compress processing .. ${filePath} [⚠️error: ${error}]`);
+      outputChannel.appendLine(`summary processing .. ${filePath} [⚠️error: ${error}]`);
     }
   };
 
@@ -1011,13 +1011,13 @@ function func2() {
 
   await processQueue();
 
-  outputChannel.appendLine("compress task finish");
+  outputChannel.appendLine("summary task finish");
 
   const newCvb = new Cvb();
   for (const [key, value] of Object.entries(metadata)) {
     newCvb.setMetaData(key, value);
   }
-  for (const [filePath, content] of Object.entries(compressedFiles)) {
+  for (const [filePath, content] of Object.entries(summaryedFiles)) {
     newCvb.setFile(filePath, content);
   }
 

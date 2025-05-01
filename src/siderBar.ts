@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { applyCvbToWorkspace, compressCvb, Cvb, generateCvb} from './cvbManager';
+import { applyCvbToWorkspace, summaryCvb, Cvb, generateCvb} from './cvbManager';
 import { analyzeCode } from './deepseekApi';
-import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand, saveAnalyzeCodeResult} from './extension';
+import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doRedesignCommand, saveAnalyzeCodeResult} from './extension';
 import { showInputMultiLineBox } from './UIComponents';
 import {getOutputChannel} from './extension';
 
@@ -60,11 +60,11 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(applyCvbCommand);
 
-  const uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadThisCvb', async (cvb: CvbFile) => {
+  const redesignCvbCommand = vscode.commands.registerCommand('codeReDesign.redesignThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
-    await uploadThisCvb(filePath);
+    await redesignThisCvb(filePath);
   });
-  context.subscriptions.push(uploadCvbCommand);
+  context.subscriptions.push(redesignCvbCommand);
 
   const analyzeCvbCommand = vscode.commands.registerCommand('codeReDesign.analyzeThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
@@ -72,11 +72,11 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(analyzeCvbCommand);
 
-  const compressCvbCommand = vscode.commands.registerCommand('codeReDesign.compressThisCvb', async (cvb: CvbFile) => {
+  const summaryCvbCommand = vscode.commands.registerCommand('codeReDesign.summaryThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
-    await compressThisCvb(filePath);
+    await summaryThisCvb(filePath);
   });
-  context.subscriptions.push(compressCvbCommand);
+  context.subscriptions.push(summaryCvbCommand);
 
   const analyzeSingleFileCommand = vscode.commands.registerCommand('codeReDesign.analyzeSingleFile', async (uri: vscode.Uri) => {
     const filePath = uri.fsPath || "";
@@ -85,12 +85,12 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(analyzeSingleFileCommand);
 
-  const uploadSingleFileCommand = vscode.commands.registerCommand('codeReDesign.uploadSingleFile', async (uri: vscode.Uri) => {
+  const redesignSingleFileCommand = vscode.commands.registerCommand('codeReDesign.redesignSingleFile', async (uri: vscode.Uri) => {
     const filePath = uri.fsPath || "";
     const cvbFile = await generateCvb([filePath], "重构单个文件：" + filePath);
-    await uploadThisCvb(cvbFile);
+    await redesignThisCvb(cvbFile);
   });
-  context.subscriptions.push(uploadSingleFileCommand);
+  context.subscriptions.push(redesignSingleFileCommand);
 
   // 注册 TreeDataProvider
   const cvbViewProvider = new CvbViewProvider();
@@ -311,7 +311,7 @@ function applyThisCvb(filePath: string) {
  * 上传 CVB 文件并调用 API
  * @param filePath .cvb 文件的路径
  */
-async function uploadThisCvb(filePath: string) {
+async function redesignThisCvb(filePath: string) {
 /*
   // 测试 begin
   {
@@ -342,7 +342,7 @@ async function uploadThisCvb(filePath: string) {
     return;
   }
   const outputChannel = getOutputChannel();
-  doUploadCommand(filePath, userPrompt, outputChannel);
+  doRedesignCommand(filePath, userPrompt, outputChannel);
 }
 
 /**
@@ -375,16 +375,16 @@ async function analyzeThisCvb(filePath: string) {
   }
 }
 
-function getCompressedFileName(filePath: string): string {
+function getSummarizedFileName(filePath: string): string {
   const { name, ext } = path.parse(filePath); // 使用 path.parse 获取文件名和扩展名
-  return path.join(path.dirname(filePath), `${name}-compress${ext}`); // 拼接新的完整路径
+  return path.join(path.dirname(filePath), `${name}-summary${ext}`); // 拼接新的完整路径
 }
 
 /**
  * 分析 CVB 文件
  * @param filePath .cvb 文件的路径
  */
-async function compressThisCvb(filePath: string) {
+async function summaryThisCvb(filePath: string) {
   const userRequest = await showInputMultiLineBox({
     prompt: '输入压缩过程中需要关注的需求',
     placeHolder: 'e.g., Analyze the code for potential bugs',
@@ -400,22 +400,22 @@ async function compressThisCvb(filePath: string) {
 
   resetCurrentOperationController();
 
-  const newCvb = await compressCvb(cvb, userRequest);
+  const newCvb = await summaryCvb(cvb, userRequest);
   clearCurrentOperationController();
 
   if (newCvb) {
-    vscode.window.showInformationMessage('compress cvb success!.');
+    vscode.window.showInformationMessage('summary cvb success!.');
   }
   else{
-    vscode.window.showInformationMessage('compress cvb failed!.');
+    vscode.window.showInformationMessage('summary cvb failed!.');
     return;
   }
 
-  if (!newCvb.getMetaData("compressFrom")) {
-    newCvb.setMetaData("compressFrom", filePath);
+  if (!newCvb.getMetaData("summaryFrom")) {
+    newCvb.setMetaData("summaryFrom", filePath);
   }
 
-  filePath = getCompressedFileName(filePath);
+  filePath = getSummarizedFileName(filePath);
 
   fs.writeFileSync(filePath, newCvb.toString(), 'utf-8');
   vscode.window.showInformationMessage(`Conversation log saved as: ${filePath}`);

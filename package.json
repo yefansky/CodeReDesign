@@ -14,15 +14,15 @@
   "main": "./dist/extension.js",
   "activationEvents": [
     "onCommand:codeReDesign.generateCvb",
-    "onCommand:codeReDesign.uploadCvb",
+    "onCommand:codeReDesign.redesignCvb",
     "onCommand:codeReDesign.applyCvb",
     "onCommand:codeReDesign.applyThisCvb",
     "onCommand:codeReDesign.analyzeCode",
-    "onCommand:codeReDesign.uploadThisCvb",
+    "onCommand:codeReDesign.redesignThisCvb",
     "onCommand:codeReDesign.analyzeThisCvb",
-    "onCommand:codeReDesign.compressThisCvb",
+    "onCommand:codeReDesign.summaryThisCvb",
     "onCommand:codeReDesign.analyzeSingleFile",
-    "onCommand:codeReDesign.uploadSingleFile"
+    "onCommand:codeReDesign.redesignSingleFile"
   ],
   "repository": {
     "type": "git",
@@ -37,8 +37,8 @@
         "icon": "${add}"
       },
       {
-        "command": "codeReDesign.uploadCvb",
-        "title": "Upload CVB and Call API",
+        "command": "codeReDesign.redesignCvb",
+        "title": "Redesign CVB and Call API",
         "category": "CodeReDesign",
         "icon": "${cloud-upload}"
       },
@@ -74,8 +74,8 @@
         "icon": "${save}"
       },
       {
-        "command": "codeReDesign.uploadThisCvb",
-        "title": "sidebar Upload this CVB and Call API",
+        "command": "codeReDesign.redesignThisCvb",
+        "title": "sidebar Redesign this CVB and Call API",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${cloud-upload}"
@@ -88,8 +88,8 @@
         "icon": "${bug}"
       },
       {
-        "command": "codeReDesign.compressThisCvb",
-        "title": "sidebar compress this CVB",
+        "command": "codeReDesign.summaryThisCvb",
+        "title": "sidebar summary this CVB",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${beaker}"
@@ -108,8 +108,8 @@
         "icon": "${bug}"
       },
       {
-        "command": "codeReDesign.uploadSingleFile",
-        "title": "CodeReDesign:Upload single File",
+        "command": "codeReDesign.redesignSingleFile",
+        "title": "CodeReDesign:Redesign single File",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${bug}"
@@ -146,7 +146,7 @@
           "group": "cvb@1"
         },
         {
-          "command": "codeReDesign.uploadThisCvb",
+          "command": "codeReDesign.redesignThisCvb",
           "group": "cvb@1"
         },
         {
@@ -154,7 +154,7 @@
           "group": "cvb@1"
         },
         {
-          "command": "codeReDesign.compressThisCvb",
+          "command": "codeReDesign.summaryThisCvb",
           "group": "cvb@1"
         }
       ],
@@ -172,7 +172,7 @@
           "when": "resourceExtname == .py || resourceExtname == .cpp || resourceExtname == .h || resourceExtname == .c || resourceExtname == .lua || resourceExtname == .js|| resourceExtname == .css"
         },
         {
-          "command": "codeReDesign.uploadSingleFile",
+          "command": "codeReDesign.redesignSingleFile",
           "group": "cvb@1",
           "when": "resourceExtname == .py || resourceExtname == .cpp || resourceExtname == .h || resourceExtname == .c || resourceExtname == .lua || resourceExtname == .js|| resourceExtname == .css"
         }

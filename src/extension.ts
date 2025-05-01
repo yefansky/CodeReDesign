@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { selectFiles } from './fileSelector';
-import { generateCvb, applyCvbToWorkspace, generateTimestamp, Cvb, TCVB, mergeCvb, compressCvb} from './cvbManager';
+import { generateCvb, applyCvbToWorkspace, generateTimestamp, Cvb, TCVB, mergeCvb, summaryCvb} from './cvbManager';
 import { queryCodeReDesign, generateFilenameFromRequest, analyzeCode, callDeepSeekFixApi, GetLastMessageBody } from './deepseekApi';
 import { setupCvbAsMarkdown } from './cvbMarkdownHandler';
 import { registerCvbContextMenu } from './siderBar';
@@ -45,7 +45,7 @@ export function getOutputChannel() : vscode.OutputChannel {
     return currentOutputChannel;
 }
 
-export async function doUploadCommand(cvbFilePath: string, userPrompt: string, outputChannel: vscode.OutputChannel){
+export async function doRedesignCommand(cvbFilePath: string, userPrompt: string, outputChannel: vscode.OutputChannel){
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
         vscode.window.showErrorMessage('No workspace folder found');
@@ -72,12 +72,12 @@ export async function doUploadCommand(cvbFilePath: string, userPrompt: string, o
     const CVB_QUERY_LENGTH_LIMIT = (64 - 32 - 8) * 1024; // 64K上下文，reasoner的思考链最多栈32k，最大输出长度8k
     const inputCvb = new Cvb(cvbContent);
     const is_token_underlimit = await isUnderTokenLimit(cvbContent, CVB_QUERY_LENGTH_LIMIT);
-    if(!is_token_underlimit && !inputCvb.getMetaData("compressFrom")) {
-        if (!inputCvb.getMetaData("compressFrom")) {
+    if(!is_token_underlimit && !inputCvb.getMetaData("summaryFrom")) {
+        if (!inputCvb.getMetaData("summaryFrom")) {
             currentOutputChannel?.appendLine("输入数据过于巨大,先进行压缩预处理...");
-            const compressedCvb = await compressCvb(inputCvb, userPrompt);
-            compressedCvb.setMetaData("compressFrom", cvbFilePath);
-            cvbContent = compressedCvb.toString();
+            const summaryedCvb = await summaryCvb(inputCvb, userPrompt);
+            summaryedCvb.setMetaData("summaryFrom", cvbFilePath);
+            cvbContent = summaryedCvb.toString();
         }
     }
 
@@ -212,7 +212,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // 注册命令:上传 CVB 并调用 API
-    let uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadCvb', async () => {
+    let redesignCvbCommand = vscode.commands.registerCommand('codeReDesign.redesignCvb', async () => {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
             vscode.window.showErrorMessage('No workspace folder found.');
@@ -236,7 +236,7 @@ export function activate(context: vscode.ExtensionContext) {
         });
     
         const selectedCvbFile = await vscode.window.showQuickPick(cvbFiles, {
-            placeHolder: 'Select a CVB file to upload',
+            placeHolder: 'Select a CVB file to redesign',
         });
     
         if (!selectedCvbFile) {
@@ -254,7 +254,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const cvbFilePath = path.join(tmpDir, selectedCvbFile);
     
-        doUploadCommand(cvbFilePath, userPrompt, outputChannel);
+        doRedesignCommand(cvbFilePath, userPrompt, outputChannel);
     });
 
     // 注册命令：中断当前的上传操作
@@ -367,7 +367,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, uploadCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, outputChannel, startChatCommand);
+    context.subscriptions.push(generateCvbCommand, redesignCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, outputChannel, startChatCommand);
 
     setupCvbAsMarkdown(context);
 
