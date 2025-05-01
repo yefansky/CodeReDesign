@@ -19,6 +19,7 @@ function setupEditButtons() {
 
             const editSend = userDiv.querySelector('.edit-send');
             const editCancel = userDiv.querySelector('.edit-cancel');
+            const editTextarea = userDiv.querySelector('.edit-textarea');
 
             editSend.onclick = () => {
                 const newText = userDiv.querySelector('textarea').value;
@@ -31,6 +32,14 @@ function setupEditButtons() {
                 userDiv.innerHTML = `<button class="edit-btn">✎</button><div class="user-content">${contentDiv.textContent}</div>`;
                 setupEditButtons();
             };
+
+            // 为 textarea 添加 Ctrl + Enter 快捷键
+            editTextarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault(); // 防止换行
+                    editSend.click(); // 触发发送按钮的点击事件
+                }
+            });
         };
     });
 }
