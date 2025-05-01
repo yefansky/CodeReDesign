@@ -39,6 +39,10 @@ function setupEditButtons() {
                     e.preventDefault(); // 防止换行
                     editSend.click(); // 触发发送按钮的点击事件
                 }
+                else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    editCancel.click();
+                }
             });
         };
     });
