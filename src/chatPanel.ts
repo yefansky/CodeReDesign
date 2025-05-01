@@ -348,6 +348,66 @@ export class ChatPanel {
         }
     }
 
+    public static async loadFromFile(context: vscode.ExtensionContext, filePath: string) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const conversation = this.parseChatContent(content);
+        
+        this.createOrShow(context);
+
+        ChatPanel.currentPanel!.chatFilePath = filePath;
+        ChatPanel.currentPanel!.conversation = conversation;
+        ChatPanel.currentPanel!.userMessageIndex = conversation.filter(m => m.role === 'user').length;
+
+        // 将历史记录发送到webview
+        conversation.forEach((msg, index) => {
+            ChatPanel.currentPanel!.panel.webview.postMessage({
+                role: msg.role,
+                content: msg.content,
+                index: msg.role === 'user' ? index : undefined
+            });
+        });
+    }
+
+    private static parseChatContent(content: string): Array<{role: string, content: string}> {
+        const conversation = [];
+        const lines = content.split('\n');
+        let currentRole = '';
+        let currentContent = [];
+        
+        for (const line of lines) {
+            if (line.startsWith('@user:')) {
+                if (currentRole) {
+                    conversation.push({
+                        role: currentRole,
+                        content: currentContent.join('\n').trim()
+                    });
+                }
+                currentRole = 'user';
+                currentContent = [];
+            } else if (line.startsWith('@AI:')) {
+                if (currentRole) {
+                    conversation.push({
+                        role: currentRole,
+                        content: currentContent.join('\n').trim()
+                    });
+                }
+                currentRole = 'model';
+                currentContent = [];
+            } else {
+                currentContent.push(line);
+            }
+        }
+
+        if (currentRole) {
+            conversation.push({
+                role: currentRole,
+                content: currentContent.join('\n').trim()
+            });
+        }
+
+        return conversation;
+    }
+
     public dispose(): void {
         ChatPanel.currentPanel = undefined;
         this.panel.dispose();

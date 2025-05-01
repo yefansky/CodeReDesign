@@ -22,7 +22,10 @@
     "onCommand:codeReDesign.analyzeThisCvb",
     "onCommand:codeReDesign.summaryThisCvb",
     "onCommand:codeReDesign.analyzeSingleFile",
-    "onCommand:codeReDesign.redesignSingleFile"
+    "onCommand:codeReDesign.redesignSingleFile",
+
+    "onCommand:codeReDesign.startChat",
+    "onCommand:codeReDesign.continueChat"
   ],
   "repository": {
     "type": "git",
@@ -63,6 +66,12 @@
       {
         "command": "codeReDesign.startChat",
         "title": "Start Chat",
+        "category": "CodeReDesign",
+        "icon": "${chat}"
+      },
+      {
+        "command": "codeReDesign.continueChat",
+        "title": "continue Chat",
         "category": "CodeReDesign",
         "icon": "${chat}"
       },
@@ -146,22 +155,27 @@
         {
           "command": "codeReDesign.applyThisCvb",
           "group": "cvb@1",
-          "when": "viewItem == cvbFile "
+          "when": "viewItem == cvbFile"
         },
         {
           "command": "codeReDesign.redesignThisCvb",
           "group": "cvb@1",
-          "when": "viewItem == cvbFile "
+          "when": "viewItem == cvbFile"
         },
         {
           "command": "codeReDesign.analyzeThisCvb",
           "group": "cvb@1",
-          "when": "viewItem == cvbFile "
+          "when": "viewItem == cvbFile"
         },
         {
           "command": "codeReDesign.summaryThisCvb",
           "group": "cvb@1",
-          "when": "viewItem == cvbFile "
+          "when": "viewItem == cvbFile"
+        },
+        {
+          "command": "codeReDesign.continueChat",
+          "group": "cvb@1",
+          "when": "viewItem == chatFile"
         }
       ],
       "editor/context": [

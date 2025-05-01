@@ -7,6 +7,7 @@ import { getCurrentOperationController,  resetCurrentOperationController, clearC
 import { showInputMultiLineBox } from './UIComponents';
 import {getOutputChannel} from './extension';
 import {SOURCE_FILE_EXTENSIONS_WITH_DOT} from './languageMapping';
+import { ChatPanel } from './chatPanel';
 
 class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
   private content: Uint8Array = new Uint8Array();
@@ -94,6 +95,12 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
     await redesignThisCvb(cvbFile);
   });
   context.subscriptions.push(redesignSingleFileCommand);
+
+  const loadChatHistoryCommand = vscode.commands.registerCommand('codeReDesign.continueChat', async (history: ChatFile) => {
+    const filePath = history.resourceUri?.fsPath || "";
+    ChatPanel.loadFromFile(context, filePath);
+  });
+  context.subscriptions.push(loadChatHistoryCommand);
 
   // 注册 TreeDataProvider
   const cvbViewProvider = new CvbViewProvider();
