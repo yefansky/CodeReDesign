@@ -18,6 +18,7 @@ import { CONFIG as RAG_CONFIG } from './ragService';
 import { parseString } from 'xml2js';
 import ExcelJS from 'exceljs';
 import pdfParse from 'pdf-parse';
+import {getLanguageFromPath} from './languageMapping';
 
 /** 定义工具的接口 */
 export interface Tool {
@@ -592,8 +593,23 @@ export const readTextFile: Tool = {
     },
     function: async (args: { filePath: string }) => {
         try {
-            const content = await fs.readFile(args.filePath, 'utf-8');
-            return content;
+            let content = await fs.readFile(args.filePath, 'utf-8');
+            const language = getLanguageFromPath(args.filePath);
+            const PRE = `${args.filePath}\n\`\`\`${language}\n`;
+            const POST = `\n\`\`\``;
+            
+            // 计算可用内容长度（预留注释和格式空间）
+            const MAX_LEN = 2048;
+            const reservedSpace = PRE.length + POST.length + 30; // 30为截断注释长度
+            let maxContentLen = MAX_LEN - reservedSpace;
+
+            // 处理内容截断
+            let truncated = content.length > maxContentLen;
+            if (truncated) {
+                content = content.substring(0, maxContentLen) + '\n// ...（内容已截断，超过2K限制）';
+            }
+            
+            return PRE + content + POST;
         } catch (error: any) {
             return `读取文件失败: ${error.message}`;
         }
