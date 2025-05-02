@@ -20,7 +20,7 @@ export async function showInputMultiLineBox(options: InputMultiLineBoxOptions): 
             'multiLineInput',
             options.title || 'Multi-line Input',
             vscode.ViewColumn.One,
-            { enableScripts: true, localResourceRoots: [] } // 允许 JavaScript
+            { enableScripts: true, localResourceRoots: [], retainContextWhenHidden: true } // 允许 JavaScript
         );
 
         // 设置 Webview 内容
