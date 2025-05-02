@@ -298,7 +298,11 @@ async function renderMessage(role, content, index) {
         });
         ensureCopyButtons();
         hljs.highlightAll();
-    } else {
+    }
+    else if (role === 'tool') {
+        targetDiv.innerHTML = `<tool_call>${targetDiv.dataset.markdownContent}</tool_call>`;
+    }
+    else {
         targetDiv.innerHTML = `<button class="edit-btn">✎</button><div class="user-content">${targetDiv.dataset.markdownContent}</div>`;
         targetDiv.dataset.index = index;
         setupEditButtons();
@@ -413,7 +417,7 @@ function checkScrollIntent(isScrollingDown) {
     }
 
     // 调试输出
-    console.log(`方向: ${isScrollingDown ? '↓' : '↑'} | 距底部: ${distanceToBottom}px | 自动: ${autoScrollEnabled}`);
+    // console.log(`方向: ${isScrollingDown ? '↓' : '↑'} | 距底部: ${distanceToBottom}px | 自动: ${autoScrollEnabled}`);
 }
 
 // 智能滚动执行
