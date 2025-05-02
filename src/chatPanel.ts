@@ -10,10 +10,12 @@ import { getOutputChannel } from './extension';
 class WebviewOutputChannel implements vscode.OutputChannel {
     private readonly webview: vscode.Webview;
     private readonly channelName: string;
+    private readonly onChanged?: () => void;
 
-    constructor(webview: vscode.Webview, name: string) {
+    constructor(webview: vscode.Webview, name: string, onChanged?: () => void ) {
         this.webview = webview;
         this.channelName = name;
+        this.onChanged = onChanged;
     }
 
     get name(): string {
@@ -23,11 +25,19 @@ class WebviewOutputChannel implements vscode.OutputChannel {
     append(value: string): void {
         this.webview.postMessage({ role: 'model', content: value });
         getOutputChannel().append(value);
+
+        if (this.onChanged) {
+            this.onChanged();
+        }
     }
 
     appendLine(value: string): void {
         this.append(value + '\n');
         getOutputChannel().append(value + '\n');
+
+        if (this.onChanged) {
+            this.onChanged();
+        }
     }
 
     clear(): void {
@@ -52,15 +62,30 @@ export class ChatPanel {
     private conversation: { role: string; content: string }[] = [];
     private userMessageIndex: number = 0;
     private chatFilePath: string | null = null;
-    private lastSaveTime: number = Date.now();
     private readonly context: vscode.ExtensionContext;
     private isFilenameCustomized: boolean = false;
+    private isSaveScheduled = false;
+    private saveTimeout: NodeJS.Timeout | null = null;
 
     private constructor(panel: vscode.WebviewPanel, context: vscode.ExtensionContext) {
         this.panel = panel;
         this.context = context;
         this.setupPanelEventListeners();
         this.panel.webview.html = this.getHtmlForWebview();
+    }
+
+    // 延迟保存方法
+    private delaySave() {
+        // 如果已经有保存任务排队，跳过新请求
+        if (this.isSaveScheduled) {return; }
+
+        this.isSaveScheduled = true;
+        
+        // 设置2秒延迟保存
+        this.saveTimeout = setTimeout(() => {
+            this.saveChatToFile(); // 实际保存操作
+            this.isSaveScheduled = false; // 重置标志位
+        }, 2000);
     }
 
     public static createOrShow(context: vscode.ExtensionContext): void {
@@ -195,13 +220,13 @@ export class ChatPanel {
     }
 
     private async handleMessage(message: any): Promise<void> {
-        const webviewOutputChannel = new WebviewOutputChannel(this.panel.webview, 'DeepSeek API Output');
+        const webviewOutputChannel = new WebviewOutputChannel(this.panel.webview, 'DeepSeek API Output', this.delaySave);
 
         switch (message.command) {
             case 'sendMessage':
             case 'editMessage':
                 await this.handleSendOrEditMessage(message, webviewOutputChannel);
-                this.saveChatToFile();
+                this.delaySave();
                 break;
                 
             case 'newSession':
@@ -269,7 +294,7 @@ export class ChatPanel {
     
         try {
             // 截取前30个字符
-            const requestSnippet = userMessage.slice(0, 30).replace(/[\n\r]/g, ' ');
+            const requestSnippet = userMessage.slice(0, 32).replace(/[\n\r]/g, ' ');
             const summary = await generateFilenameFromRequest(requestSnippet);
             
             // 生成新路径
@@ -364,10 +389,9 @@ export class ChatPanel {
     }
 
     private saveChatToFile(): void {
-        if (!this.chatFilePath || Date.now() - this.lastSaveTime < 10000) {
+        if (!this.chatFilePath) {
             return;
         }
-
         try {
             const mdContent = this.conversation.map(msg => {
                 return `@${msg.role === 'user' ? 'user' : 'AI'}:\n\n${msg.content}\n\n`;
@@ -380,7 +404,6 @@ export class ChatPanel {
             }
 
             fs.writeFileSync(this.chatFilePath, mdContent, 'utf-8');
-            this.lastSaveTime = Date.now();
         } catch (error) {
             console.error('Failed to save chat file:', error);
         }
