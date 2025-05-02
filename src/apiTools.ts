@@ -312,6 +312,7 @@ export const webSearchTool: Tool = {
 用户提供这个工具通常是对你的知识储备或判断持怀疑态度，希望通过网络搜索获取更权威或更新的信息。
 你可以用它来补充自己的回答，确保回答准确且有据可依。
 当问到你依稀技术名词的时候，你没有把握就不要乱说，先联网搜索。因为大模型很容易产生幻觉，以为自己什么都懂。
+使用完这些搜索到的信息以后，你还应该输出所有被你采纳信息的来源，也就是url，方便用户核实
 
 使用场景:
 - 获取最新信息: 例如，用户询问“2023年最好的编程语言是什么？”
@@ -343,15 +344,28 @@ export const webSearchTool: Tool = {
                 return '未找到相关结果';
             }
             
+            // 修改结果处理部分
             const results = await Promise.all(
                 links.map(link => 
                     fetchPageContent(link as string)
-                        .catch(e => `抓取失败: ${link} (${e.message})`)
+                        .then(content => ({
+                            url: link,
+                            content: content
+                        }))
+                        .catch(e => ({
+                            url: link,
+                            content: `抓取失败: ${e.message}`
+                        }))
                 )
             );
             
+            // 添加URL信息到返回结果
             return results
-                .map((res, i) => `【结果${i+1}】\n${res}`)
+                .map((res, i) => 
+                    `【结果${i+1}】\n` + 
+                    `来源：${res.url}\n` + 
+                    `内容摘要：${res.content.slice(0, 500)}...` // 限制内容长度
+                )
                 .join('\n\n');
         } catch (error: any) {
             return `搜索失败: ${error.message}`;
