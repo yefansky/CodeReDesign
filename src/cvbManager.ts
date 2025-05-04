@@ -255,6 +255,7 @@ export class TCVB {
     } catch (error) {
       vscode.window.showWarningMessage('TCVB格式输出有错误，正在尝试主动修复...');
       const fixedContent = TCVB.autoFixTCVBContent(tcStrContent);
+      this.m_arrOperations = [];
       this.parse(fixedContent);
     }
   }
