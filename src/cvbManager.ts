@@ -274,7 +274,7 @@ export class TCVB {
           const hasStart = trimmed.startsWith('```');
           const hasEnd = trimmed.endsWith('```');
 
-          let fixedCode = codeSection.trim();
+          let fixedCode = codeSection.trimEnd();
           
           // 确保代码块正确包裹
           if (!hasStart && !hasEnd) {
@@ -294,15 +294,15 @@ export class TCVB {
       /(## (?:OLD_CONTENT|NEW_CONTENT|OPERATION:CREATE)\n)([\s\S]*?)(?=\n## |\n## END_TCVB|$)/gis,
       (match, directive, codeSection) => {
           // 检测代码块是否被正确包裹
-          const trimmed = codeSection.trim();
+          const trimmed = codeSection.trimEnd();
           const hasStart = trimmed.startsWith('```');
           const hasEnd = trimmed.endsWith('```');
 
-          directive = directive.trim();
+          directive = directive.trimEnd();
 
           // 情况1：完全未包裹的代码块
           if (!hasStart && !hasEnd) {
-              return `${directive}\n\`\`\`\n${codeSection.trim()}\n\`\`\``;
+              return `${directive}\n\`\`\`\n${codeSection.trimEnd()}\n\`\`\``;
           }
 
           // 情况2：只有开始标记
@@ -337,7 +337,7 @@ export class TCVB {
             if (!hasOldContent && hasNewContent) {
                 const newContentMatch = match.match(/## NEW_CONTENT\n```([\s\S]*?)```/);
                 let newContentCode = newContentMatch ? newContentMatch[1] : '';
-                newContentCode = newContentCode.trim();
+                newContentCode = newContentCode.trimEnd();
                 return `## OPERATION:CREATE\n\`\`\`\n${newContentCode}\n\`\`\``;
             } else if (hasOldContent && !hasNewContent) {
                 return match + '\n## NEW_CONTENT\n```\n```';
