@@ -250,7 +250,50 @@ export class TCVB {
   private m_arrOperations: TcvbOperation[] = [];
 
   constructor(tcStrContent: string) {
-    this.parse(tcStrContent);
+    try {
+      this.parse(tcStrContent);
+    } catch (error) {
+      const fixedContent = TCVB.autoFixTCVBContent(tcStrContent);
+      this.parse(fixedContent);
+    }
+  }
+
+  public static autoFixTCVBContent(original: string): string {
+    let content = original;
+  
+    // Remove leading spaces before ## directives
+    content = content.replace(/^(\s+)##/gm, '##');
+  
+    // Close unclosed code blocks, inspired by the file-ending reference regex
+    content = content.replace(/(```[^\n]*\n[\s\S]*?)(?=^##|\n## END_TCVB|(?![\s\S]))/gm, '$1\n```');
+  
+    // Ensure END_TCVB is present
+    if (!/^##\s*END_TCVB\s*$/m.test(content)) {
+      content += '\n## END_TCVB';
+    }
+  
+    // Fix GLOBAL-REPLACE operations
+    content = content.replace(
+      /## OPERATION:GLOBAL-REPLACE\n([\s\S]*?)(?=\n## OPERATION:|\n## FILE:|\n## END_TCVB|$)/g,
+      (match) => {
+        const hasOldContent = /## OLD_CONTENT/.test(match);
+        const hasNewContent = /## NEW_CONTENT/.test(match);
+  
+        if (!hasOldContent && hasNewContent) {
+          // Convert to CREATE if only NEW_CONTENT is present
+          const newContentMatch = match.match(/## NEW_CONTENT\n```([\s\S]*?)```/);
+          const newContentCode = newContentMatch ? newContentMatch[1] : '';
+          return `## OPERATION:CREATE\n\`\`\`\n${newContentCode}\n\`\`\``;
+        } else if (hasOldContent && !hasNewContent) {
+          // Add empty NEW_CONTENT if only OLD_CONTENT is present
+          return match + '\n## NEW_CONTENT\n```\n```';
+        }
+        // Return unchanged if both are present or both are missing (assuming minimal valid structure)
+        return match;
+      }
+    );
+  
+    return content;
   }
 
   private parse(tcStrContent: string): void {
