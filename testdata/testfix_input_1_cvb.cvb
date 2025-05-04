@@ -1,3 +1,13 @@
+## BEGIN_CVB
+## META
+@用户需求: 重构单个文件：k:\lab\CodeReDesign\src\cvbManager.ts
+
+@时间戳: 250504085858
+
+## END_META
+
+## FILE:k:\lab\CodeReDesign\src\cvbManager.ts
+```typescript
 import * as fs from "fs";
 import * as path from "path";
 import * as jschardet from "jschardet"; // 编码检测库
@@ -9,16 +19,6 @@ import { getLanguageFromPath } from "./languageMapping";
 import {getOutputChannel, getCurrentOperationController} from './extension';
 
 import * as FuzzyMatch from './fuzzyMatch';
-
-
-/**
- * 预处理输入字符串，将所有换行符（\r\n、\r、\n）统一转换为 \n
- * @param input 输入字符串
- * @returns 转换后的字符串，所有换行符替换为 \n
- */
-function normalizeAllLineEndings(input: string): string {
-  return input.replace(/\r\n|\r|\n/g, '\n');
-}
 
 // ================== CVB 核心类 ==================
 export class Cvb {
@@ -83,14 +83,11 @@ export class Cvb {
     return cvbContent;
   }
 
-
   private parse(strCvbContent: string): {
     cvbContent: string;
     metadata: Record<string, string>;
     files: Record<string, string>;
   } {
-
-    strCvbContent = normalizeAllLineEndings(strCvbContent);
     // 查找 CVB 开始与结束标记
     const regCvbStart: RegExp = /^## BEGIN_CVB$/m;
     const arrStartMatch = regCvbStart.exec(strCvbContent);
@@ -254,33 +251,22 @@ export class TCVB {
   }
 
   private parse(tcStrContent: string): void {
-
-    tcStrContent = normalizeAllLineEndings(tcStrContent);
-
-    // 查找 TCVB 开始标记
-    const regTCVBStart: RegExp = /^##\s*BEGIN_TCVB$/m;
-    const arrStartMatch = regTCVBStart.exec(tcStrContent);
-    if (!arrStartMatch) {
-      throw new Error("文件内容必须包含 '## BEGIN_TCVB'，文件不完整");
+    // 从文件内容中提取 "## BEGIN_TCVB" 和 "## END_TCVB" 之间的部分
+    const regTCVB: RegExp = /##\s*BEGIN_TCVB\s*([\s\S]*?)\s*##\s*END_TCVB/;
+    const arrTCVBMatch: RegExpExecArray | null = regTCVB.exec(tcStrContent);
+    if (!arrTCVBMatch) {
+      throw new Error(
+        "文件内容必须包含 '## BEGIN_TCVB' 和 '## END_TCVB' 之间的内容，文件不完整"
+      );
     }
-    const iTCVBStartIndex = arrStartMatch.index + arrStartMatch[0].length;
-
-    // 查找 TCVB 结束标记
-    const regTCVBEnd: RegExp = /^##\s*END_TCVB$/m;
-    const arrEndMatch = regTCVBEnd.exec(tcStrContent);
-    if (!arrEndMatch) {
-      throw new Error("文件内容必须包含 '## END_TCVB'，文件不完整");
-    }
-    const iTCVBEndIndex = arrEndMatch.index;
-
-    // 提取 TCVB 部分内容
-    const strTCVBContentPart = tcStrContent.slice(iTCVBStartIndex, iTCVBEndIndex).trim();
+    // 重新赋值 tcStrContent 为 BEGIN_TCVB 与 END_TCVB 之间的内容
+    tcStrContent = arrTCVBMatch[1];
 
     // 匹配文件块，每个文件块以 "## FILE:" 开头
     const regFileBlock: RegExp =
       /^## FILE:(.*?)\n([\s\S]*?)(?=^## FILE:|(?![\s\S]))/gm;
     let arrFileMatch: RegExpExecArray | null;
-    while ((arrFileMatch = regFileBlock.exec(strTCVBContentPart)) !== null) {
+    while ((arrFileMatch = regFileBlock.exec(tcStrContent)) !== null) {
       const strFilePath: string = filePathNormalize(arrFileMatch[1]);
       const strOperationsBlock: string = arrFileMatch[2];
       // 支持操作类型中含有 "-" 符号（如 exact-replace 等）
@@ -1244,3 +1230,7 @@ export function applyCvbToWorkspace(strCvbContent: string): void {
   }
   vscode.window.showInformationMessage("CVB applied successfully!");
 }
+
+```
+
+## END_CVB
