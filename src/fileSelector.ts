@@ -18,31 +18,43 @@ const EXCLUDED_DIRECTORIES = [
 ]; // 排除目录
 
 /**
- * 解析 ignore 文件内容并返回匹配模式数组
- * @param filePath ignore 文件路径
- * @returns 过滤模式数组
+ * 解析 .gitignore 文件，返回正向模式和反向模式
+ * @param filePath .gitignore 文件路径
+ * @returns { ignorePatterns: string[], includePatterns: string[] }
  */
-function parseIgnoreFile(filePath: string): string[] {
+function parseGitignore(filePath: string): { ignorePatterns: string[], includePatterns: string[] } {
     try {
         const content = fs.readFileSync(filePath, 'utf8');
-        return content
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => 
-                line && // 非空行
-                !line.startsWith('#') && // 不是注释
-                !line.startsWith('!') // 不是反向模式
-            )
-            .map(pattern => {
-                // 转换 gitignore 风格的模式为 glob 模式
-                if (pattern.endsWith('/')) {
-                    return `**/${pattern}**`;
-                }
-                return `**/${pattern}`;
-            });
+        const lines = content.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+        const ignorePatterns: string[] = [];
+        const includePatterns: string[] = [];
+        lines.forEach(line => {
+            if (line.startsWith('!')) {
+                includePatterns.push(line.slice(1)); // 去掉 '!'，作为强制包含模式
+            } else {
+                ignorePatterns.push(line);
+            }
+        });
+        return { ignorePatterns, includePatterns };
     } catch (error) {
-        return [];
+        return { ignorePatterns: [], includePatterns: [] };
     }
+}
+
+/**
+ * 检查文件是否匹配某个模式（简单的手动匹配）
+ * @param filePath 文件路径
+ * @param pattern 模式
+ * @returns 是否匹配
+ */
+function matchesPattern(filePath: string, pattern: string): boolean {
+    const basename = path.basename(filePath);
+    if (pattern.startsWith('*') && pattern.includes(',')) {
+        const exactExtension = pattern.slice(1); // 去掉前面的 *，保留 .py,cover
+        return basename.endsWith(exactExtension);
+    }
+    // 其他简单模式（可以扩展支持更多规则）
+    return basename === pattern || filePath.includes(pattern);
 }
 
 /**
@@ -50,7 +62,6 @@ function parseIgnoreFile(filePath: string): string[] {
  * @returns 用户选择的文件路径数组
  */
 export async function selectFiles(): Promise<string[]> {
-    // 检查是否打开了工作区
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
         vscode.window.showErrorMessage('No workspace folder found.');
@@ -58,40 +69,53 @@ export async function selectFiles(): Promise<string[]> {
     }
 
     const rootPath = workspaceFolders[0].uri.fsPath;
-    
-    // 构建默认排除模式数组
-    const defaultExcludePatterns = EXCLUDED_DIRECTORIES.map(dir => `**/${dir}/**`);
-    
-    // 获取 ignore 文件的模式
-    let ignorePatterns: string[] = [];
     const gitignorePath = path.join(rootPath, '.gitignore');
-    
-    if (fs.existsSync(gitignorePath)) {
-        ignorePatterns = ignorePatterns.concat(parseIgnoreFile(gitignorePath));
-    }
+    const { ignorePatterns, includePatterns } = fs.existsSync(gitignorePath) ? parseGitignore(gitignorePath) : { ignorePatterns: [], includePatterns: [] };
 
-    // 合并所有排除模式并确保是扁平结构
-    const allExcludePatterns = [...defaultExcludePatterns, ...ignorePatterns];
-    const excludePattern = allExcludePatterns.length > 0 
-        ? `{${allExcludePatterns.join(',')}}`
-        : undefined;
-
-    // 1. 匹配白名单文件名
+    // 获取所有符合扩展名和文件名的文件
     const filenamePattern = `**/{${ALLOWED_FILENAMES.join(',')}}`;
-    const filenameFiles = await vscode.workspace.findFiles(filenamePattern, excludePattern);
-
-    // 2. 匹配扩展名文件
     const extensionPattern = `**/*.{${INCLUDED_EXTENSIONS.join(',')}}`;
-    const extensionFiles = await vscode.workspace.findFiles(extensionPattern, excludePattern);
+    const filenameFiles = await vscode.workspace.findFiles(filenamePattern);
+    const extensionFiles = await vscode.workspace.findFiles(extensionPattern);
 
-    // 3. 合并结果并去重
+    // 合并并去重
     const allFiles = [...filenameFiles, ...extensionFiles];
     const uniqueFiles = Array.from(new Set(allFiles.map(file => file.fsPath)));
 
-    // 4. 显示文件选择面板
-    const selectedItems = await vscode.window.showQuickPick(uniqueFiles, {
+    // 手动过滤
+    const filteredFiles = uniqueFiles.filter(filePath => {
+        const relativePath = path.relative(rootPath, filePath);
+
+        // 检查排除目录
+        for (const dir of EXCLUDED_DIRECTORIES) {
+            if (relativePath.startsWith(dir + path.sep)) {
+                return false;
+            }
+        }
+
+        // 检查 .gitignore 模式
+        let shouldIgnore = false;
+        for (const pattern of ignorePatterns) {
+            if (matchesPattern(filePath, pattern)) {
+                shouldIgnore = true;
+                break;
+            }
+        }
+        // 检查反向模式（强制包含）
+        for (const pattern of includePatterns) {
+            if (matchesPattern(filePath, pattern)) {
+                shouldIgnore = false; // 强制包含
+                break;
+            }
+        }
+
+        return !shouldIgnore;
+    });
+
+    // 显示选择面板
+    const selectedItems = await vscode.window.showQuickPick(filteredFiles, {
         placeHolder: 'Select files to include in the refactoring',
-        canPickMany: true, // 允许多选
+        canPickMany: true,
     });
 
     // 返回用户选择的文件
