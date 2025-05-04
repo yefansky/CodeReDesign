@@ -265,6 +265,30 @@ export class TCVB {
     // 移除##指令前的空格
     content = content.replace(/^(\s+)##/gm, '##');
 
+    // 处理CREATE操作后多余的NEW_CONTENT指令
+    content = content.replace(
+      /## OPERATION:CREATE\n(?:## NEW_CONTENT\n)?([\s\S]*?)(?=\n## |\n## END_TCVB|$)/gi,
+      (match, codeSection) => {
+          // 检测代码块是否被正确包裹
+          const trimmed = codeSection.trim();
+          const hasStart = trimmed.startsWith('```');
+          const hasEnd = trimmed.endsWith('```');
+
+          let fixedCode = codeSection.trim();
+          
+          // 确保代码块正确包裹
+          if (!hasStart && !hasEnd) {
+              fixedCode = `\`\`\`\n${fixedCode}\n\`\`\``;
+          } else if (hasStart && !hasEnd) {
+              fixedCode = `${codeSection}\n\`\`\``;
+          } else if (!hasStart && hasEnd) {
+              fixedCode = `\`\`\`\n${codeSection}`;
+          }
+
+          return `## OPERATION:CREATE\n${fixedCode}`;
+      }
+    );
+
     // 规则4/10：修复代码块包裹问题（精确处理需要代码块的操作）
     content = content.replace(
       /(## (?:OLD_CONTENT|NEW_CONTENT|OPERATION:CREATE)\n)([\s\S]*?)(?=\n## |\n## END_TCVB|$)/gis,
@@ -273,6 +297,8 @@ export class TCVB {
           const trimmed = codeSection.trim();
           const hasStart = trimmed.startsWith('```');
           const hasEnd = trimmed.endsWith('```');
+
+          directive = directive.trim();
 
           // 情况1：完全未包裹的代码块
           if (!hasStart && !hasEnd) {
@@ -310,7 +336,8 @@ export class TCVB {
   
             if (!hasOldContent && hasNewContent) {
                 const newContentMatch = match.match(/## NEW_CONTENT\n```([\s\S]*?)```/);
-                const newContentCode = newContentMatch ? newContentMatch[1] : '';
+                let newContentCode = newContentMatch ? newContentMatch[1] : '';
+                newContentCode = newContentCode.trim();
                 return `## OPERATION:CREATE\n\`\`\`\n${newContentCode}\n\`\`\``;
             } else if (hasOldContent && !hasNewContent) {
                 return match + '\n## NEW_CONTENT\n```\n```';

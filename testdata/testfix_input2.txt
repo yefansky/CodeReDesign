@@ -1,0 +1,162 @@
+【第一步：错误原因分析】
+
+1. 错误类型：锚点上下文不完整
+   - 原因描述：原锚点未包含足够的上下文导致匹配失败，实际代码中demo.load前有额外空行
+   - 文件路径：d:/lab/GPT-SoVITS_yefanFork/tools/subfix_webui.py
+   - 错误写法：锚点未包含前导空行和完整上下文
+   - 正确写法：应包含前导空行和完整函数调用上下文
+
+2. 错误类型：缩进不一致
+   - 原因描述：原代码使用4个空格缩进，而锚点中使用不一致的缩进
+   - 文件路径：d:/lab/GPT-SoVITS_yefanFork/tools/subfix_webui.py
+   - 错误写法：缩进不匹配实际代码
+   - 正确写法：严格使用4空格缩进
+
+3. 错误类型：路径格式问题
+   - 原因描述：Windows路径反斜杠未转义
+   - 文件路径：所有文件路径
+   - 错误写法：d:\lab\路径
+   - 正确写法：d:/lab/路径 或 双反斜杠
+
+【第二步：最小改动修正】
+
+1. 文件1修改：
+   - 位置：d:/lab/GPT-SoVITS_yefanFork/tools/subfix_webui.py
+   - 修改内容：
+     - 扩展锚点范围包含前导空行
+     - 严格保持4空格缩进
+     - 确保demo.load调用完整保留
+
+2. 文件2修改：
+   - 位置：d:/lab/GPT-SoVITS_yefanFork/GPT_SoVITS/inference_webui.py
+   - 修改内容：
+     - 精确匹配原有Markdown结构
+     - 保持原有参数顺序
+     - 确保按钮添加位置准确
+
+【第三步：完整输出】
+
+```python
+## BEGIN_TCVB
+
+## FILE:d:/lab/GPT-SoVITS_yefanFork/tools/subfix_webui.py
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+        with gr.Row():
+            batchsize_slider = gr.Slider(
+                minimum=1, maximum=g_batch, value=g_batch, step=1, label="Batch Size", scale=3, interactive=False
+            )
+            interval_slider = gr.Slider(minimum=0, maximum=2, value=0, step=0.01, label="Interval", scale=3)
+            btn_theme_dark = gr.Button("Light Theme", link="?__theme=light", scale=1)
+            btn_theme_light = gr.Button("Dark Theme", link="?__theme=dark", scale=1)
+
+        demo.load(
+            b_change_index,
+            inputs=[
+                index_slider,
+                batchsize_slider,
+            ],
+            outputs=[*g_text_list, *g_audio_list, *g_checkbox_list],
+        )
+```
+## NEW_CONTENT
+        with gr.Row():
+            batchsize_slider = gr.Slider(
+                minimum=1, maximum=g_batch, value=g_batch, step=1, label="Batch Size", scale=3, interactive=False
+            )
+            interval_slider = gr.Slider(minimum=0, maximum=2, value=0, step=0.01, label="Interval", scale=3)
+            btn_theme_dark = gr.Button("Light Theme", link="?__theme=light", scale=1)
+            btn_theme_light = gr.Button("Dark Theme", link="?__theme=dark", scale=1)
+            btn_send_to_infer = gr.Button("Send to Inference", variant="primary", scale=1)
+
+        def b_send_to_inference(*checkbox_list):
+            selected_data = []
+            for i, checkbox in enumerate(checkbox_list):
+                if checkbox and g_index + i < len(g_data_json):
+                    selected_data.append({
+                        "audio_path": g_data_json[g_index + i][g_json_key_path],
+                        "text": g_data_json[g_index + i][g_json_key_text].strip()
+                    })
+            if selected_data:
+                try:
+                    with open("shared_audio_ref.txt", "w", encoding="utf-8") as f:
+                        json.dump(selected_data[0], f)
+                    return gr.Info("Sent to inference page successfully!")
+                except Exception as e:
+                    return gr.Warning(f"Failed to send: {str(e)}")
+            return gr.Warning("No audio selected!")
+            
+        btn_send_to_infer.click(
+            b_send_to_inference,
+            inputs=[*g_checkbox_list],
+            outputs=[]
+        )
+
+        demo.load(
+            b_change_index,
+            inputs=[
+                index_slider,
+                batchsize_slider,
+            ],
+            outputs=[*g_text_list, *g_audio_list, *g_checkbox_list],
+        )
+
+## FILE:d:/lab/GPT-SoVITS_yefanFork/GPT_SoVITS/inference_webui.py
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+                gr.Markdown(
+                    html_left(
+                        i18n("使用无参考文本模式时建议使用微调的GPT")
+                        + "<br>"
+                        + i18n("听不清参考音频说的啥(不晓得写啥)可以开。开启后无视填写的参考文本。")
+                    )
+                )
+                prompt_text = gr.Textbox(label=i18n("参考音频的文本"), value="", lines=5, max_lines=5, scale=1)
+```
+## NEW_CONTENT
+                gr.Markdown(
+                    html_left(
+                        i18n("使用无参考文本模式时建议使用微调的GPT")
+                        + "<br>"
+                        + i18n("听不清参考音频说的啥(不晓得写啥)可以开。开启后无视填写的参考文本。")
+                    )
+                )
+                btn_load_ref = gr.Button(i18n("Load from Annotation"), variant="secondary", scale=1)
+                prompt_text = gr.Textbox(label=i18n("参考音频的文本"), value="", lines=5, max_lines=5, scale=1)
+
+        def load_annotation_data():
+            try:
+                if os.path.exists("shared_audio_ref.txt"):
+                    with open("shared_audio_ref.txt", "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    return data["audio_path"], data["text"], gr.Info("Loaded from annotation!")
+                return None, None, gr.Warning("No shared data found!")
+            except Exception as e:
+                return None, None, gr.Warning(f"Load failed: {str(e)}")
+                
+        btn_load_ref.click(
+            load_annotation_data,
+            outputs=[inp_ref, prompt_text]
+        )
+
+## END_TCVB
+```
+
+【第四步：总结说明】
+
+1. 错误修正验证：
+   - 锚点范围已扩展包含完整上下文
+   - 缩进严格匹配原文件(4空格)
+   - 路径格式统一为正斜杠
+   - 所有功能组件完整保留
+
+2. 修改内容确认：
+   - 标注页面：新增按钮及功能逻辑
+   - 推理页面：新增加载按钮及处理逻辑
+   - 共享文件机制完整实现
+
+3. 兼容性保证：
+   - 不改变原有参数传递方式
+   - 不破坏现有功能逻辑
+   - 新增代码风格与原有代码一致
+
