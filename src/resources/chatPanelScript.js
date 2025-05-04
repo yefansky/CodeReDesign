@@ -19,6 +19,7 @@ function setupEditButtons() {
 
             const editSend = userDiv.querySelector('.edit-send');
             const editCancel = userDiv.querySelector('.edit-cancel');
+            const editTextarea = userDiv.querySelector('.edit-textarea');
 
             editSend.onclick = () => {
                 const newText = userDiv.querySelector('textarea').value;
@@ -31,6 +32,18 @@ function setupEditButtons() {
                 userDiv.innerHTML = `<button class="edit-btn">✎</button><div class="user-content">${contentDiv.textContent}</div>`;
                 setupEditButtons();
             };
+
+            // 为 textarea 添加 Ctrl + Enter 快捷键
+            editTextarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault(); // 防止换行
+                    editSend.click(); // 触发发送按钮的点击事件
+                }
+                else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    editCancel.click();
+                }
+            });
         };
     });
 }
@@ -208,7 +221,7 @@ function separateThinkContent(input) {
     const parts = input.split(/(<think>[\s\S]*?<\/think>)/g);
     
     parts.forEach(part => {
-        if (!part) return;
+        if (!part) {return; }
         
         if (part.startsWith('<think>') && part.endsWith('</think>')) {
             segments.push({
@@ -285,12 +298,20 @@ async function renderMessage(role, content, index) {
         });
         ensureCopyButtons();
         hljs.highlightAll();
-    } else {
+    }
+    else if (role === 'tool') {
+        targetDiv.innerHTML = `<tool_call>${targetDiv.dataset.markdownContent}</tool_call>`;
+    }
+    else {
         targetDiv.innerHTML = `<button class="edit-btn">✎</button><div class="user-content">${targetDiv.dataset.markdownContent}</div>`;
         targetDiv.dataset.index = index;
         setupEditButtons();
     }
-    chat.scrollTop = chat.scrollHeight;
+    //chat.scrollTop = chat.scrollHeight;
+
+    if (autoScrollEnabled) {
+        smartScroll();
+    }
 }
 
 // 消息处理
@@ -345,7 +366,7 @@ function setupInputHandlers() {
 function sendMessage() {
     const text = input.value.trim();
     if (text) {
-        vscode.postMessage({ command: 'sendMessage', text, webSearch: webSearchCheckbox.checked });
+        vscode.postMessage({ command: 'sendMessage', text, webSearch: webSearchCheckbox.checked, agentMode: agentModeCheckbox.checked });
         input.value = '';
     }
 }
@@ -367,6 +388,65 @@ function handleKeyDown(e) {
     }
 }
 
+
+// 优化版智能滚动控制
+// 配置常量
+const SCROLL_THRESHOLD = 200; // 距离底部?px视为触底
+let autoScrollEnabled = true;
+let lastScrollTop = 0;
+
+// 精准的滚轮方向检测
+function handleWheel(e) {
+    const isScrollingDown = e.deltaY > 0;
+    checkScrollIntent(isScrollingDown);
+}
+
+// 滚动意图检测
+function checkScrollIntent(isScrollingDown) {
+    const currentPos = chat.scrollTop + chat.clientHeight;
+    const maxPos = chat.scrollHeight;
+    const distanceToBottom = maxPos - currentPos;
+
+    // 判断条件
+    if (isScrollingDown) {
+        // 向下滚动时：距离底部小于阈值则开启自动滚动
+        autoScrollEnabled = distanceToBottom <= SCROLL_THRESHOLD;
+    } else {
+        // 任何向上滚动动作立即关闭自动滚动
+        autoScrollEnabled = false;
+    }
+
+    // 调试输出
+    // console.log(`方向: ${isScrollingDown ? '↓' : '↑'} | 距底部: ${distanceToBottom}px | 自动: ${autoScrollEnabled}`);
+}
+
+// 智能滚动执行
+function smartScroll() {
+    if (autoScrollEnabled) {
+        chat.scrollTop = chat.scrollHeight;
+    }
+}
+
+// 初始化
+function setupScroll() {
+    // 监听滚轮事件
+    chat.addEventListener('wheel', handleWheel, { passive: true });
+    
+    // 实时滚动检测（使用requestAnimationFrame优化性能）
+    let lastRender = 0;
+    const checkScroll = (timestamp) => {
+        if (timestamp - lastRender > 100) { // 每100ms检查一次
+            if (autoScrollEnabled) {
+                smartScroll();
+            }
+            lastRender = timestamp;
+        }
+        requestAnimationFrame(checkScroll);
+    };
+    requestAnimationFrame(checkScroll);
+}
+
+
 // 主初始化函数
 function initializeWebview() {
     // 初始化库和事件监听
@@ -375,7 +455,8 @@ function initializeWebview() {
     setupInputHandlers();
     setupEditButtons();
     setupCopyButtonDelegation();
+
+    setupScroll();
 }
 
 initializeWebview();
-

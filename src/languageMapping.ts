@@ -21,7 +21,8 @@ export const g_objLanguageMapping: { [key: string]: string } = {
   'rust': 'rust',        // Rust
   'dart': 'dart',        // Dart
   'md': 'markdown',       // markdown
-  'json':'json'
+  'json':'json',
+  'txt': 'text'
 };
 
 /**
@@ -33,3 +34,6 @@ export function getLanguageFromPath(filePath: string): string {
   const strExt = filePath.split('.').pop()?.toLowerCase() || '';
   return g_objLanguageMapping[strExt] || 'text';
 }
+
+export const SOURCE_FILE_EXTENSIONS_WITH_DOT = Object.keys(g_objLanguageMapping)
+  .map(ext => `.${ext}`);

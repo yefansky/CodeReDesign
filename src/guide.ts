@@ -235,7 +235,7 @@ class GuideViewProvider implements vscode.WebviewViewProvider {
           </li>
           <li>
             <p><strong>2. 选择一个文件镜像集合到大模型，并提出修改需求。模型会在本地输出框输出处理过程，成功后也会在本地生成一个新的 CVB 文件。</strong></p>
-            <a href="#" id="uploadCvb">CodeReDesign: Upload CVB and Call API</a>
+            <a href="#" id="redesignCvb">CodeReDesign: Redesign CVB and Call API</a>
           </li>
           <li>
             <p><strong>3. 选择一个本地的 CVB 文件，把里面的内容覆盖到当前目录中，也就是应用修改。</strong></p>

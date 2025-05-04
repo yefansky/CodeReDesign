@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { callDeepSeekApi } from './deepseekApi';
+import { callDeepSeekApi, generateFilenameFromRequest } from './deepseekApi';
 import { getCurrentOperationController, resetCurrentOperationController } from './extension';
 import path from 'path';
 import * as fs from "fs";
@@ -10,10 +10,12 @@ import { getOutputChannel } from './extension';
 class WebviewOutputChannel implements vscode.OutputChannel {
     private readonly webview: vscode.Webview;
     private readonly channelName: string;
+    private readonly onChanged?: () => void;
 
-    constructor(webview: vscode.Webview, name: string) {
+    constructor(webview: vscode.Webview, name: string, onChanged?: () => void ) {
         this.webview = webview;
         this.channelName = name;
+        this.onChanged = onChanged;
     }
 
     get name(): string {
@@ -23,11 +25,19 @@ class WebviewOutputChannel implements vscode.OutputChannel {
     append(value: string): void {
         this.webview.postMessage({ role: 'model', content: value });
         getOutputChannel().append(value);
+
+        if (this.onChanged) {
+            this.onChanged();
+        }
     }
 
     appendLine(value: string): void {
         this.append(value + '\n');
         getOutputChannel().append(value + '\n');
+
+        if (this.onChanged) {
+            this.onChanged();
+        }
     }
 
     clear(): void {
@@ -52,14 +62,30 @@ export class ChatPanel {
     private conversation: { role: string; content: string }[] = [];
     private userMessageIndex: number = 0;
     private chatFilePath: string | null = null;
-    private lastSaveTime: number = Date.now();
     private readonly context: vscode.ExtensionContext;
+    private isFilenameCustomized: boolean = false;
+    private isSaveScheduled = false;
+    private saveTimeout: NodeJS.Timeout | null = null;
 
     private constructor(panel: vscode.WebviewPanel, context: vscode.ExtensionContext) {
         this.panel = panel;
         this.context = context;
         this.setupPanelEventListeners();
         this.panel.webview.html = this.getHtmlForWebview();
+    }
+
+    // 延迟保存方法
+    private delaySave() {
+        // 如果已经有保存任务排队，跳过新请求
+        if (this.isSaveScheduled) {return; }
+
+        this.isSaveScheduled = true;
+        
+        // 设置2秒延迟保存
+        this.saveTimeout = setTimeout(() => {
+            this.saveChatToFile(); // 实际保存操作
+            this.isSaveScheduled = false; // 重置标志位
+        }, 2000);
     }
 
     public static createOrShow(context: vscode.ExtensionContext): void {
@@ -146,7 +172,11 @@ export class ChatPanel {
                         <button id="stop" style="display:none;">Stop</button>
                         <div class="web-search">
                             <input type="checkbox" id="web-search">
-                            <label for="web-search">Agent模式(可联网)</label>
+                            <label for="web-search">联网搜索</label>
+                        </div>
+                        <div class="agent-mode">
+                            <input type="checkbox" id="agent-mode">
+                            <label for="agent-mode">Agent模式</label>
                         </div>
                     </div>
                 </div>
@@ -179,6 +209,7 @@ export class ChatPanel {
             const stopButton = document.getElementById('stop');
             const newSessionButton = document.getElementById('new-session');
             const webSearchCheckbox = document.getElementById('web-search');
+            const agentModeCheckbox = document.getElementById('agent-mode');
             const mermaidToggle = document.getElementById('mermaid-toggle');
     
             // 加载外部脚本
@@ -189,13 +220,13 @@ export class ChatPanel {
     }
 
     private async handleMessage(message: any): Promise<void> {
-        const webviewOutputChannel = new WebviewOutputChannel(this.panel.webview, 'DeepSeek API Output');
+        const webviewOutputChannel = new WebviewOutputChannel(this.panel.webview, 'DeepSeek API Output', this.delaySave);
 
         switch (message.command) {
             case 'sendMessage':
             case 'editMessage':
                 await this.handleSendOrEditMessage(message, webviewOutputChannel);
-                this.saveChatToFile();
+                this.delaySave();
                 break;
                 
             case 'newSession':
@@ -216,6 +247,10 @@ export class ChatPanel {
         }
 
         this.prepareChatFilePath();
+
+        if (this.conversation.length === 0) { // 只有第一次消息时处理
+            await this.tryGenerateCustomFilename(message.text);
+        }
         
         this.conversation.push({ role: 'user', content: message.text });
         this.panel.webview.postMessage({ 
@@ -249,6 +284,38 @@ export class ChatPanel {
         }
     }
 
+    private async tryGenerateCustomFilename(userMessage: string): Promise<void> {
+        if (this.isFilenameCustomized) { return; }
+    
+        const originalPath = this.chatFilePath;
+        if (!originalPath || !originalPath.endsWith('_chat.chat')) {
+            return;
+        }
+    
+        try {
+            // 截取前30个字符
+            const requestSnippet = userMessage.slice(0, 32).replace(/[\n\r]/g, ' ');
+            const summary = await generateFilenameFromRequest(requestSnippet);
+            
+            // 生成新路径
+            const newFilename = `${path.basename(originalPath, '_chat.chat')}_${summary}.chat`;
+            const newPath = path.join(path.dirname(originalPath), newFilename);
+    
+            // 更新状态
+            this.chatFilePath = newPath;
+            this.isFilenameCustomized = true;
+
+            // 重命名文件
+            if (fs.existsSync(originalPath)) {
+                await fs.promises.rename(originalPath, newPath);
+            }
+        } catch (error) {
+            console.error('Failed to rename chat file:', error);
+            // 失败时保持原文件名
+            this.chatFilePath = originalPath;
+        }
+    }
+
     private updateUIForSending(): void {
         this.panel.webview.postMessage({ command: 'disableSendButton' });
         this.panel.webview.postMessage({ command: 'showStopButton' });
@@ -272,11 +339,18 @@ export class ChatPanel {
     }
 
     private async callModelApi(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<string | null> {
-        const tools = message.webSearch ? apiTools.getAllTools() : null;
+        let tools = null;
         const normalSystemPrompt = "用markdown输出。如果有数学公式要用$$包裹，每条一行不要换行。如果有流程图(Mermaid)里的每个字符串都要用引号包裹。";
-        const systemPrompt = message.webSearch 
-            ?  this.loadAgentPrompt() + normalSystemPrompt 
-            : normalSystemPrompt;
+        let systemPrompt = normalSystemPrompt;
+
+        if (message.webSearch) {
+            tools = apiTools.getWebSearchTools();
+            systemPrompt += "每次回答问题前,先观察信息是否足够, 如果不够，先用tool_call进行网络搜索。不要盲目自信， 不要臆测不确定的信息。";
+        }
+        if (message.agentMode) {
+            tools = apiTools.getAllTools();
+            systemPrompt += this.loadAgentPrompt();
+        }
 
         return await callDeepSeekApi(
             this.conversation.map(msg => ({ role: msg.role, content: msg.content })),
@@ -299,6 +373,7 @@ export class ChatPanel {
 
     private handleNewSession(): void {
         this.chatFilePath = null;
+        this.isFilenameCustomized = false;
         this.conversation = [];
         this.userMessageIndex = 0;
         resetCurrentOperationController();
@@ -314,10 +389,9 @@ export class ChatPanel {
     }
 
     private saveChatToFile(): void {
-        if (!this.chatFilePath || Date.now() - this.lastSaveTime < 10000) {
+        if (!this.chatFilePath) {
             return;
         }
-
         try {
             const mdContent = this.conversation.map(msg => {
                 return `@${msg.role === 'user' ? 'user' : 'AI'}:\n\n${msg.content}\n\n`;
@@ -330,10 +404,70 @@ export class ChatPanel {
             }
 
             fs.writeFileSync(this.chatFilePath, mdContent, 'utf-8');
-            this.lastSaveTime = Date.now();
         } catch (error) {
             console.error('Failed to save chat file:', error);
         }
+    }
+
+    public static async loadFromFile(context: vscode.ExtensionContext, filePath: string) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const conversation = this.parseChatContent(content);
+        
+        this.createOrShow(context);
+
+        ChatPanel.currentPanel!.isFilenameCustomized = true;
+        ChatPanel.currentPanel!.chatFilePath = filePath;
+        ChatPanel.currentPanel!.conversation = conversation;
+        ChatPanel.currentPanel!.userMessageIndex = conversation.filter(m => m.role === 'user').length;
+
+        // 将历史记录发送到webview
+        conversation.forEach((msg, index) => {
+            ChatPanel.currentPanel!.panel.webview.postMessage({
+                role: msg.role,
+                content: msg.content,
+                index: msg.role === 'user' ? index : undefined
+            });
+        });
+    }
+
+    private static parseChatContent(content: string): Array<{role: string, content: string}> {
+        const conversation = [];
+        const lines = content.split('\n');
+        let currentRole = '';
+        let currentContent = [];
+        
+        for (const line of lines) {
+            if (line.startsWith('@user:')) {
+                if (currentRole) {
+                    conversation.push({
+                        role: currentRole,
+                        content: currentContent.join('\n').trim()
+                    });
+                }
+                currentRole = 'user';
+                currentContent = [];
+            } else if (line.startsWith('@AI:')) {
+                if (currentRole) {
+                    conversation.push({
+                        role: currentRole,
+                        content: currentContent.join('\n').trim()
+                    });
+                }
+                currentRole = 'model';
+                currentContent = [];
+            } else {
+                currentContent.push(line);
+            }
+        }
+
+        if (currentRole) {
+            conversation.push({
+                role: currentRole,
+                content: currentContent.join('\n').trim()
+            });
+        }
+
+        return conversation;
     }
 
     public dispose(): void {

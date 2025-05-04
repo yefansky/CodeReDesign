@@ -18,6 +18,7 @@ import { CONFIG as RAG_CONFIG } from './ragService';
 import { parseString } from 'xml2js';
 import ExcelJS from 'exceljs';
 import pdfParse from 'pdf-parse';
+import {getLanguageFromPath} from './languageMapping';
 
 /** 定义工具的接口 */
 export interface Tool {
@@ -32,6 +33,7 @@ export interface Tool {
 }
 
 export const toolRegistry: Map<string, Tool> = new Map();
+export const webSearchRegistry : Map<string, Tool> = new Map();
 
 /**
  * 注册一个工具到全局工具表
@@ -41,12 +43,20 @@ export function registerTool(tool: Tool) {
     toolRegistry.set(tool.name, tool);
 }
 
+export function registerWebSearchTool(tool: Tool) {
+    webSearchRegistry.set(tool.name, tool);
+}
+
 /**
  * Retrieves an array of all registered tools from the tool registry.
  * @returns An array of Tool objects.
  */
 export function getAllTools(): Tool[] {
     return Array.from(toolRegistry.values());
+}
+
+export function getWebSearchTools(): Tool[] {
+    return Array.from(webSearchRegistry.values());
 }
 
 export async function handleNativeFunctionCalling(
@@ -297,12 +307,13 @@ async function fetchPageContent(url: string): Promise<string> {
 }
 
 // 1. 搜索网络
-export const searchTool: Tool = {
+export const webSearchTool: Tool = {
     name: 'web_search',
     description: `执行网络搜索并返回前5个结果的摘要。适用于需要获取外部信息、验证数据或了解最新动态的情况。
 用户提供这个工具通常是对你的知识储备或判断持怀疑态度，希望通过网络搜索获取更权威或更新的信息。
 你可以用它来补充自己的回答，确保回答准确且有据可依。
 当问到你依稀技术名词的时候，你没有把握就不要乱说，先联网搜索。因为大模型很容易产生幻觉，以为自己什么都懂。
+使用完这些搜索到的信息以后，你还应该输出所有被你采纳信息的来源，也就是url，方便用户核实
 
 使用场景:
 - 获取最新信息: 例如，用户询问“2023年最好的编程语言是什么？”
@@ -334,22 +345,36 @@ export const searchTool: Tool = {
                 return '未找到相关结果';
             }
             
+            // 修改结果处理部分
             const results = await Promise.all(
                 links.map(link => 
                     fetchPageContent(link as string)
-                        .catch(e => `抓取失败: ${link} (${e.message})`)
+                        .then(content => ({
+                            url: link,
+                            content: content
+                        }))
+                        .catch(e => ({
+                            url: link,
+                            content: `抓取失败: ${e.message}`
+                        }))
                 )
             );
             
+            // 添加URL信息到返回结果
             return results
-                .map((res, i) => `【结果${i+1}】\n${res}`)
+                .map((res, i) => 
+                    `【结果${i+1}】\n` + 
+                    `来源：${res.url}\n` + 
+                    `内容摘要：${res.content.slice(0, 500)}...` // 限制内容长度
+                )
                 .join('\n\n');
         } catch (error: any) {
             return `搜索失败: ${error.message}`;
         }
     },
 };
-registerTool(searchTool);
+registerTool(webSearchTool);
+registerWebSearchTool(webSearchTool);
 
 // 获取网页正文内容的工具
 export const getWebpageContent: Tool = {
@@ -426,6 +451,7 @@ export const getWebpageContent: Tool = {
 };
 
 registerTool(getWebpageContent);
+registerWebSearchTool(getWebpageContent);
 
 // 列举指定路径下文件和目录的工具
 export const listDirectory: Tool = {
@@ -567,8 +593,23 @@ export const readTextFile: Tool = {
     },
     function: async (args: { filePath: string }) => {
         try {
-            const content = await fs.readFile(args.filePath, 'utf-8');
-            return content;
+            let content = await fs.readFile(args.filePath, 'utf-8');
+            const language = getLanguageFromPath(args.filePath);
+            const PRE = `${args.filePath}\n\`\`\`${language}\n`;
+            const POST = `\n\`\`\``;
+            
+            // 计算可用内容长度（预留注释和格式空间）
+            const MAX_LEN = 2048;
+            const reservedSpace = PRE.length + POST.length + 30; // 30为截断注释长度
+            let maxContentLen = MAX_LEN - reservedSpace;
+
+            // 处理内容截断
+            let truncated = content.length > maxContentLen;
+            if (truncated) {
+                content = content.substring(0, maxContentLen) + '\n// ...（内容已截断，超过2K限制）';
+            }
+            
+            return PRE + content + POST;
         } catch (error: any) {
             return `读取文件失败: ${error.message}`;
         }
@@ -989,6 +1030,11 @@ export const writeMemory: Tool = {
 一些我们一起讨论得出的结论你也可以存起来。你要做个虚心好学的学生，学到的东西都要做好笔记。
 如果一个任务你做了好几个步骤才完成，可以总结一下，写明任务目标，注意事项，一些积累经验，快速执行的方法，存入记忆，下次类似任务可以根据这个经验快速处理。
 当我告诉你的话里出现"记住","存入记忆","下次"等关键词，就是明确告诉你要调用write_memory把信息记录下来
+你存入的每一条记忆，必须有前倾提要，或者有说明语境。单独拿出来看必须能知道是在什么情况下总结出来的信息，有什么价值
+比如"在???情况下应该用什么???策略应对", "因为我提到了某某，所以你需要记录下来XX，以便下次能想起来"， "用户让我搜索互联网，主题是XXX，结果我搜到了信息XXX"
+必须包含这些丰富的上下文语境，有了语境的记忆才是正确的，必须要注意！不能只存需要写入的信息的片段，必须有上下文！
+存入记忆前你最好评估这条信息的可信度，如果是从网络上搜索到的可信度比较高，如果是你自己猜测的可信度就比较低，最好不要存入可信度不高的信息
+并且存入的语句要通顺
 
 使用场景:
 - 记录新信息: 例如，用户说“我发现了一个新工具叫 X”，你可以保存它。

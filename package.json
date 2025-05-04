@@ -4,7 +4,7 @@
   "description": "A VSCode extension for code refactoring and redesign by DeepSeek API.",
   "publisher": "shellingye",
   "icon": "images/icon.png",
-  "version": "0.0.170",
+  "version": "0.0.195",
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -14,13 +14,17 @@
   "main": "./dist/extension.js",
   "activationEvents": [
     "onCommand:codeReDesign.generateCvb",
-    "onCommand:codeReDesign.uploadCvb",
+    "onCommand:codeReDesign.redesignCvb",
     "onCommand:codeReDesign.applyCvb",
     "onCommand:codeReDesign.applyThisCvb",
     "onCommand:codeReDesign.analyzeCode",
-    "onCommand:codeReDesign.uploadThisCvb",
+    "onCommand:codeReDesign.redesignThisCvb",
     "onCommand:codeReDesign.analyzeThisCvb",
-    "onCommand:codeReDesign.compressThisCvb"
+    "onCommand:codeReDesign.summaryThisCvb",
+    "onCommand:codeReDesign.analyzeSingleFile",
+    "onCommand:codeReDesign.redesignSingleFile",
+    "onCommand:codeReDesign.startChat",
+    "onCommand:codeReDesign.continueChat"
   ],
   "repository": {
     "type": "git",
@@ -35,8 +39,8 @@
         "icon": "${add}"
       },
       {
-        "command": "codeReDesign.uploadCvb",
-        "title": "Upload CVB and Call API",
+        "command": "codeReDesign.redesignCvb",
+        "title": "Redesign CVB and Call API",
         "category": "CodeReDesign",
         "icon": "${cloud-upload}"
       },
@@ -65,6 +69,12 @@
         "icon": "${chat}"
       },
       {
+        "command": "codeReDesign.continueChat",
+        "title": "continue Chat",
+        "category": "CodeReDesign",
+        "icon": "${chat}"
+      },
+      {
         "command": "codeReDesign.applyThisCvb",
         "title": "sidebar Apply this CVB to Workspace",
         "when": "false",
@@ -72,8 +82,8 @@
         "icon": "${save}"
       },
       {
-        "command": "codeReDesign.uploadThisCvb",
-        "title": "sidebar Upload this CVB and Call API",
+        "command": "codeReDesign.redesignThisCvb",
+        "title": "sidebar Redesign this CVB and Call API",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${cloud-upload}"
@@ -86,8 +96,8 @@
         "icon": "${bug}"
       },
       {
-        "command": "codeReDesign.compressThisCvb",
-        "title": "sidebar compress this CVB",
+        "command": "codeReDesign.summaryThisCvb",
+        "title": "sidebar summary this CVB",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${beaker}"
@@ -97,6 +107,20 @@
         "title": "Show Guide",
         "category": "CodeReDesign",
         "icon": "${question}"
+      },
+      {
+        "command": "codeReDesign.analyzeSingleFile",
+        "title": "CodeReDesign:Analyze single File",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${bug}"
+      },
+      {
+        "command": "codeReDesign.redesignSingleFile",
+        "title": "CodeReDesign:Redesign single File",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${bug}"
       }
     ],
     "viewsContainers": {
@@ -112,14 +136,16 @@
       "explorer": [
         {
           "id": "codeReDesign.cvbView",
-          "name": "CodeReDesign Actions"
+          "name": "CodeReDesign Actions",
+          "icon": "images/icon.svg"
         }
       ],
       "guide-bar": [
         {
           "type": "webview",
           "id": "guideView",
-          "name": "User Guide"
+          "name": "User Guide",
+          "icon": "images/icon.svg"
         }
       ]
     },
@@ -127,19 +153,28 @@
       "view/item/context": [
         {
           "command": "codeReDesign.applyThisCvb",
-          "group": "cvb@1"
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile"
         },
         {
-          "command": "codeReDesign.uploadThisCvb",
-          "group": "cvb@1"
+          "command": "codeReDesign.redesignThisCvb",
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile"
         },
         {
           "command": "codeReDesign.analyzeThisCvb",
-          "group": "cvb@1"
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile"
         },
         {
-          "command": "codeReDesign.compressThisCvb",
-          "group": "cvb@1"
+          "command": "codeReDesign.summaryThisCvb",
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile"
+        },
+        {
+          "command": "codeReDesign.continueChat",
+          "group": "cvb@1",
+          "when": "viewItem == chatFile"
         }
       ],
       "editor/context": [
@@ -147,6 +182,18 @@
           "command": "codeReDesign.stopOperation",
           "group": "navigation",
           "when": "panelFocus && activePanel == 'workbench.panel.output'"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "codeReDesign.analyzeSingleFile",
+          "group": "cvb@1",
+          "when": "resourceExtname in codeReDesign.supportedSourceFileTypeExt"
+        },
+        {
+          "command": "codeReDesign.redesignSingleFile",
+          "group": "cvb@1",
+          "when": "resourceExtname in codeReDesign.supportedSourceFileTypeExt"
         }
       ]
     },

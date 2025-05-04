@@ -142,6 +142,35 @@ export async function processDeepSeekResponse(
     return { chunkResponse, finishReason };
 }
 
+function fixMessages(messages: OpenAI.ChatCompletionMessageParam[]): OpenAI.ChatCompletionMessageParam[] {
+    const result = [...messages]; // Create a copy to avoid mutating the original
+    let i = 0;
+  
+    // Traverse the array, but check length dynamically since we may insert elements
+    while (i < result.length - 1) {
+      const current = result[i];
+      const next = result[i + 1];
+  
+      // Check if current and next have the same role
+      if (current.role === next.role) {
+        // Insert the opposite role with content "ok"
+        const newMessage : OpenAI.ChatCompletionMessageParam = {
+          role: current.role === 'user' ? 'assistant' : 'user',
+          content: 'ok'
+        };
+        // Insert at index i + 1
+        result.splice(i + 1, 0, newMessage);
+        // Move to the next pair, since we just inserted
+        i += 2;
+      } else {
+        // Move to the next message if no insertion is needed
+        i += 1;
+      }
+    }
+  
+    return result;
+  }
+
 /**
  * 调用 DeepSeek API，支持 Function Calling
  * @param userContent 用户输入内容，可以是字符串或消息数组
@@ -194,39 +223,39 @@ export async function callDeepSeekApi(
         let maxToken = 1024 * 8;
         let temperature = 0;
 
-        let systemPromot : OpenAI.ChatCompletionMessageParam = {role : "system",  content: systemContent};
-
-        if (/r1|reasoner/i.test(modelName)) {
+        const isR1Mode = /r1|reasoner/i.test(modelName);
+        if (isR1Mode) {
             temperature = 0.6;
-            systemPromot = {role : "user",  content: systemContent};
         }
 
-        // 构造消息体
+        // 构造消息体，先将所有内容放入 messages_body
         let messages_body: OpenAI.ChatCompletionMessageParam[] = [];
-        if (Array.isArray(userContent)) {
-            if (systemPromot.role === 'user') { 
-                userContent[0].content = systemPromot.content + "\n\n" + userContent[0].content; 
-            }
-            else{ 
-                messages_body.push(systemPromot); 
-            }
 
-            const role = (userContent[0].role === 'user') ? 'user' : 'assistant';
-            messages_body.push({ role, content: userContent[0].content });
-
-            // 如果 userContent 是数组，按交替方式生成消息
-            for (let i = 1; i < userContent.length; i++) {
-                const role = (userContent[i].role === 'user') ? 'user' : 'assistant';
-                messages_body.push({ role, content: userContent[i].content });
-            }
-        } 
-        else {
-            if (systemPromot.role === 'user') { userContent = systemPromot.content + "\n\n" + userContent; }
-            else{ messages_body.push(systemPromot); }
-
-            // 如果是单个字符串，默认是 'user' 角色
-            messages_body.push({ role: 'user', content: userContent });
+        // 将 userContent 转换为数组并加入 messages_body
+        const userContentArray = typeof userContent === 'string' 
+            ? [{ role: 'user', content: userContent }] 
+            : userContent;
+        for (const msg of userContentArray) {
+            const role = msg.role === 'user' ? 'user' : 'assistant';
+            messages_body.push({ role, content: msg.content });
         }
+
+        if (messages_body.length > 0) {
+            if (messages_body[0].role === 'user') {
+                messages_body[0].content = (messages_body[0].content as string).replace(/<system>.*?<\/system>/gs, ''); // 替换 <system> 标签为空串
+            } else {
+                messages_body.shift(); // 移除头部系统消息
+            }
+        }
+
+        if (isR1Mode) {
+            messages_body[0].content = `<system>${systemContent}</system>` +  messages_body[0].content;
+        }
+        else {
+            messages_body.unshift({role: 'system', content: `<system>${systemContent}</system>`});
+        }
+
+        messages_body = fixMessages(messages_body);
 
         vscode.window.showInformationMessage('开始上传DeepSeek API');
 

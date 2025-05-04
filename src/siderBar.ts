@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { applyCvbToWorkspace, compressCvb, Cvb} from './cvbManager';
+import { applyCvbToWorkspace, summaryCvb, Cvb, generateCvb} from './cvbManager';
 import { analyzeCode } from './deepseekApi';
-import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doUploadCommand, saveAnalyzeCodeResult} from './extension';
+import { getCurrentOperationController,  resetCurrentOperationController, clearCurrentOperationController, doRedesignCommand, saveAnalyzeCodeResult} from './extension';
 import { showInputMultiLineBox } from './UIComponents';
 import {getOutputChannel} from './extension';
+import {SOURCE_FILE_EXTENSIONS_WITH_DOT} from './languageMapping';
+import { ChatPanel } from './chatPanel';
 
 class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
   private content: Uint8Array = new Uint8Array();
@@ -54,34 +56,51 @@ class ChatPreviewFileSystemProvider implements vscode.FileSystemProvider {
 
 export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
-  // 注册右键菜单命令
+  vscode.commands.executeCommand('setContext', 'codeReDesign.supportedSourceFileTypeExt', SOURCE_FILE_EXTENSIONS_WITH_DOT);
+
   const applyCvbCommand = vscode.commands.registerCommand('codeReDesign.applyThisCvb', (cvb: CvbFile) => {
-    // 获取文件路径
     const filePath = cvb.resourceUri?.fsPath || "";
-    // 调用处理函数
     applyThisCvb(filePath);
   });
+  context.subscriptions.push(applyCvbCommand);
 
-  // 注册上传 CVB 命令
-  const uploadCvbCommand = vscode.commands.registerCommand('codeReDesign.uploadThisCvb', async (cvb: CvbFile) => {
+  const redesignCvbCommand = vscode.commands.registerCommand('codeReDesign.redesignThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
-    await uploadThisCvb(filePath);
+    await redesignThisCvb(filePath);
   });
+  context.subscriptions.push(redesignCvbCommand);
 
-  // 注册分析 CVB 命令
   const analyzeCvbCommand = vscode.commands.registerCommand('codeReDesign.analyzeThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
     await analyzeThisCvb(filePath);
   });
+  context.subscriptions.push(analyzeCvbCommand);
 
-  // 注册分析 CVB 命令
-  const compressCvbCommand = vscode.commands.registerCommand('codeReDesign.compressThisCvb', async (cvb: CvbFile) => {
+  const summaryCvbCommand = vscode.commands.registerCommand('codeReDesign.summaryThisCvb', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
-    await compressThisCvb(filePath);
+    await summaryThisCvb(filePath);
   });
+  context.subscriptions.push(summaryCvbCommand);
 
-  // 将命令添加到订阅中
-  context.subscriptions.push(applyCvbCommand, uploadCvbCommand, analyzeCvbCommand);
+  const analyzeSingleFileCommand = vscode.commands.registerCommand('codeReDesign.analyzeSingleFile', async (uri: vscode.Uri) => {
+    const filePath = uri.fsPath || "";
+    const cvbFile = await generateCvb([filePath], "分析单个文件：" + filePath);
+    await analyzeThisCvb(cvbFile);
+  });
+  context.subscriptions.push(analyzeSingleFileCommand);
+
+  const redesignSingleFileCommand = vscode.commands.registerCommand('codeReDesign.redesignSingleFile', async (uri: vscode.Uri) => {
+    const filePath = uri.fsPath || "";
+    const cvbFile = await generateCvb([filePath], "重构单个文件：" + filePath);
+    await redesignThisCvb(cvbFile);
+  });
+  context.subscriptions.push(redesignSingleFileCommand);
+
+  const loadChatHistoryCommand = vscode.commands.registerCommand('codeReDesign.continueChat', async (history: ChatFile) => {
+    const filePath = history.resourceUri?.fsPath || "";
+    ChatPanel.loadFromFile(context, filePath);
+  });
+  context.subscriptions.push(loadChatHistoryCommand);
 
   // 注册 TreeDataProvider
   const cvbViewProvider = new CvbViewProvider();
@@ -117,9 +136,9 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
   const previewUri = vscode.Uri.parse(`${scheme}:/chat-preview.md`);
 
+  // markdown 自定义渲染显示
   context.subscriptions.push(
     vscode.commands.registerCommand('codeReDesign.showFile', async (uri: vscode.Uri) => {
-      // 读取文件内容
       const content = await vscode.workspace.fs.readFile(uri);
       const rawText = Buffer.from(content).toString('utf-8');
       
@@ -302,7 +321,7 @@ function applyThisCvb(filePath: string) {
  * 上传 CVB 文件并调用 API
  * @param filePath .cvb 文件的路径
  */
-async function uploadThisCvb(filePath: string) {
+async function redesignThisCvb(filePath: string) {
 /*
   // 测试 begin
   {
@@ -333,7 +352,7 @@ async function uploadThisCvb(filePath: string) {
     return;
   }
   const outputChannel = getOutputChannel();
-  doUploadCommand(filePath, userPrompt, outputChannel);
+  doRedesignCommand(filePath, userPrompt, outputChannel);
 }
 
 /**
@@ -366,16 +385,16 @@ async function analyzeThisCvb(filePath: string) {
   }
 }
 
-function getCompressedFileName(filePath: string): string {
+function getSummarizedFileName(filePath: string): string {
   const { name, ext } = path.parse(filePath); // 使用 path.parse 获取文件名和扩展名
-  return path.join(path.dirname(filePath), `${name}-compress${ext}`); // 拼接新的完整路径
+  return path.join(path.dirname(filePath), `${name}-summary${ext}`); // 拼接新的完整路径
 }
 
 /**
  * 分析 CVB 文件
  * @param filePath .cvb 文件的路径
  */
-async function compressThisCvb(filePath: string) {
+async function summaryThisCvb(filePath: string) {
   const userRequest = await showInputMultiLineBox({
     prompt: '输入压缩过程中需要关注的需求',
     placeHolder: 'e.g., Analyze the code for potential bugs',
@@ -391,25 +410,23 @@ async function compressThisCvb(filePath: string) {
 
   resetCurrentOperationController();
 
-  const newCvb = await compressCvb(cvb, userRequest);
+  const newCvb = await summaryCvb(cvb, userRequest);
   clearCurrentOperationController();
 
   if (newCvb) {
-    vscode.window.showInformationMessage('compress cvb success!.');
+    vscode.window.showInformationMessage('summary cvb success!.');
   }
   else{
-    vscode.window.showInformationMessage('compress cvb failed!.');
+    vscode.window.showInformationMessage('summary cvb failed!.');
     return;
   }
 
-  if (!newCvb.getMetaData("compressFrom")) {
-    newCvb.setMetaData("compressFrom", filePath);
+  if (!newCvb.getMetaData("summaryFrom")) {
+    newCvb.setMetaData("summaryFrom", filePath);
   }
 
-  filePath = getCompressedFileName(filePath);
+  filePath = getSummarizedFileName(filePath);
 
   fs.writeFileSync(filePath, newCvb.toString(), 'utf-8');
   vscode.window.showInformationMessage(`Conversation log saved as: ${filePath}`);
 }
-
-export function deactivate() {}
