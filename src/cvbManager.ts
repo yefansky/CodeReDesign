@@ -294,19 +294,28 @@ export class TCVB {
     content = content.replace(
       /## OPERATION:GLOBAL-REPLACE\n([\s\S]*?)(?=\n## NEW_CONTENT|\n## OPERATION:|\n## FILE:|\n## END_TCVB|$)/g,
       (match, codeSection) => {
-          // 如果已经有OLD_CONTENT标记，不做处理
-          if (/## OLD_CONTENT/.test(match) || /## OLD_CONTENT/.test(match)) {
+          // 确保我们不会匹配到 NEW_CONTENT 之后的内容
+          const beforeNewContent = codeSection.split('## NEW_CONTENT')[0];
+          const trimmed = beforeNewContent.trim();
+          
+          // 如果只有空白或没有实际内容，转换为CREATE操作
+          if (!trimmed) {
+              // 找到后续的NEW_CONTENT内容
+              const newContentMatch = match.match(/## NEW_CONTENT\n([\s\S]*)/);
+              if (newContentMatch) {
+                  const newContent = newContentMatch[1].trim();
+                  return `## OPERATION:CREATE\n\`\`\`\n${newContent}\n\`\`\``;
+              }
               return match;
           }
           
-          const trimmed = codeSection.trim();
-          // 如果OPERATION和NEW_CONTENT之间有非空内容，视为缺失OLD_CONTENT
-          if (trimmed) {
+          // 如果有内容但缺少OLD_CONTENT标记
+          if (!/## OLD_CONTENT/.test(trimmed)) {
               // 处理代码块包裹
               const hasStart = trimmed.startsWith('```');
               const hasEnd = trimmed.endsWith('```');
               
-              let fixedCode = codeSection.trimEnd();
+              let fixedCode = beforeNewContent.trimEnd();
               
               if (!hasStart && !hasEnd) {
                   fixedCode = `## OLD_CONTENT\n\`\`\`\n${fixedCode}\n\`\`\``;
@@ -318,12 +327,17 @@ export class TCVB {
                   fixedCode = `## OLD_CONTENT\n${fixedCode}`;
               }
               
-              return `## OPERATION:GLOBAL-REPLACE\n${fixedCode}`;
+              // 保留原有的NEW_CONTENT部分
+              const newContentPart = match.includes('## NEW_CONTENT') 
+                  ? match.split('## NEW_CONTENT')[1]
+                  : '';
+              
+              return `## OPERATION:GLOBAL-REPLACE\n${fixedCode}` + 
+                    (newContentPart ? `\n## NEW_CONTENT${newContentPart}` : '');
           }
           return match;
       }
     );
-
     // 规则4/10：修复代码块包裹问题（精确处理需要代码块的操作）
     content = content.replace(
       /(## (?:OLD_CONTENT|NEW_CONTENT|OPERATION:CREATE)\n)([\s\S]*?)(?=\n## |\n## END_TCVB|$)/gis,
