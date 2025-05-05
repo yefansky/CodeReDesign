@@ -290,6 +290,40 @@ export class TCVB {
       }
     );
 
+    // 新增：处理GLOBAL-REPLACE中缺失OLD_CONTENT的情况
+    content = content.replace(
+      /## OPERATION:GLOBAL-REPLACE\n([\s\S]*?)(?=\n## NEW_CONTENT|\n## OPERATION:|\n## FILE:|\n## END_TCVB|$)/g,
+      (match, codeSection) => {
+          // 如果已经有OLD_CONTENT标记，不做处理
+          if (/## OLD_CONTENT/.test(match) || /## OLD_CONTENT/.test(match)) {
+              return match;
+          }
+          
+          const trimmed = codeSection.trim();
+          // 如果OPERATION和NEW_CONTENT之间有非空内容，视为缺失OLD_CONTENT
+          if (trimmed) {
+              // 处理代码块包裹
+              const hasStart = trimmed.startsWith('```');
+              const hasEnd = trimmed.endsWith('```');
+              
+              let fixedCode = codeSection.trimEnd();
+              
+              if (!hasStart && !hasEnd) {
+                  fixedCode = `## OLD_CONTENT\n\`\`\`\n${fixedCode}\n\`\`\``;
+              } else if (hasStart && !hasEnd) {
+                  fixedCode = `## OLD_CONTENT\n${fixedCode}\n\`\`\``;
+              } else if (!hasStart && hasEnd) {
+                  fixedCode = `## OLD_CONTENT\n\`\`\`\n${fixedCode}`;
+              } else {
+                  fixedCode = `## OLD_CONTENT\n${fixedCode}`;
+              }
+              
+              return `## OPERATION:GLOBAL-REPLACE\n${fixedCode}`;
+          }
+          return match;
+      }
+    );
+
     // 规则4/10：修复代码块包裹问题（精确处理需要代码块的操作）
     content = content.replace(
       /(## (?:OLD_CONTENT|NEW_CONTENT|OPERATION:CREATE)\n)([\s\S]*?)(?=\n## |\n## END_TCVB|$)/gis,
@@ -349,7 +383,6 @@ export class TCVB {
 
     return content;
   }
-
   private parse(tcStrContent: string): void {
 
     tcStrContent = normalizeAllLineEndings(tcStrContent);

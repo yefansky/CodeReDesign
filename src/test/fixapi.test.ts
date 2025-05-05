@@ -140,8 +140,39 @@ console.log('test')
   });
 });
 
+// 测试用例3: GLOBAL-REPLACE中缺失OLD_CONTENT但实际有内容
+test('Case6: GLOBAL-REPLACE with implicit OLD_CONTENT', () => {
+    const input = `
+## FILE: d:\\lab\\GPT-SoVITS_yefanFork\\webui.py
+## OPERATION:GLOBAL-REPLACE
+from tools import my_utils
+from tools.i18n.i18n import I18nAuto, scan_language_list
+## NEW_CONTENT
+from tools import my_utils
+from tools.i18n.i18n import I18nAuto, scan_language_list
+from webui_config import grTextBox_autoSave, config_saver`;
+  
+    const expected = `
+## FILE: d:\\lab\\GPT-SoVITS_yefanFork\\webui.py
+## OPERATION:GLOBAL-REPLACE
+## OLD_CONTENT
+\`\`\`
+from tools import my_utils
+from tools.i18n.i18n import I18nAuto, scan_language_list
+\`\`\`
+## NEW_CONTENT
+\`\`\`
+from tools import my_utils
+from tools.i18n.i18n import I18nAuto, scan_language_list
+from webui_config import grTextBox_autoSave, config_saver
+\`\`\`
+## END_TCVB`.trim();
+  
+    assert.strictEqual(TCVB.autoFixTCVBContent(input).trim(), expected);
+  });
+
 // 测试用例5：无效的闭合顺序
-test('Case6: miss markdown', () => {
+test('Case7: miss markdown', () => {
   const input = `
 ## BEGIN_TCVB
 ## FILE:d:/lab/GPT-SoVITS_yefanFork/tools/subfix_webui.py
