@@ -21,11 +21,13 @@
     "onCommand:codeReDesign.redesignThisCvb",
     "onCommand:codeReDesign.analyzeThisCvb",
     "onCommand:codeReDesign.summaryThisCvb",
+    "onCommand:codeReDesign.sendThisToChat",
     "onCommand:codeReDesign.analyzeSingleFile",
     "onCommand:codeReDesign.redesignSingleFile",
     "onCommand:codeReDesign.startChat",
     "onCommand:codeReDesign.continueChat",
-    "onCommand:codeReDesign.packupToCvb"
+    "onCommand:codeReDesign.packupToCvb",
+    "onCommand:codeReDesign.sendToChat"
   ],
   "repository": {
     "type": "git",
@@ -99,6 +101,13 @@
       {
         "command": "codeReDesign.summaryThisCvb",
         "title": "sidebar summary this CVB",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${beaker}"
+      },
+      {
+        "command": "codeReDesign.sendThisToChat",
+        "title": "sidebar send this to Chat",
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${beaker}"
@@ -190,6 +199,11 @@
           "command": "codeReDesign.continueChat",
           "group": "cvb@1",
           "when": "viewItem == chatFile"
+        },
+        {
+          "command": "codeReDesign.sendThisToChat",
+          "group": "cvb@1",
+          "when": "viewItem == cvbFile"
         }
       ],
       "editor/context": [

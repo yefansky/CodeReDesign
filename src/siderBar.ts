@@ -82,6 +82,12 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(summaryCvbCommand);
 
+  const sendToChatommand = vscode.commands.registerCommand('codeReDesign.sendThisToChat', async (cvb: CvbFile) => {
+    const filePath = cvb.resourceUri?.fsPath || "";
+    await sendToChat(filePath);
+  });
+  context.subscriptions.push(sendToChatommand);
+
   const analyzeSingleFileCommand = vscode.commands.registerCommand('codeReDesign.analyzeSingleFile', async (uri: vscode.Uri) => {
     const filePath = uri.fsPath || "";
     const cvbFile = await generateCvb([filePath], "分析单个文件：" + filePath);
@@ -429,4 +435,8 @@ async function summaryThisCvb(filePath: string) {
 
   fs.writeFileSync(filePath, newCvb.toString(), 'utf-8');
   vscode.window.showInformationMessage(`Conversation log saved as: ${filePath}`);
+}
+
+async function sendToChat(filePath: string) {
+  ChatPanel.insertFilePathToInput(filePath);
 }
