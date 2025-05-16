@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.0.210 (2025-05-16)
+
+
+### Features
+
+* 增加右键选中文件打包功能 ([0ba9a2a](https://github.com/yefansky/CodeReDesign/commit/0ba9a2a4e1020c598fe4e5ac70e6ebe055f7dffc))
+
 ### 0.0.209 (2025-05-05)
 
 ### 0.0.208 (2025-05-05)
