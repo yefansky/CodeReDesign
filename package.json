@@ -24,7 +24,8 @@
     "onCommand:codeReDesign.analyzeSingleFile",
     "onCommand:codeReDesign.redesignSingleFile",
     "onCommand:codeReDesign.startChat",
-    "onCommand:codeReDesign.continueChat"
+    "onCommand:codeReDesign.continueChat",
+    "onCommand:codeReDesign.packupToCvb"
   ],
   "repository": {
     "type": "git",
@@ -121,6 +122,13 @@
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${bug}"
+      },
+      {
+        "command": "codeReDesign.packupToCvb",
+        "title": "CodeReDesign: Packup to CVB",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${add}"
       }
     ],
     "viewsContainers": {
@@ -194,6 +202,10 @@
           "command": "codeReDesign.redesignSingleFile",
           "group": "cvb@1",
           "when": "resourceExtname in codeReDesign.supportedSourceFileTypeExt"
+        },
+        {
+          "command": "codeReDesign.packupToCvb",
+          "group": "cvb@1"
         }
       ]
     },

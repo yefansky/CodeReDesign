@@ -11,6 +11,7 @@ import { activateGuide } from './guide';
 import {ChatPanel} from './chatPanel';
 import { isUnderTokenLimit, initTokenizer } from './deepseekTokenizer';
 import * as ragService from './ragService';
+import {collectSupportedFiles} from './languageMapping';
 
 let currentOperationController: AbortController | null = null;
 
@@ -211,6 +212,36 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`CVB file generated at: ${cvbFilePath}`);
     });
 
+    // New command for the context menu
+    let packupToCvbCommand = vscode.commands.registerCommand('codeReDesign.packupToCvb', async (uri: vscode.Uri, selectedUris: vscode.Uri[]) => {
+        // Collect URIs (prioritize selectedUris for multi-selection)
+        const uris: vscode.Uri[] = selectedUris && selectedUris.length > 0 ? selectedUris : uri ? [uri] : [];
+
+        if (uris.length === 0) {
+            vscode.window.showErrorMessage('No files or folders selected.');
+            return;
+        }
+
+        // Collect all supported files (recursively for folders)
+        const filePaths = await collectSupportedFiles(uris);
+
+        const userRequest = await vscode.window.showInputBox({
+            prompt: 'Enter your refactoring request',
+            placeHolder: 'e.g., Move all mouse event handling code to a single file',
+        });
+
+        if (!userRequest) {
+            return;
+        }
+
+        try {
+            const cvbFilePath = generateCvb(filePaths, userRequest);
+            vscode.window.showInformationMessage(`CVB file generated at: ${cvbFilePath}`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to generate CVB file: ${(error as Error).message}`);
+        }
+    });
+
     // 注册命令:上传 CVB 并调用 API
     let redesignCvbCommand = vscode.commands.registerCommand('codeReDesign.redesignCvb', async () => {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -367,7 +398,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, redesignCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, outputChannel, startChatCommand);
+    context.subscriptions.push(generateCvbCommand, redesignCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, startChatCommand, packupToCvbCommand);
 
     setupCvbAsMarkdown(context);
 
