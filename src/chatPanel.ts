@@ -5,6 +5,7 @@ import path from 'path';
 import * as fs from "fs";
 import * as apiTools from './apiTools';
 import { getOutputChannel } from './extension';
+import { processFilePlaceholder } from './metaCommand';
 
 // Webview 输出通道实现
 class WebviewOutputChannel implements vscode.OutputChannel {
@@ -240,6 +241,8 @@ export class ChatPanel {
     }
 
     private async handleSendOrEditMessage(message: any, webviewOutputChannel: WebviewOutputChannel): Promise<void> {
+        message.text = await processFilePlaceholder(message.text);
+
         if (message.command === 'editMessage' && message.index < this.conversation.length) {
             this.conversation.splice(message.index + 1);
             this.panel.webview.postMessage({ command: 'clearAfterIndex', index: message.index });
@@ -468,6 +471,18 @@ export class ChatPanel {
         }
 
         return conversation;
+    }
+
+    public static insertFilePathToInput(filePath: string): void {
+        if (ChatPanel.currentPanel) {
+            const formattedPath = `@file:${filePath}`;
+            ChatPanel.currentPanel.panel.webview.postMessage({
+                command: 'insertFilePath',
+                content: formattedPath
+            });
+        } else {
+            vscode.window.showInformationMessage('No active chat panel. Please open a chat panel first.');
+        }
     }
 
     public dispose(): void {

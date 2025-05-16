@@ -398,7 +398,13 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(generateCvbCommand, redesignCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, startChatCommand, packupToCvbCommand);
+    let sendFileToChatCommand = vscode.commands.registerCommand('codeReDesign.sendToChat', async (uri: vscode.Uri) => {
+            if (uri && uri.scheme === 'file') {
+                ChatPanel.insertFilePathToInput(uri.fsPath);
+            }
+    });
+
+    context.subscriptions.push(generateCvbCommand, redesignCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, startChatCommand, packupToCvbCommand, sendFileToChatCommand);
 
     setupCvbAsMarkdown(context);
 

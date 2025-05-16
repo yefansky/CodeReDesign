@@ -129,6 +129,13 @@
         "when": "false",
         "category": "CodeReDesign",
         "icon": "${add}"
+      },
+      {
+        "command": "codeReDesign.sendToChat",
+        "title": "CodeReDesign: Send to Chat",
+        "when": "false",
+        "category": "CodeReDesign",
+        "icon": "${file}"
       }
     ],
     "viewsContainers": {
@@ -206,6 +213,11 @@
         {
           "command": "codeReDesign.packupToCvb",
           "group": "cvb@1"
+        },
+        {
+          "command": "codeReDesign.sendToChat",
+          "group": "cvb@1",
+          "when": "resourceScheme == file"
         }
       ]
     },

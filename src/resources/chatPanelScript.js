@@ -349,6 +349,11 @@ function setupMessageHandlers() {
                     }
                 });
                 break;
+            case 'insertFilePath':
+                // Insert file path at the beginning of the input
+                input.value = data.content + ' ' + input.value;
+                input.focus();
+                break;
         }
     });
 
