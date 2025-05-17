@@ -163,8 +163,34 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
 // 处理聊天内容的独立函数
 function processChatContent(text: string): string {
+
+  let processedText = text;
+  const fileStyle = `
+    display: inline-block;
+    color: #e1ebe5de; /* 浅绿色文字 */
+    background-color: #119b4aad; /* 半透明蓝色背景 */
+    font-style: italic;
+    margin: 10px 0;
+    padding: 4px 8px;
+    border: 2px solid #1e90ff; /* 蓝色边框 */
+    border-radius: 6px;
+    box-shadow: 
+      3px 3px 6px rgba(0, 0, 0, 0.4), /* 外阴影 */
+      inset 2px 2px 3px rgba(255, 255, 255, 0.3), /* 内亮阴影 */
+      inset -2px -2px 3px rgba(0, 0, 0, 0.2); /* 内暗阴影 */
+  `;
+
+  // 处理 <file_upload> 标签，匹配开始和结束标签
+  processedText = processedText.replace(
+    /<FILE_UPLOAD\s+data-path="([^"]+)"\s*>(.*?)<\/FILE_UPLOAD>/gs,
+    (match, filePath, content) => {
+      // 模拟 file_upload::before，显示 "File: path"，忽略原始内容
+      return `<div style="${fileStyle}" data-path="${filePath}">File: ${filePath}</div>`;
+    }
+  );
+
   // 为用户和 AI 消息添加类标记
-  let processedText = text.replace(/^@user:\n/gm, '# 🙋‍♂️ User:\n> ');
+  processedText = processedText.replace(/^@user:\n/gm, '# 🙋‍♂️ User:\n> ');
   processedText = processedText.replace(/^@AI:\n/gm, '# 🧠 AI:\n> ');
 
   // 处理其他标记
