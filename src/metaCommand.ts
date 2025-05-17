@@ -20,12 +20,12 @@ export async function processFilePlaceholder(messageText: string): Promise<strin
         // Replace placeholder with formatted content
         return messageText.replace(
             filePlaceholderRegex,
-            `@file:${filePath}\n---------------\n${content}\n---------------\n`
+            `<FILE_UPLOAD data-path="${filePath}"><content>\n${content}\n</content></FILE_UPLOAD>`
         );
     } catch (error) {
         return messageText.replace(
             filePlaceholderRegex,
-            `@file:${filePath}\n---------------\n**Error reading file**: ${(error as Error).message}\n---------------\n`
+            `<FILE_UPLOAD data-path="${filePath}">\n**Error reading file**: ${(error as Error).message}\n</FILE_UPLOAD>`
         );
     }
 }
