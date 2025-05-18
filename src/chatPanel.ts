@@ -473,15 +473,17 @@ export class ChatPanel {
         return conversation;
     }
 
-    public static insertFilePathToInput(filePath: string): void {
+    public static insertFilePathToInput(context: vscode.ExtensionContext, filePath: string): void {
+        if (!ChatPanel.currentPanel) {
+            ChatPanel.createOrShow(context);
+        }
+
         if (ChatPanel.currentPanel) {
             const formattedPath = `@file:${filePath}`;
             ChatPanel.currentPanel.panel.webview.postMessage({
                 command: 'insertFilePath',
                 content: formattedPath
             });
-        } else {
-            vscode.window.showInformationMessage('No active chat panel. Please open a chat panel first.');
         }
     }
 

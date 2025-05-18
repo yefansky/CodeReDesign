@@ -400,7 +400,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     let sendFileToChatCommand = vscode.commands.registerCommand('codeReDesign.sendToChat', async (uri: vscode.Uri) => {
             if (uri && uri.scheme === 'file') {
-                ChatPanel.insertFilePathToInput(uri.fsPath);
+                ChatPanel.insertFilePathToInput(context, uri.fsPath);
             }
     });
 

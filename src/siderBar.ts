@@ -84,7 +84,7 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
 
   const sendToChatommand = vscode.commands.registerCommand('codeReDesign.sendThisToChat', async (cvb: CvbFile) => {
     const filePath = cvb.resourceUri?.fsPath || "";
-    await sendToChat(filePath);
+    await sendToChat(context, filePath);
   });
   context.subscriptions.push(sendToChatommand);
 
@@ -463,6 +463,6 @@ async function summaryThisCvb(filePath: string) {
   vscode.window.showInformationMessage(`Conversation log saved as: ${filePath}`);
 }
 
-async function sendToChat(filePath: string) {
-  ChatPanel.insertFilePathToInput(filePath);
+async function sendToChat(context: vscode.ExtensionContext, filePath: string) {
+  ChatPanel.insertFilePathToInput(context, filePath);
 }
