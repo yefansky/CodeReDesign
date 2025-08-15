@@ -398,10 +398,12 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    let sendFileToChatCommand = vscode.commands.registerCommand('codeReDesign.sendToChat', async (uri: vscode.Uri) => {
-            if (uri && uri.scheme === 'file') {
-                ChatPanel.insertFilePathToInput(context, uri.fsPath);
+    let sendFileToChatCommand = vscode.commands.registerCommand('codeReDesign.sendToChat', async (uri: vscode.Uri, alluri: vscode.Uri[]) => {
+        for (const singleUri of alluri) {
+            if (singleUri && singleUri.scheme === 'file') {
+                ChatPanel.insertFilePathToInput(context, singleUri.fsPath);
             }
+        }
     });
 
     context.subscriptions.push(generateCvbCommand, redesignCvbCommand, applyCvbCommand, stopOperation, analyzeCodeCommand, startChatCommand, packupToCvbCommand, sendFileToChatCommand);

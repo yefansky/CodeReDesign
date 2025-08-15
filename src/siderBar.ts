@@ -82,11 +82,15 @@ export function registerCvbContextMenu(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(summaryCvbCommand);
 
-  const sendToChatommand = vscode.commands.registerCommand('codeReDesign.sendThisToChat', async (cvb: CvbFile) => {
-    const filePath = cvb.resourceUri?.fsPath || "";
-    await sendToChat(context, filePath);
+  const sendToChatCommand = vscode.commands.registerCommand('codeReDesign.sendThisToChat', async (cvb: CvbFile, cvbs: CvbFile[]) => {
+      for (const item of cvbs) {
+          const filePath = item.resourceUri?.fsPath || "";
+          if (filePath) {
+              await sendToChat(context, filePath);
+          }
+      }
   });
-  context.subscriptions.push(sendToChatommand);
+  context.subscriptions.push(sendToChatCommand);
 
   const analyzeSingleFileCommand = vscode.commands.registerCommand('codeReDesign.analyzeSingleFile', async (uri: vscode.Uri) => {
     const filePath = uri.fsPath || "";
