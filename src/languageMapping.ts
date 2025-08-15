@@ -26,7 +26,8 @@ export const g_objLanguageMapping: { [key: string]: string } = {
   'dart': 'dart',        // Dart
   'md': 'markdown',       // markdown
   'json':'json',
-  'txt': 'text'
+  'txt': 'text',
+  'yml':'yaml'
 };
 
 /**
