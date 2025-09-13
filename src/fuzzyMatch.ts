@@ -1,4 +1,4 @@
-// ================ ÀàĞÍ¶¨Òå ================
+// ================ ç±»å‹å®šä¹‰ ================
 interface MatchPosition {
     start: number;
     end: number;
@@ -9,7 +9,7 @@ interface NormalizedContent {
     mapping: number[];
 }
 
-// ================ ºËĞÄÊµÏÖ ================
+// ================ æ ¸å¿ƒå®ç° ================
 const MAX_EDIT_DISTANCE = 5;
 const SEGMENT_COUNT = MAX_EDIT_DISTANCE + 1;
 
@@ -18,42 +18,42 @@ export function applyFuzzyGlobalReplace(
     strOldContent: string,
     strNewContent: string
 ): string {
-    // µÚ¶ş½×¶Î£ºÄ£ºıÆ¥ÅäÁ÷³Ì
+    // ç¬¬äºŒé˜¶æ®µï¼šæ¨¡ç³ŠåŒ¹é…æµç¨‹
     const { content: normContent, mapping } = normalizeContent(strContent);
     const pattern = normalizePattern(strOldContent);
 
-    // ·ÖÆ¬²éÕÒºòÑ¡Î»ÖÃ
+    // åˆ†ç‰‡æŸ¥æ‰¾å€™é€‰ä½ç½®
     const candidates = findCandidatePositions(normContent, pattern);
 
-    // ÑéÖ¤²¢»ñÈ¡ÓĞĞ§Æ¥Åä
+    // éªŒè¯å¹¶è·å–æœ‰æ•ˆåŒ¹é…
     const matches = verifyMatches(normContent, pattern, candidates, mapping);
 
     if (matches.length === 0) {
-        throw new Error(`GLOBAL-REPLACEÊ§°Ü£ºÎ´ÕÒµ½ÔÊĞí${MAX_EDIT_DISTANCE}¸ö×Ö·û²îÒìµÄÆ¥Åä`);
+        throw new Error(`GLOBAL-REPLACEå¤±è´¥ï¼šæœªæ‰¾åˆ°å…è®¸${MAX_EDIT_DISTANCE}ä¸ªå­—ç¬¦å·®å¼‚çš„åŒ¹é…`);
     }
 
-    // Ó¦ÓÃÌæ»»
+    // åº”ç”¨æ›¿æ¢
     return applyReplacements(strContent, matches, strNewContent);
 }
 
-// ================ Ëã·¨ºËĞÄÄ£¿é ================
+// ================ ç®—æ³•æ ¸å¿ƒæ¨¡å— ================
 export function normalizeContent(original: string): { content: string; mapping: number[] } {
-    // µÚÒ»²½£ºÈ¥³ı×¢ÊÍ
+    // ç¬¬ä¸€æ­¥ï¼šå»é™¤æ³¨é‡Š
     const { content: noComments, mapping: mapping1 } = removeComments(original);
 
-    // µÚ¶ş²½£ºÈ¥³ı·ûºÅÇ°ºóµÄ¿Õ¸ñ
+    // ç¬¬äºŒæ­¥ï¼šå»é™¤ç¬¦å·å‰åçš„ç©ºæ ¼
     const { content: noSymbolSpaces, mapping: mapping2 } = removeSymbolSpaces(noComments);
 
-    // µÚÈı²½£º½«»»ĞĞ·û¸ÄÎª¿Õ¸ñ£¬²¢ºÏ²¢Á¬ĞøµÄ¿Õ¸ñ
+    // ç¬¬ä¸‰æ­¥ï¼šå°†æ¢è¡Œç¬¦æ”¹ä¸ºç©ºæ ¼ï¼Œå¹¶åˆå¹¶è¿ç»­çš„ç©ºæ ¼
     const { content: finalContent, mapping: mapping3 } = normalizeWhitespace(noSymbolSpaces);
 
-    // ºÏ²¢ mapping
+    // åˆå¹¶ mapping
     const finalMapping = mapping3.map(idx => mapping2[idx]).map(idx => mapping1[idx]);
 
     return { content: finalContent, mapping: finalMapping };
 }
 
-// ¸¨Öúº¯Êı1£ºÈ¥³ı×¢ÊÍ£¬²¢È·±£ mapping Êı×éÑÏ¸ñ¶ÔÓ¦Ã¿¸öÊä³ö×Ö·û£¨°üÀ¨»»ĞĞ·û£©
+// è¾…åŠ©å‡½æ•°1ï¼šå»é™¤æ³¨é‡Šï¼Œå¹¶ç¡®ä¿ mapping æ•°ç»„ä¸¥æ ¼å¯¹åº”æ¯ä¸ªè¾“å‡ºå­—ç¬¦ï¼ˆåŒ…æ‹¬æ¢è¡Œç¬¦ï¼‰
 export function removeComments(original: string): { content: string; mapping: number[] } {
     const astrLines: string[] = original.split('\n');
     let strContent: string = "";
@@ -65,27 +65,27 @@ export function removeComments(original: string): { content: string; mapping: nu
         const nCommentIndex: number = strLine.indexOf('//');
         const strCleanLine: string = nCommentIndex !== -1 ? strLine.slice(0, nCommentIndex) : strLine;
         
-        // Ìí¼ÓÇåÀíºóµÄĞĞÄÚÈİ£¬²¢¼ÇÂ¼Ó³Éä
+        // æ·»åŠ æ¸…ç†åçš„è¡Œå†…å®¹ï¼Œå¹¶è®°å½•æ˜ å°„
         strContent += strCleanLine;
         for (let nI: number = 0; nI < strCleanLine.length; nI++) {
             arrMapping.push(nCurrentPos + nI);
         }
 
-        // Ö»ÓĞÔÚ²»ÊÇ×îºóÒ»ĞĞÊ±Ìí¼Ó»»ĞĞ·û
+        // åªæœ‰åœ¨ä¸æ˜¯æœ€åä¸€è¡Œæ—¶æ·»åŠ æ¢è¡Œç¬¦
         if (i < astrLines.length - 1) {
             strContent += "\n";
             arrMapping.push(nCurrentPos + strLine.length);
-            nCurrentPos += strLine.length + 1; // +1 ±íÊ¾»»ĞĞ·û
+            nCurrentPos += strLine.length + 1; // +1 è¡¨ç¤ºæ¢è¡Œç¬¦
         } else {
-            nCurrentPos += strLine.length; // ×îºóÒ»ĞĞÃ»ÓĞ»»ĞĞ·û
+            nCurrentPos += strLine.length; // æœ€åä¸€è¡Œæ²¡æœ‰æ¢è¡Œç¬¦
         }
     }
     return { content: strContent, mapping: arrMapping };
 }
 
-// ¸¨Öúº¯Êı2£ºÈ¥³ı·ûºÅÇ°ºóµÄ¿Õ¸ñ
+// è¾…åŠ©å‡½æ•°2ï¼šå»é™¤ç¬¦å·å‰åçš„ç©ºæ ¼
 export function removeSymbolSpaces(strContentIn: string): { content: string; mapping: number[] } {
-    // ¸üĞÂÕıÔò±í´ïÊ½£¬Æ¥Åä³£¼û·ûºÅ
+    // æ›´æ–°æ­£åˆ™è¡¨è¾¾å¼ï¼ŒåŒ¹é…å¸¸è§ç¬¦å·
     const regSymbols: RegExp = /[+\-/*()\[\]{};=,'"`!&|]/;
     let strNewContent: string = "";
     const arrMapping: number[] = [];
@@ -94,35 +94,35 @@ export function removeSymbolSpaces(strContentIn: string): { content: string; map
     for (let nI: number = 0; nI < nLen; nI++) {
         const strCurrentChar: string = strContentIn[nI];
         
-        // Ê¹ÓÃÕıÔò±í´ïÊ½Æ¥ÅäËùÓĞ¿Õ°××Ö·û£¨¿Õ¸ñ¡¢ÖÆ±í·û¡¢»»ĞĞ·ûµÈ£©
+        // ä½¿ç”¨æ­£åˆ™è¡¨è¾¾å¼åŒ¹é…æ‰€æœ‰ç©ºç™½å­—ç¬¦ï¼ˆç©ºæ ¼ã€åˆ¶è¡¨ç¬¦ã€æ¢è¡Œç¬¦ç­‰ï¼‰
         if (/\s/.test(strCurrentChar) && strCurrentChar !== '\n') {
-            // ²éÕÒÏò×óµÚÒ»¸ö·Ç¿Õ°××Ö·û
+            // æŸ¥æ‰¾å‘å·¦ç¬¬ä¸€ä¸ªéç©ºç™½å­—ç¬¦
             let nPrev: number = nI - 1;
             while (nPrev >= 0 && /\s/.test(strContentIn[nPrev])) {
                 nPrev--;
             }
-            // ²éÕÒÏòÓÒµÚÒ»¸ö·Ç¿Õ°××Ö·û
+            // æŸ¥æ‰¾å‘å³ç¬¬ä¸€ä¸ªéç©ºç™½å­—ç¬¦
             let nNext: number = nI + 1;
             while (nNext < nLen && /\s/.test(strContentIn[nNext])) {
                 nNext++;
             }
             
             let bSkipSpace: boolean = false;
-            // Èç¹ûÇ°Ò»¸ö×Ö·ûÊÇ·ûºÅ£¬Ìø¹ıµ±Ç°¿Õ°××Ö·û
+            // å¦‚æœå‰ä¸€ä¸ªå­—ç¬¦æ˜¯ç¬¦å·ï¼Œè·³è¿‡å½“å‰ç©ºç™½å­—ç¬¦
             if (nPrev >= 0 && regSymbols.test(strContentIn[nPrev])) {
                 bSkipSpace = true;
             }
-            // Èç¹ûºóÒ»¸ö×Ö·ûÊÇ·ûºÅ£¬Ìø¹ıµ±Ç°¿Õ°××Ö·û
+            // å¦‚æœåä¸€ä¸ªå­—ç¬¦æ˜¯ç¬¦å·ï¼Œè·³è¿‡å½“å‰ç©ºç™½å­—ç¬¦
             if (nNext < nLen && regSymbols.test(strContentIn[nNext])) {
                 bSkipSpace = true;
             }
             
             if (bSkipSpace) {
-                continue; // Ìø¹ı·ûºÅ¸½½üµÄ¿Õ°××Ö·û
+                continue; // è·³è¿‡ç¬¦å·é™„è¿‘çš„ç©ºç™½å­—ç¬¦
             }
         }
         
-        // ±£Áô·Ç¿Õ°××Ö·û»òÎ´Ìø¹ıµÄ¿Õ°××Ö·û
+        // ä¿ç•™éç©ºç™½å­—ç¬¦æˆ–æœªè·³è¿‡çš„ç©ºç™½å­—ç¬¦
         strNewContent += strCurrentChar;
         arrMapping.push(nI);
     }
@@ -130,13 +130,13 @@ export function removeSymbolSpaces(strContentIn: string): { content: string; map
     return { content: strNewContent, mapping: arrMapping };
 }
 
-// ¸¨Öúº¯Êı3£º½«»»ĞĞ·û¸ÄÎª¿Õ¸ñ£¬²¢ºÏ²¢Á¬ĞøµÄ¿Õ¸ñ
+// è¾…åŠ©å‡½æ•°3ï¼šå°†æ¢è¡Œç¬¦æ”¹ä¸ºç©ºæ ¼ï¼Œå¹¶åˆå¹¶è¿ç»­çš„ç©ºæ ¼
 export function normalizeWhitespace(content: string): { content: string; mapping: number[] }
 {
     let strNewContent: string = "";
     let arrMapping: number[] = [];
-    let bAtLineStart: boolean = true;          // ±ê¼Çµ±Ç°ÊÇ·ñ´¦ÓÚĞĞÊ×
-    let nPendingSpaceIndex: number | null = null; // ´ıÌí¼Ó¿Õ¸ñµÄÔ­Ê¼Ë÷Òı
+    let bAtLineStart: boolean = true;          // æ ‡è®°å½“å‰æ˜¯å¦å¤„äºè¡Œé¦–
+    let nPendingSpaceIndex: number | null = null; // å¾…æ·»åŠ ç©ºæ ¼çš„åŸå§‹ç´¢å¼•
 
     for (let nIdx = 0; nIdx < content.length; nIdx++)
     {
@@ -144,9 +144,9 @@ export function normalizeWhitespace(content: string): { content: string; mapping
 
         if (chChar === '\n')
         {
-            // Óöµ½»»ĞĞ·ûÊ±£¬¶ªÆú´ıÌí¼ÓµÄ¿Õ¸ñ£¨±ÜÃâĞĞÎ²¿Õ¸ñ£©
+            // é‡åˆ°æ¢è¡Œç¬¦æ—¶ï¼Œä¸¢å¼ƒå¾…æ·»åŠ çš„ç©ºæ ¼ï¼ˆé¿å…è¡Œå°¾ç©ºæ ¼ï¼‰
             nPendingSpaceIndex = null;
-            // Èç¹ûÊä³öÎª¿Õ»òÉÏÒ»¸ö×Ö·û²»ÊÇ»»ĞĞ·û£¬ÔòÌí¼Ó»»ĞĞ·û
+            // å¦‚æœè¾“å‡ºä¸ºç©ºæˆ–ä¸Šä¸€ä¸ªå­—ç¬¦ä¸æ˜¯æ¢è¡Œç¬¦ï¼Œåˆ™æ·»åŠ æ¢è¡Œç¬¦
             if (strNewContent.length === 0 || strNewContent[strNewContent.length - 1] !== '\n')
             {
                 strNewContent += '\n';
@@ -156,7 +156,7 @@ export function normalizeWhitespace(content: string): { content: string; mapping
         }
         else if (/\s/.test(chChar))
         {
-            // Óöµ½·Ç»»ĞĞ¿Õ°××Ö·û£ºÈç¹ûÔÚĞĞÊ×£¬ÔòºöÂÔ£»·ñÔò£¬¼ÇÂ¼µÚÒ»¸ö¿Õ°××Ö·ûË÷Òı
+            // é‡åˆ°éæ¢è¡Œç©ºç™½å­—ç¬¦ï¼šå¦‚æœåœ¨è¡Œé¦–ï¼Œåˆ™å¿½ç•¥ï¼›å¦åˆ™ï¼Œè®°å½•ç¬¬ä¸€ä¸ªç©ºç™½å­—ç¬¦ç´¢å¼•
             if (!bAtLineStart)
             {
                 if (nPendingSpaceIndex === null)
@@ -167,7 +167,7 @@ export function normalizeWhitespace(content: string): { content: string; mapping
         }
         else
         {
-            // Óöµ½·Ç¿Õ°××Ö·ûÊ±£¬Èç¹ûÓĞ´ıÌí¼ÓµÄ¿Õ¸ñÔòÏÈÊä³öÒ»¸ö¿Õ¸ñ
+            // é‡åˆ°éç©ºç™½å­—ç¬¦æ—¶ï¼Œå¦‚æœæœ‰å¾…æ·»åŠ çš„ç©ºæ ¼åˆ™å…ˆè¾“å‡ºä¸€ä¸ªç©ºæ ¼
             if (nPendingSpaceIndex !== null)
             {
                 strNewContent += ' ';
@@ -235,13 +235,13 @@ export function verifyMatches(
         }
     });
     
-    // Èç¹ûÕÒµ½ÁË×î¼ÑºòÑ¡£¬ÔòÓÃÌ°ĞÄ·½Ê½À©Õ¹Æ¥Åä·¶Î§
+    // å¦‚æœæ‰¾åˆ°äº†æœ€ä½³å€™é€‰ï¼Œåˆ™ç”¨è´ªå¿ƒæ–¹å¼æ‰©å±•åŒ¹é…èŒƒå›´
     if (bestMatch && bestCandidate !== -1)
     {
         let candidateIdx: number = bestCandidate;
         let patternIdx: number = 0;
         let startIndex: number = -1;
-        // ´Ó×î¼ÑºòÑ¡Æğµã¿ªÊ¼£¬Ì°ĞÄÉ¨ÃèºòÑ¡ÇøÓò£¬Óöµ½Æ¥ÅäµÄ×Ö·ûÔòÍ¬²½ÍÆ½øÄ£Ê½´®ÏÂ±ê
+        // ä»æœ€ä½³å€™é€‰èµ·ç‚¹å¼€å§‹ï¼Œè´ªå¿ƒæ‰«æå€™é€‰åŒºåŸŸï¼Œé‡åˆ°åŒ¹é…çš„å­—ç¬¦åˆ™åŒæ­¥æ¨è¿›æ¨¡å¼ä¸²ä¸‹æ ‡
         while (candidateIdx < content.length && patternIdx < pattern.length)
         {
             if (content.charAt(candidateIdx) === pattern.charAt(patternIdx))
@@ -256,7 +256,7 @@ export function verifyMatches(
         }
 
         let tmpMatch : MatchPosition = bestMatch;
-        // nCandidateIdx ×÷Îª×îÖÕÆ¥Åä½áÊøÎ»ÖÃ£¨×¢ÒâÕâÀïÊÇ×îºóÒ»´ÎÆ¥Åäºó¼Ó1µÄÎ»ÖÃ£©
+        // nCandidateIdx ä½œä¸ºæœ€ç»ˆåŒ¹é…ç»“æŸä½ç½®ï¼ˆæ³¨æ„è¿™é‡Œæ˜¯æœ€åä¸€æ¬¡åŒ¹é…ååŠ 1çš„ä½ç½®ï¼‰
         tmpMatch.start = mapping[startIndex];
         tmpMatch.end = mapping[Math.min(candidateIdx, content.length - 1)];
         bestMatch = tmpMatch;
@@ -265,7 +265,7 @@ export function verifyMatches(
     return bestMatch ? [bestMatch] : [];
 }
 
-// ================ ¹¤¾ßº¯Êı ================
+// ================ å·¥å…·å‡½æ•° ================
 function splitPatternWithStart(pattern: string, count: number): { segment: string, start: number }[] {
     const segments: { segment: string, start: number }[] = [];
     const minSegmentLength = 3;
@@ -289,7 +289,7 @@ function calculateEditDistance(a: string, b: string, maxDistance: number): numbe
         return Infinity;
     }
 
-    // Ê¹ÓÃ¹ö¶¯Êı×éÓÅ»¯
+    // ä½¿ç”¨æ»šåŠ¨æ•°ç»„ä¼˜åŒ–
     let prevRow = Array(b.length + 1).fill(0).map((_, i) => i);
     let currentRow = new Array(b.length + 1);
 

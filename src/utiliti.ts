@@ -8,17 +8,17 @@ export function activate(context: ExtensionContext) {
 }
 
 /**
- * ¶ÁÈ¡ÎÄ¼ş²¢¸ù¾İÆä±àÂë£¨GBK¡¢UTF-8 »ò´ø BOM µÄ UTF-8£©×ª»»Îª UTF-8 ×Ö·û´®
- * @param filePath ÎÄ¼şÂ·¾¶
- * @returns ×ª»»ºóµÄ UTF-8 ×Ö·û´®
- * @throws Èç¹ûÎŞ·¨¶ÁÈ¡ÎÄ¼ş»ò½âÂëÊ§°Ü£¬Å×³ö´íÎó
+ * è¯»å–æ–‡ä»¶å¹¶æ ¹æ®å…¶ç¼–ç ï¼ˆGBKã€UTF-8 æˆ–å¸¦ BOM çš„ UTF-8ï¼‰è½¬æ¢ä¸º UTF-8 å­—ç¬¦ä¸²
+ * @param filePath æ–‡ä»¶è·¯å¾„
+ * @returns è½¬æ¢åçš„ UTF-8 å­—ç¬¦ä¸²
+ * @throws å¦‚æœæ— æ³•è¯»å–æ–‡ä»¶æˆ–è§£ç å¤±è´¥ï¼ŒæŠ›å‡ºé”™è¯¯
  */
 export async function readFileAsUtf8(filePath: string): Promise<string> {
     try {
-        // ¶ÁÈ¡ÎÄ¼şµÄÔ­Ê¼ Buffer
+        // è¯»å–æ–‡ä»¶çš„åŸå§‹ Buffer
         const buffer = await fs.readFile(filePath);
 
-        // ¼ì²âÊÇ·ñÎª´ø BOM µÄ UTF-8
+        // æ£€æµ‹æ˜¯å¦ä¸ºå¸¦ BOM çš„ UTF-8
         const isUtf8WithBom =
             buffer.length >= 3 &&
             buffer[0] === 0xEF &&
@@ -26,23 +26,23 @@ export async function readFileAsUtf8(filePath: string): Promise<string> {
             buffer[2] === 0xBF;
 
         if (isUtf8WithBom) {
-            // ÒÆ³ı BOM ²¢×÷Îª UTF-8 ½âÂë
+            // ç§»é™¤ BOM å¹¶ä½œä¸º UTF-8 è§£ç 
             return buffer.slice(3).toString('utf8');
         }
 
-        // ³¢ÊÔ×÷Îª UTF-8 ½âÂë
+        // å°è¯•ä½œä¸º UTF-8 è§£ç 
         try {
-            // ÏÈÑéÖ¤ÊÇ·ñÊÇÓĞĞ§µÄ UTF-8
+            // å…ˆéªŒè¯æ˜¯å¦æ˜¯æœ‰æ•ˆçš„ UTF-8
             const utf8Text = buffer.toString('utf8');
-            // ¼òµ¥µÄ UTF-8 ÓĞĞ§ĞÔ¼ì²é£ºÖØĞÂ±àÂëºó±È½Ï
+            // ç®€å•çš„ UTF-8 æœ‰æ•ˆæ€§æ£€æŸ¥ï¼šé‡æ–°ç¼–ç åæ¯”è¾ƒ
             if (Buffer.from(utf8Text, 'utf8').equals(buffer)) {
                 return utf8Text;
             }
         } catch (utf8Error) {
-            // Èç¹û UTF-8 ½âÂëÊ§°Ü£¬¼ÌĞø³¢ÊÔ GBK
+            // å¦‚æœ UTF-8 è§£ç å¤±è´¥ï¼Œç»§ç»­å°è¯• GBK
         }
 
-        // ³¢ÊÔ×÷Îª GBK ½âÂë
+        // å°è¯•ä½œä¸º GBK è§£ç 
         try {
             const gbkText = iconv.decode(buffer, 'gbk');
             return gbkText;
